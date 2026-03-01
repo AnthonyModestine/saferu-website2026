@@ -1,0 +1,35 @@
+import { NextResponse } from "next/server"
+import { getFreeMemberByEmail } from "@/lib/members-store"
+import { createResetToken } from "@/lib/password-reset-tokens"
+import { sendPasswordResetEmail } from "@/lib/send-reset-email"
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json()
+    const email = typeof body.email === "string" ? body.email.trim() : ""
+    if (!email) {
+      return NextResponse.json({ error: "Email is required" }, { status: 400 })
+    }
+
+    const member = await getFreeMemberByEmail(email)
+    if (!member) {
+      return NextResponse.json({ ok: true, message: "If an account exists for this email, you will receive a reset link." })
+    }
+
+    const token = await createResetToken(email)
+    const origin = new URL(request.url).origin
+    const resetLink = `${origin}/reset-password?token=${encodeURIComponent(token)}`
+
+    const sent = await sendPasswordResetEmail(email, resetLink)
+    if (!sent.ok) {
+      return NextResponse.json(
+        { error: sent.error ?? "Failed to send reset email. Please try again or contact support." },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({ ok: true, message: "If an account exists for this email, you will receive a reset link." })
+  } catch {
+    return NextResponse.json({ error: "Something went wrong" }, { status: 500 })
+  }
+}

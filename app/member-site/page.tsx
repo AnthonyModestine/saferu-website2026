@@ -1,0 +1,283 @@
+"use client"
+
+import React from "react"
+
+import { useState } from "react"
+import Link from "next/link"
+import { Header } from "@/components/header"
+import { Footer } from "@/components/footer"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Shield, CheckCircle, ArrowRight } from "lucide-react"
+
+export default function MemberSitePage() {
+  const [signUpSuccess, setSignUpSuccess] = useState(false)
+  const [signUpError, setSignUpError] = useState<string | null>(null)
+  const [signUpLoading, setSignUpLoading] = useState(false)
+  const [signInError, setSignInError] = useState<string | null>(null)
+  const [signInLoading, setSignInLoading] = useState(false)
+
+  const handleSignIn = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setSignInError(null)
+    const form = e.currentTarget
+    const email = (form.querySelector("#signinEmail") as HTMLInputElement)?.value?.trim()
+    const password = (form.querySelector("#signinPassword") as HTMLInputElement)?.value ?? ""
+    if (!email || !password) return
+    setSignInLoading(true)
+    try {
+      const res = await fetch("/api/members/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setSignInError(data.error ?? "Invalid email or password")
+        return
+      }
+      window.location.href = "/"
+    } catch {
+      setSignInError("Something went wrong. Please try again.")
+    } finally {
+      setSignInLoading(false)
+    }
+  }
+
+  const handleSignUp = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setSignUpError(null)
+    const form = e.currentTarget
+    const email = (form.querySelector("#signupEmail") as HTMLInputElement)?.value?.trim()
+    const firstName = (form.querySelector("#firstName") as HTMLInputElement)?.value?.trim()
+    const lastName = (form.querySelector("#lastName") as HTMLInputElement)?.value?.trim()
+    const agency = (form.querySelector("#agency") as HTMLInputElement)?.value?.trim()
+    const password = (form.querySelector("#signupPassword") as HTMLInputElement)?.value ?? ""
+    if (!email) {
+      setSignUpError("Email is required")
+      return
+    }
+    if (password.length < 8) {
+      setSignUpError("Password must be at least 8 characters")
+      return
+    }
+    setSignUpLoading(true)
+    try {
+      const res = await fetch("/api/members/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          firstName: (form.querySelector("#firstName") as HTMLInputElement)?.value?.trim() ?? "",
+          lastName: (form.querySelector("#lastName") as HTMLInputElement)?.value?.trim() ?? "",
+          agency,
+          password,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setSignUpError(data.error || "Sign up failed")
+        return
+      }
+      const loginRes = await fetch("/api/members/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      })
+      if (loginRes.ok) {
+        window.location.href = "/"
+        return
+      }
+      setSignUpSuccess(true)
+    } catch {
+      setSignUpError("Something went wrong. Please try again.")
+    } finally {
+      setSignUpLoading(false)
+    }
+  }
+
+  return (
+    <div className="flex min-h-screen flex-col">
+      <Header />
+      <main className="flex-1">
+        <section className="py-20">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
+              {/* Left Column - Benefits */}
+              <div>
+                <div className="flex items-center gap-3">
+                  <Shield className="h-10 w-10 text-primary" />
+                  <span className="text-2xl font-bold text-foreground">SaferU</span>
+                </div>
+                <h1 className="mt-6 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+                  Join SaferU for Free
+                </h1>
+                <p className="mt-4 text-lg text-muted-foreground">
+                  Get access to our complete library of ready-to-share safety
+                  content for your agency.
+                </p>
+
+                <ul className="mt-8 space-y-4">
+                  {[
+                    "Access to all content categories",
+                    "Copy captions with one click",
+                    "Download high-quality graphics",
+                    "Save favorites for quick access",
+                    "New content added regularly",
+                    "100% free for public safety agencies",
+                  ].map((benefit) => (
+                    <li key={benefit} className="flex items-center gap-3">
+                      <CheckCircle className="h-5 w-5 text-primary" />
+                      <span className="text-foreground">{benefit}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Right Column - Form */}
+              <div>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Get Started</CardTitle>
+                    <CardDescription>
+                      Create your free account or sign in to access content.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {signUpSuccess ? (
+                      <div className="flex flex-col items-center justify-center py-8 text-center">
+                        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+                          <CheckCircle className="h-8 w-8 text-primary" />
+                        </div>
+                        <h3 className="mt-4 text-xl font-semibold text-foreground">
+                          Welcome to SaferU!
+                        </h3>
+                        <p className="mt-2 text-muted-foreground">
+                          Your account has been created. Start browsing our
+                          content library.
+                        </p>
+                        <Button asChild className="mt-6">
+                          <Link href="/">
+                            Go to SaferU
+                            <ArrowRight className="ml-2 h-4 w-4" />
+                          </Link>
+                        </Button>
+                      </div>
+                    ) : (
+                      <Tabs defaultValue="signup" className="w-full">
+                        <TabsList className="grid w-full grid-cols-2">
+                          <TabsTrigger value="signup">Sign Up</TabsTrigger>
+                          <TabsTrigger value="signin">Sign In</TabsTrigger>
+                        </TabsList>
+
+                        <TabsContent value="signup" className="mt-6">
+                          <form onSubmit={handleSignUp} className="space-y-4">
+                            {signUpError && (
+                              <p className="rounded-lg bg-red-50 p-2 text-sm text-red-800">{signUpError}</p>
+                            )}
+                            <div className="grid gap-4 sm:grid-cols-2">
+                              <div className="space-y-2">
+                                <Label htmlFor="firstName">First Name</Label>
+                                <Input
+                                  id="firstName"
+                                  placeholder="John"
+                                  required
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="lastName">Last Name</Label>
+                                <Input
+                                  id="lastName"
+                                  placeholder="Smith"
+                                  required
+                                />
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="signupEmail">Work Email</Label>
+                              <Input
+                                id="signupEmail"
+                                type="email"
+                                placeholder="you@agency.gov"
+                                required
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="agency">Agency Name</Label>
+                              <Input
+                                id="agency"
+                                placeholder="Metro Police Department"
+                                required
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="signupPassword">Password</Label>
+                              <Input
+                                id="signupPassword"
+                                type="password"
+                                placeholder="Create a password"
+                                required
+                              />
+                            </div>
+                            <Button type="submit" className="w-full" disabled={signUpLoading}>
+                              {signUpLoading ? "Creating…" : "Create Free Account"}
+                            </Button>
+                            <p className="text-center text-xs text-muted-foreground">
+                              By signing up, you agree to our Terms of Service
+                              and Privacy Policy.
+                            </p>
+                          </form>
+                        </TabsContent>
+
+                        <TabsContent value="signin" className="mt-6">
+                          <form onSubmit={handleSignIn} className="space-y-4">
+                            {signInError && (
+                              <p className="rounded-lg bg-red-50 p-2 text-sm text-red-800">{signInError}</p>
+                            )}
+                            <div className="space-y-2">
+                              <Label htmlFor="signinEmail">Email</Label>
+                              <Input
+                                id="signinEmail"
+                                type="email"
+                                placeholder="you@agency.gov"
+                                required
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="signinPassword">Password</Label>
+                              <Input
+                                id="signinPassword"
+                                type="password"
+                                placeholder="Your password"
+                                required
+                              />
+                            </div>
+                            <Button type="submit" className="w-full" disabled={signInLoading}>
+                              {signInLoading ? "Signing in…" : "Sign In"}
+                            </Button>
+                            <p className="text-center text-sm">
+                              <Link
+                                href="/forgot-password"
+                                className="text-primary hover:underline"
+                              >
+                                Forgot your password?
+                              </Link>
+                            </p>
+                          </form>
+                        </TabsContent>
+                      </Tabs>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+      <Footer />
+    </div>
+  )
+}
