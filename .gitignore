@@ -25,3 +25,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# sensitive data files
+data/admin-users.json
+data/member-sessions.json
+data/free-members.json
