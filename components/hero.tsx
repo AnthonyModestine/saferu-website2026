@@ -21,8 +21,8 @@ export function Hero() {
             Public Safety Communications
           </h1>
           
-          <p className="mt-6 text-xl font-semibold text-[#1a365d] sm:text-2xl">
-            Ready-to-share safety content and tools to draft press releases and community requests. Inform, educate, and protect your community.
+          <p className="mt-6 max-w-3xl mx-auto text-xl font-semibold leading-snug text-[#1a365d] sm:text-2xl">
+            From incidents to safety tips. Supporting agencies with graphics, messaging, and official press release support so your community stays informed.
           </p>
 
           <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">

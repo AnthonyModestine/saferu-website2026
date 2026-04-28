@@ -16,7 +16,7 @@ const features = [
   {
     icon: Sparkles,
     title: "Community Requests",
-    description: "Generate clear, platform-appropriate alerts and footage requests for social media and community platforms. Professional voice that fits each platform.",
+    description: "Clear social posts requesting community video or tips—built to follow Neighbors by Ring Community Guidelines when you publish on that platform.",
   },
   {
     icon: Building2,
@@ -75,7 +75,7 @@ export default function SubscribePage() {
       <div className="text-center">
         <h1 className="text-3xl font-bold text-[#1a365d]">Confident Communication for Public Safety.</h1>
         <p className="mt-2 text-lg text-muted-foreground">
-          Press Center helps agencies draft clear, structured public messaging in minutes—without compromising oversight or professionalism. AI assists with wording. Final review always remains with your team.
+          Press Center helps agencies draft clear, structured public messaging in minutes—without compromising oversight or professionalism.
         </p>
       </div>
 
@@ -101,7 +101,7 @@ export default function SubscribePage() {
       <Card className="border-[#1470AF]/20">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Press Center</CardTitle>
-          <CardDescription>Draft press releases and community requests. Guided drafting with consistent tone—final review remains with your team.</CardDescription>
+          <CardDescription>Draft press releases and community requests. Guided drafting with consistent tone.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="text-center">
@@ -120,7 +120,6 @@ export default function SubscribePage() {
               "Community requests for social media and community platforms—use wherever you post",
               "Structured wording to protect your agency",
               "Professional tone—reads like official agency communications",
-              "Final review always remains with your team",
               "Saves time on first drafts; focus on fact-checking and approval",
               "Branded PDF with your agency logo, or copy into your workflow. Cancel anytime.",
             ].map((feature) => (

@@ -46,7 +46,7 @@ export default function HelpPage() {
       <div>
         <h1 className="text-2xl font-bold text-foreground">Help & Support</h1>
         <p className="text-muted-foreground">
-          Press Center helps agencies draft clear, structured public messaging. AI assists with wording; final review always remains with your team.
+          Press Center helps agencies draft clear, structured public messaging.
         </p>
       </div>
 

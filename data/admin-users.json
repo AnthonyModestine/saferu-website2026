@@ -1,0 +1,23 @@
+{
+  "admins": [
+    {
+      "id": "9ff09d3a-0d8e-423c-9acf-4301925cfa28",
+      "email": "a@saferu.com",
+      "passwordHash": "f541e12d679fb57ab0e0c71a4e60cedf:bacf5fdba461d330607130a6ec6f1fd1cb7e450bc184d40ff300950ab505c794ed53672b99450cc1a5079f90f20a39afe74a86420683ee0da9f2edba49bec02e",
+      "createdAt": 1775520001
+    },
+    {
+      "id": "1248cc7c-20e9-4980-8c61-988aefdbdf3f",
+      "email": "caitlinmodestine@gmail.com",
+      "passwordHash": "064d4a38452d5812c21e0c57a4248f81:a80335b6c2f021f860d01ae3ee4878a6e18e4e1884642f13e39e19ac1a8693d97ea22c9628200be8c970c00fb81c2f64158ab1ff15165a331d2cd96a4c7b4a88",
+      "createdAt": 1775520788
+    },
+    {
+      "id": "00882bdc-df1f-4c9a-9f70-c6eb380a0f7f",
+      "email": "amodesti@saferu-admin.local",
+      "username": "amodesti",
+      "passwordHash": "9e18b2d02986c800f0b66680afc16e52:e86d903f8aaf2f5f9b67b180b4dd81f70e8566b456be29ad4c0f79e23572c4d5fcd9fc0046728505b6d47a4fcc8666b58c5b57871dd0ef400fdde796dd563f5a",
+      "createdAt": 1775928000
+    }
+  ]
+}

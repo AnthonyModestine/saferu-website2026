@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { Suspense, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { useSearchParams } from "next/navigation"
@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
-export default function SignInPage() {
+function SignInForm() {
   const searchParams = useSearchParams()
   const returnUrl = searchParams.get("returnUrl") || "/"
   const [error, setError] = useState<string | null>(null)
@@ -109,5 +109,13 @@ export default function SignInPage() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading…</div>}>
+      <SignInForm />
+    </Suspense>
   )
 }

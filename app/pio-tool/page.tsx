@@ -32,7 +32,7 @@ export default function PIODashboardPage() {
           <div>
             <p className="font-bold text-[#1a365d] text-lg">Get started with Press Center</p>
             <p className="text-sm text-muted-foreground mt-0.5">
-              $20/month. Confident communication for public safety—draft press releases and community requests in minutes without compromising oversight. Final review remains with your team.
+              $20/month. Confident communication for public safety—draft press releases and community requests in minutes without compromising oversight.
             </p>
           </div>
           <Button
@@ -48,7 +48,7 @@ export default function PIODashboardPage() {
       <div>
         <h1 className="text-2xl font-bold text-foreground">Press Center</h1>
         <p className="text-muted-foreground mt-1">
-          Confident communication for public safety. Draft press releases and community requests with guided drafting—AI assists with wording; final review remains with your team.
+          Confident communication for public safety. Draft press releases and community requests with guided drafting.
         </p>
       </div>
 
@@ -142,7 +142,7 @@ export default function PIODashboardPage() {
                 </div>
                 <h2 className="font-semibold text-foreground">Community Request</h2>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Generate clear, platform-appropriate alerts and footage requests for social media and community platforms. Professional voice that fits each platform.
+                  Clear social posts requesting community video or tips—built to follow Neighbors by Ring Community Guidelines when you publish on that platform.
                 </p>
               </CardContent>
             </Card>
@@ -169,7 +169,7 @@ export default function PIODashboardPage() {
             </div>
             <h3 className="font-semibold text-foreground">2. Answer a Few Questions</h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Enter the details—incident type, location, timeframe. AI assists with wording. Final review always remains with your team.
+              Enter the details—incident type, location, timeframe.
             </p>
           </div>
           <div className="space-y-3">

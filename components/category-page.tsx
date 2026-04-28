@@ -7,14 +7,16 @@ import { PostPackCard } from "@/components/post-pack-card"
 import { PostPackModal } from "@/components/post-pack-modal"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Search } from "lucide-react"
+import { Search, AlertTriangle } from "lucide-react"
 import type { PostPack } from "@/lib/data/post-packs"
-import type { LucideIcon } from "lucide-react"
+
+const ICON_MAP = { AlertTriangle } as const
+type IconName = keyof typeof ICON_MAP
 
 interface CategoryPageProps {
   title: string
   description: string
-  icon: LucideIcon
+  iconName: IconName
   iconColor: string
   packs: PostPack[]
 }
@@ -22,10 +24,11 @@ interface CategoryPageProps {
 export function CategoryPage({
   title,
   description,
-  icon: Icon,
+  iconName,
   iconColor,
   packs,
 }: CategoryPageProps) {
+  const Icon = ICON_MAP[iconName]
   const [selectedPack, setSelectedPack] = useState<PostPack | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
@@ -55,7 +58,7 @@ export function CategoryPage({
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="flex items-center gap-4">
               <div className={`rounded-lg bg-primary/10 p-3 ${iconColor}`}>
-                <Icon className="h-8 w-8" />
+                {Icon && <Icon className="h-8 w-8" />}
               </div>
               <div>
                 <h1 className="text-3xl font-bold text-foreground">{title}</h1>

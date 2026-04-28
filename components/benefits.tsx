@@ -5,7 +5,7 @@ import { CheckCircle, BarChart3, Award, Handshake, ArrowRight } from "lucide-rea
 const benefits = [
   {
     title: "Save Time",
-    description: "Use ready-made content and simple drafting tools instead of starting from scratch.",
+    description: "Use ready-made content and built-in help for releases and community posts instead of starting from scratch.",
     icon: CheckCircle,
     iconBg: "bg-[#f2b233]",
     iconColor: "text-[#1a365d]",
@@ -45,12 +45,12 @@ export function Benefits() {
       <div className="absolute inset-0 bg-gradient-to-b from-[#dae6f0]/85 to-[#c5d8eb]/90" />
       
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-2xl text-center">
+        <div className="mx-auto max-w-3xl text-center">
           <h2 className="text-3xl font-bold tracking-tight text-[#1a365d] sm:text-4xl">
             Ready-to-Share Safety Content
           </h2>
           <p className="mt-4 text-lg text-[#4a5568]">
-            Ready-to-share safety content, plus Press Center to draft press releases and community requests. Inform, educate, and protect your community.
+            Save time and resources with SaferU's FREE curated social media posts that promote safety and boost engagement.
           </p>
         </div>
 

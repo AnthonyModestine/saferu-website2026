@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { addArticle, generateId } from "@/lib/cms-additions"
 import { loadCmsAdditions, persistAdditions } from "@/lib/cms-additions-persist"
+import { unauthorizedIfNotAdmin } from "@/lib/require-admin-api"
 
 /** Sanitize custom slug: letters, numbers, hyphens only; preserve case */
 function sanitizeSlug(s: string): string {
@@ -12,6 +13,8 @@ function sanitizeSlug(s: string): string {
 }
 
 export async function POST(request: NextRequest) {
+  const denied = await unauthorizedIfNotAdmin()
+  if (denied) return denied
   try {
     const body = await request.json()
     const { categoryId, subcategoryId, title, description, slug } = body as {

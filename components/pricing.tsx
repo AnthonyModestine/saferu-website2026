@@ -77,7 +77,6 @@ export function Pricing() {
                 "Community requests for social media and community platforms—use wherever you post",
                 "Structured wording to protect your agency and limit liability",
                 "Professional tone—reads like official agency communications",
-                "Final review always remains with your team",
                 "Saves time on first drafts; focus on fact-checking and approval",
                 "Branded PDF with your agency logo, or copy into your workflow",
               ].map((feature) => (

@@ -99,7 +99,17 @@ export default function NewPressReleasePage() {
   const [detectiveContact, setDetectiveContact] = useState("")
   const [resolutionText, setResolutionText] = useState("")
 
+  const [requestFootage, setRequestFootage] = useState(false)
+  const [footageTimeframe, setFootageTimeframe] = useState("")
+  const [whatToLookFor, setWhatToLookFor] = useState("")
+
   const [generatedRelease, setGeneratedRelease] = useState("")
+  const [generatedFacebook, setGeneratedFacebook] = useState("")
+  const [generatedTwitter, setGeneratedTwitter] = useState("")
+  const [generatedTalkingPoints, setGeneratedTalkingPoints] = useState("")
+  const [generatedCommunityRequest, setGeneratedCommunityRequest] = useState<string | null>(null)
+  const [previewTab, setPreviewTab] = useState("press-release")
+  const [copiedField, setCopiedField] = useState<string | null>(null)
 
   // Pre-fill from agency settings
   useEffect(() => {
@@ -163,7 +173,7 @@ export default function NewPressReleasePage() {
     const displayEmail = contactEmail || "Email Address"
 
     try {
-      const res = await fetch("/api/pio/generate-press-release", {
+      const res = await fetch("/api/pio/generate-all", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -188,20 +198,28 @@ export default function NewPressReleasePage() {
           contactPhone: displayPhone,
           contactPhone2: contactPhone2?.trim() || undefined,
           contactEmail: displayEmail,
+          requestFootage,
+          footageTimeframe: footageTimeframe.trim() || undefined,
+          whatToLookFor: whatToLookFor.trim() || undefined,
         }),
       })
       const data = await res.json()
-      if (res.ok && data.content) {
-        setGeneratedRelease(data.content)
+      if (res.ok && data.pressRelease) {
+        setGeneratedRelease(data.pressRelease)
+        setGeneratedFacebook(data.facebook || "")
+        setGeneratedTwitter(data.twitter || "")
+        setGeneratedTalkingPoints(data.talkingPoints || "")
+        setGeneratedCommunityRequest(data.communityRequest || null)
         addPioHistoryItem({
           title: `${incidentType || "Incident"} - Press Release`,
           type: incidentType || "Incident",
           format: "Press Release",
-          content: data.content,
+          content: data.pressRelease,
         })
         setGenerated(true)
+        setPreviewTab("press-release")
         setActiveTab("preview")
-        track("pio_generate", { source: "press_release" })
+        track("pio_generate", { source: "multi_output" })
         setGenerating(false)
         return
       }
@@ -209,8 +227,7 @@ export default function NewPressReleasePage() {
       // Fall through to template
     }
 
-    // Fallback template when AI is unavailable or fails
-    const releaseText = `**${displayAgency.toUpperCase()} PRESS RELEASE**
+    const releaseText = `${displayAgency.toUpperCase()} PRESS RELEASE
 
 ${displayCity.toUpperCase()}, ${displayState.toUpperCase()} – ${incidentDate ? new Date(incidentDate).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })} – For Immediate Release
 
@@ -219,13 +236,17 @@ ${displayAgency} is investigating a reported ${incidentType || "incident"}${loca
 ${incidentSummary ? `${incidentSummary.trim()}\n\n` : ""}${investigationOngoing ? "The investigation is ongoing. " : ""}Anyone with information regarding this incident is encouraged to contact ${displayAgency} at ${displayPhone} or submit an anonymous tip through Crime Stoppers.
 
 ${agencySettings.boilerplate ? `\n${agencySettings.boilerplate}\n` : ""}
-**Media Contact:**
+Media Contact:
 ${displayContact}
 ${displayAgency}
 Phone: ${displayPhone}${contactPhone2 ? `\nSecondary: ${contactPhone2}` : ""}
 Email: ${displayEmail}`
 
     setGeneratedRelease(releaseText)
+    setGeneratedFacebook("")
+    setGeneratedTwitter("")
+    setGeneratedTalkingPoints("")
+    setGeneratedCommunityRequest(null)
     addPioHistoryItem({
       title: `${incidentType || "Incident"} - Press Release`,
       type: incidentType || "Incident",
@@ -234,8 +255,15 @@ Email: ${displayEmail}`
     })
     setGenerating(false)
     setGenerated(true)
+    setPreviewTab("press-release")
     setActiveTab("preview")
     track("pio_generate", { source: "press_release" })
+  }
+
+  const handleCopyField = async (text: string, field: string) => {
+    await navigator.clipboard.writeText(text)
+    setCopiedField(field)
+    setTimeout(() => setCopiedField(null), 2000)
   }
 
   const handleCopy = async () => {
@@ -247,6 +275,10 @@ Email: ${displayEmail}`
   const handleClear = () => {
     setGenerated(false)
     setGeneratedRelease("")
+    setGeneratedFacebook("")
+    setGeneratedTwitter("")
+    setGeneratedTalkingPoints("")
+    setGeneratedCommunityRequest(null)
     setPersons([])
     setArrests([])
     setArrestsMade(false)
@@ -262,6 +294,10 @@ Email: ${displayEmail}`
     setTipLine("")
     setDetectiveContact("")
     setResolutionText("")
+    setRequestFootage(false)
+    setFootageTimeframe("")
+    setWhatToLookFor("")
+    setPreviewTab("press-release")
     setActiveTab("header")
   }
 
@@ -297,7 +333,7 @@ Email: ${displayEmail}`
       <div>
         <h1 className="text-2xl font-bold text-foreground">New Press Release</h1>
         <p className="text-muted-foreground">
-          Fill in the details below. Press Center will generate a professional press release—review and edit before you export or share.
+          Fill in the details below. Press Center will generate a press release, Facebook post, X/Twitter post, talking points, and a community request (if selected)—review and edit before you export or share.
         </p>
       </div>
 
@@ -661,6 +697,50 @@ Email: ${displayEmail}`
               )}
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Community Video/Footage Request</CardTitle>
+              <CardDescription>
+                Check this if you want to ask the community for security camera footage or video
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="requestFootage"
+                  checked={requestFootage}
+                  onCheckedChange={(checked) => setRequestFootage(checked as boolean)}
+                />
+                <Label htmlFor="requestFootage" className="font-medium">
+                  Request video footage from the community
+                </Label>
+              </div>
+              {requestFootage && (
+                <div className="space-y-4 rounded-xl border border-blue-500/30 bg-blue-50 p-5">
+                  <div className="space-y-2">
+                    <Label>Timeframe for footage</Label>
+                    <Input
+                      placeholder="e.g. Between 10pm Jan 5 and 2am Jan 6"
+                      className="placeholder:text-muted-foreground/60 bg-background"
+                      value={footageTimeframe}
+                      onChange={(e) => setFootageTimeframe(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>What to look for</Label>
+                    <Textarea
+                      placeholder="e.g. A dark-colored sedan, suspicious activity near driveways..."
+                      rows={2}
+                      className="placeholder:text-muted-foreground/60 bg-background"
+                      value={whatToLookFor}
+                      onChange={(e) => setWhatToLookFor(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Contact Tab */}
@@ -726,57 +806,127 @@ Email: ${displayEmail}`
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <FileText className="h-5 w-5" />
-                Generated Press Release
+                Generated Content
               </CardTitle>
               <CardDescription>
-                Review your press release, edit if needed, and export when ready. The downloaded PDF includes a finalized version with your agency's logo.
+                All outputs generated from your incident details. Review, edit, copy, or export each one.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="rounded-lg border border-border bg-card p-6">
-                {/* Logo and Header */}
-                {agencySettings.logoUrl && (
-                  <div className="mb-4">
-                    <div className="relative h-16 w-16">
-                      <Image
-                        src={agencySettings.logoUrl || "/placeholder.svg"}
-                        alt="Agency logo"
-                        fill
-                        className="object-contain"
+              <Tabs value={previewTab} onValueChange={setPreviewTab}>
+                <TabsList className="flex flex-wrap gap-1 h-auto">
+                  <TabsTrigger value="press-release" className="text-xs sm:text-sm">Press Release</TabsTrigger>
+                  <TabsTrigger value="facebook" className="text-xs sm:text-sm">Facebook</TabsTrigger>
+                  <TabsTrigger value="twitter" className="text-xs sm:text-sm">X / Twitter</TabsTrigger>
+                  <TabsTrigger value="talking-points" className="text-xs sm:text-sm">Talking Points</TabsTrigger>
+                  {generatedCommunityRequest && (
+                    <TabsTrigger value="community-request" className="text-xs sm:text-sm">Community Request</TabsTrigger>
+                  )}
+                </TabsList>
+
+                {/* Press Release */}
+                <TabsContent value="press-release" className="mt-4">
+                  <div className="rounded-lg border border-border bg-card p-6">
+                    {agencySettings.logoUrl && (
+                      <div className="mb-4">
+                        <div className="relative h-16 w-16">
+                          <Image
+                            src={agencySettings.logoUrl || "/placeholder.svg"}
+                            alt="Agency logo"
+                            fill
+                            className="object-contain"
+                          />
+                        </div>
+                      </div>
+                    )}
+                    <textarea
+                      value={generatedRelease}
+                      onChange={(e) => setGeneratedRelease(e.target.value)}
+                      className="w-full min-h-[400px] whitespace-pre-wrap text-sm text-foreground font-sans leading-relaxed bg-transparent border-0 focus:outline-none focus:ring-0 resize-none"
+                      placeholder="Your generated press release will appear here..."
+                    />
+                  </div>
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    <Button variant="outline" size="sm" onClick={handleCopy} className="bg-transparent">
+                      {copied ? <><Check className="mr-2 h-4 w-4" />Copied!</> : <><Copy className="mr-2 h-4 w-4" />Copy Text</>}
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={handleExportPDF} className="bg-transparent">
+                      <Download className="mr-2 h-4 w-4" />Export to PDF
+                    </Button>
+                  </div>
+                </TabsContent>
+
+                {/* Facebook */}
+                <TabsContent value="facebook" className="mt-4">
+                  <div className="rounded-lg border border-border bg-card p-6">
+                    <textarea
+                      value={generatedFacebook}
+                      onChange={(e) => setGeneratedFacebook(e.target.value)}
+                      className="w-full min-h-[200px] whitespace-pre-wrap text-sm text-foreground font-sans leading-relaxed bg-transparent border-0 focus:outline-none focus:ring-0 resize-none"
+                      placeholder="Facebook post will appear here..."
+                    />
+                  </div>
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    <Button variant="outline" size="sm" onClick={() => handleCopyField(generatedFacebook, "facebook")} className="bg-transparent">
+                      {copiedField === "facebook" ? <><Check className="mr-2 h-4 w-4" />Copied!</> : <><Copy className="mr-2 h-4 w-4" />Copy Facebook Post</>}
+                    </Button>
+                  </div>
+                </TabsContent>
+
+                {/* X / Twitter */}
+                <TabsContent value="twitter" className="mt-4">
+                  <div className="rounded-lg border border-border bg-card p-6">
+                    <textarea
+                      value={generatedTwitter}
+                      onChange={(e) => setGeneratedTwitter(e.target.value)}
+                      className="w-full min-h-[100px] whitespace-pre-wrap text-sm text-foreground font-sans leading-relaxed bg-transparent border-0 focus:outline-none focus:ring-0 resize-none"
+                      placeholder="X/Twitter post will appear here..."
+                    />
+                    <p className="text-xs text-muted-foreground mt-2">{generatedTwitter.length} / 280 characters</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    <Button variant="outline" size="sm" onClick={() => handleCopyField(generatedTwitter, "twitter")} className="bg-transparent">
+                      {copiedField === "twitter" ? <><Check className="mr-2 h-4 w-4" />Copied!</> : <><Copy className="mr-2 h-4 w-4" />Copy X Post</>}
+                    </Button>
+                  </div>
+                </TabsContent>
+
+                {/* Talking Points */}
+                <TabsContent value="talking-points" className="mt-4">
+                  <div className="rounded-lg border border-border bg-card p-6">
+                    <textarea
+                      value={generatedTalkingPoints}
+                      onChange={(e) => setGeneratedTalkingPoints(e.target.value)}
+                      className="w-full min-h-[300px] whitespace-pre-wrap text-sm text-foreground font-sans leading-relaxed bg-transparent border-0 focus:outline-none focus:ring-0 resize-none"
+                      placeholder="Talking points will appear here..."
+                    />
+                  </div>
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    <Button variant="outline" size="sm" onClick={() => handleCopyField(generatedTalkingPoints, "talking-points")} className="bg-transparent">
+                      {copiedField === "talking-points" ? <><Check className="mr-2 h-4 w-4" />Copied!</> : <><Copy className="mr-2 h-4 w-4" />Copy Talking Points</>}
+                    </Button>
+                  </div>
+                </TabsContent>
+
+                {/* Community Request */}
+                {generatedCommunityRequest && (
+                  <TabsContent value="community-request" className="mt-4">
+                    <div className="rounded-lg border border-border bg-card p-6">
+                      <textarea
+                        value={generatedCommunityRequest}
+                        onChange={(e) => setGeneratedCommunityRequest(e.target.value)}
+                        className="w-full min-h-[200px] whitespace-pre-wrap text-sm text-foreground font-sans leading-relaxed bg-transparent border-0 focus:outline-none focus:ring-0 resize-none"
+                        placeholder="Community footage request will appear here..."
                       />
                     </div>
-                  </div>
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      <Button variant="outline" size="sm" onClick={() => handleCopyField(generatedCommunityRequest || "", "community-request")} className="bg-transparent">
+                        {copiedField === "community-request" ? <><Check className="mr-2 h-4 w-4" />Copied!</> : <><Copy className="mr-2 h-4 w-4" />Copy Community Request</>}
+                      </Button>
+                    </div>
+                  </TabsContent>
                 )}
-                <textarea 
-                  value={generatedRelease}
-                  onChange={(e) => setGeneratedRelease(e.target.value)}
-                  className="w-full min-h-[400px] whitespace-pre-wrap text-sm text-foreground font-sans leading-relaxed bg-transparent border-0 focus:outline-none focus:ring-0 resize-none"
-                  placeholder="Your generated press release will appear here..."
-                />
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" onClick={handleCopy} className="bg-transparent">
-                  {copied ? (
-                    <>
-                      <Check className="mr-2 h-4 w-4" />
-                      Copied!
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="mr-2 h-4 w-4" />
-                      Copy Text
-                    </>
-                  )}
-                </Button>
-                <Button variant="outline" size="sm" onClick={handleExportPDF} className="bg-transparent">
-                  <Download className="mr-2 h-4 w-4" />
-                  Export to PDF
-                </Button>
-                <Button variant="outline" size="sm" className="bg-transparent">
-                  <Download className="mr-2 h-4 w-4" />
-                  Export to Word
-                </Button>
-              </div>
+              </Tabs>
             </CardContent>
           </Card>
         </TabsContent>
@@ -797,7 +947,7 @@ Email: ${displayEmail}`
           ) : (
             <>
               <Sparkles className="mr-2 h-4 w-4" />
-              Generate Preview
+              Generate All
             </>
           )}
         </Button>

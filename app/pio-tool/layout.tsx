@@ -5,7 +5,7 @@ import React from "react"
 import { useState } from "react"
 import { Header } from "@/components/header"
 import { PIOSidebar } from "@/components/pio/sidebar"
-import { Sheet, SheetContent } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { Menu } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AgencyProvider } from "@/lib/agency-context"
@@ -32,6 +32,7 @@ export default function PIOToolLayout({
           {/* Mobile Sidebar */}
           <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
             <SheetContent side="left" className="w-64 p-0">
+              <SheetTitle className="sr-only">Navigation</SheetTitle>
               <PIOSidebar />
             </SheetContent>
           </Sheet>

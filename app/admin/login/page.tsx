@@ -12,6 +12,7 @@ import { Shield, Lock, AlertCircle } from "lucide-react"
 import { verifyAdminPassword } from "@/lib/admin-auth"
 
 export default function AdminLoginPage() {
+  const [identifier, setIdentifier] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -23,12 +24,12 @@ export default function AdminLoginPage() {
     setError(null)
 
     try {
-      const isValid = await verifyAdminPassword(password)
+      const isValid = await verifyAdminPassword(identifier.trim(), password)
       if (isValid) {
         router.push("/admin")
         router.refresh()
       } else {
-        setError("Invalid password. Please try again.")
+        setError("Invalid username or password. Please try again.")
       }
     } catch {
       setError("An error occurred. Please try again.")
@@ -55,18 +56,32 @@ export default function AdminLoginPage() {
               Admin Access
             </CardTitle>
             <CardDescription>
-              Enter your admin password to access the content management system.
+              Sign in with your admin username or email and password.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleLogin}>
               <div className="flex flex-col gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="password">Admin Password</Label>
+                  <Label htmlFor="identifier">Username or email</Label>
+                  <Input
+                    id="identifier"
+                    type="text"
+                    autoComplete="username"
+                    placeholder="e.g. amodesti or your admin email"
+                    required
+                    value={identifier}
+                    onChange={(e) => setIdentifier(e.target.value)}
+                    className="h-12"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="password">Password</Label>
                   <Input
                     id="password"
                     type="password"
-                    placeholder="Enter admin password"
+                    autoComplete="current-password"
+                    placeholder="Enter password"
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}

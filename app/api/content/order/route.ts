@@ -4,8 +4,11 @@ import {
   setArticleOrder,
   setPostOrder,
 } from "@/lib/content-order"
+import { unauthorizedIfNotAdmin } from "@/lib/require-admin-api"
 
 export async function POST(request: NextRequest) {
+  const denied = await unauthorizedIfNotAdmin()
+  if (denied) return denied
   try {
     const body = await request.json()
     const { type, categoryId, subcategoryId, articleId, orderedIds } = body as {

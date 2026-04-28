@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { generatePressReleaseWithAI } from "@/lib/press-release-ai"
+import { generateMultiOutput } from "@/lib/multi-output-ai"
 import { getMemberSession } from "@/lib/member-session"
 
 export async function POST(request: Request) {
@@ -38,18 +38,21 @@ export async function POST(request: Request) {
       contactPhone: String(body.contactPhone ?? "").trim() || "Phone Number",
       contactPhone2: body.contactPhone2 != null ? String(body.contactPhone2).trim() || undefined : undefined,
       contactEmail: String(body.contactEmail ?? "").trim() || "email@agency.gov",
+      requestFootage: Boolean(body.requestFootage),
+      footageTimeframe: body.footageTimeframe != null ? String(body.footageTimeframe).trim() : undefined,
+      whatToLookFor: body.whatToLookFor != null ? String(body.whatToLookFor).trim() : undefined,
     }
 
-    const content = await generatePressReleaseWithAI(payload)
-    if (!content) {
+    const result = await generateMultiOutput(payload)
+    if (!result) {
       return NextResponse.json(
-        { error: "AI generation unavailable. Add OPENAI_API_KEY in Vercel (or .env.local) and try again, or use the template." },
+        { error: "AI generation unavailable. Add OPENAI_API_KEY in Vercel (or .env.local) and try again." },
         { status: 503 }
       )
     }
-    return NextResponse.json({ content })
+    return NextResponse.json(result)
   } catch (e) {
-    console.error("Generate press release error:", e)
-    return NextResponse.json({ error: "Failed to generate press release." }, { status: 500 })
+    console.error("Generate all outputs error:", e)
+    return NextResponse.json({ error: "Failed to generate outputs." }, { status: 500 })
   }
 }

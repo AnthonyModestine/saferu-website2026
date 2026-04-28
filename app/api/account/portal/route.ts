@@ -11,7 +11,7 @@ export async function GET() {
       return NextResponse.json({ url: null, error: "Not signed in" }, { status: 401 })
     }
     if (!stripe) {
-      return NextResponse.json({ url: null, error: "Billing not configured" })
+      return NextResponse.json({ url: null, error: "Billing not configured" }, { status: 503 })
     }
     const email = session.email.trim().toLowerCase()
     const customers = await stripe.customers.list({ email, limit: 1 })

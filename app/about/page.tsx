@@ -37,7 +37,7 @@ export default function AboutPage() {
                 Creating clear social media content, professional press releases, and community requests takes time many agencies don’t have.
               </p>
               <p className="mt-4 text-lg leading-relaxed text-muted-foreground">
-                SaferU provides a free content library and Press Center. Press Center helps agencies draft clear, structured public messaging in minutes—without compromising oversight or professionalism. AI assists with wording; final review always remains with your team.
+                SaferU provides a free content library and Press Center. Press Center helps agencies draft clear, structured public messaging in minutes—without compromising oversight or professionalism.
               </p>
             </div>
           </div>

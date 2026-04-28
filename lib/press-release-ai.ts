@@ -2,6 +2,9 @@
  * Generate press release body text using OpenAI from structured form data.
  * Set OPENAI_API_KEY in Vercel (Project → Settings → Environment Variables) or in .env.local.
  * If the key is missing or the request fails, returns null and the caller can fall back to template.
+ *
+ * To use YOUR prompt + user info: edit SYSTEM_PROMPT below (and the user message in generatePressReleaseWithAI).
+ * User data is built in buildUserMessage() and sent with the system prompt to OpenAI.
  */
 
 export interface PressReleasePayload {

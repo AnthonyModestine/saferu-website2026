@@ -10,7 +10,7 @@ const features = [
   },
   {
     title: "Community Requests",
-    description: "Generate clear, platform-appropriate alerts and footage requests for social media and community platforms. Messaging is structured to align with platform moderation standards while maintaining a professional voice.",
+    description: "Clear social posts requesting community video or tips—built to follow Neighbors by Ring Community Guidelines when you publish on that platform.",
     icon: Zap,
   },
   {
@@ -47,9 +47,6 @@ export function PIOToolSection() {
             </p>
             <p className="mt-4 text-lg text-[#c5d8eb] leading-relaxed">
               Whether preparing a press release or a community request, Press Center provides guided drafting with consistent tone and structured language designed for public safety communication.
-            </p>
-            <p className="mt-4 text-lg text-[#c5d8eb] leading-relaxed">
-              AI assists with wording. Final review always remains with your team.
             </p>
             
             <div className="mt-8 flex flex-col gap-4 sm:flex-row">

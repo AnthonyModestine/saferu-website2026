@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server"
 import { generateCommunityRequestWithAI } from "@/lib/community-request-ai"
+import { getMemberSession } from "@/lib/member-session"
 
 export async function POST(request: Request) {
+  const session = await getMemberSession()
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
   try {
     const body = await request.json()
     const payload = {

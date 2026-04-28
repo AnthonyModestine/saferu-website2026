@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
 import { writeFile, mkdir } from "fs/promises"
 import path from "path"
+import { unauthorizedIfNotAdmin } from "@/lib/require-admin-api"
 
 const UPLOAD_DIR = "public/images/posts"
 const MAX_SIZE = 5 * 1024 * 1024 // 5MB
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"]
 
 export async function POST(request: NextRequest) {
+  const denied = await unauthorizedIfNotAdmin()
+  if (denied) return denied
   try {
     const formData = await request.formData()
     const file = formData.get("file") as File | null

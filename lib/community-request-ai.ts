@@ -1,6 +1,9 @@
 /**
  * Generate community request (footage request / community alert) text using OpenAI.
  * Uses OPENAI_API_KEY (same as press release). Falls back to template if key missing or request fails.
+ *
+ * To use YOUR prompt + user info: edit SYSTEM_PROMPT below (and the user message in generateCommunityRequestWithAI).
+ * User data is built in buildUserMessage() and sent with the system prompt to OpenAI.
  */
 
 export interface CommunityRequestPayload {

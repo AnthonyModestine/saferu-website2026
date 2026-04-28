@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { addSubcategory, generateId } from "@/lib/cms-additions"
 import { loadCmsAdditions, persistAdditions } from "@/lib/cms-additions-persist"
+import { unauthorizedIfNotAdmin } from "@/lib/require-admin-api"
 
 export async function POST(request: NextRequest) {
+  const denied = await unauthorizedIfNotAdmin()
+  if (denied) return denied
   try {
     const body = await request.json()
     const { categoryId, title, description, icon } = body as {
