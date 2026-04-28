@@ -237,7 +237,7 @@ export default function AgencySettingsPage() {
           <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-4">
             <div>
               <p className="font-medium text-foreground">Press Center Pro</p>
-              <p className="text-sm text-muted-foreground">Monthly subscription - $20/month</p>
+              <p className="text-sm text-muted-foreground">Monthly subscription - $30/month</p>
             </div>
             <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">
               Active

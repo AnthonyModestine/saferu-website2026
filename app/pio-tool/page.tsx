@@ -32,7 +32,7 @@ export default function PIODashboardPage() {
           <div>
             <p className="font-bold text-[#1a365d] text-lg">Get started with Press Center</p>
             <p className="text-sm text-muted-foreground mt-0.5">
-              $20/month. Confident communication for public safety—draft press releases and community requests in minutes without compromising oversight.
+              $30/month. Confident communication for public safety—draft press releases and community requests in minutes without compromising oversight.
             </p>
           </div>
           <Button
@@ -76,7 +76,7 @@ export default function PIODashboardPage() {
                       <p className="text-sm font-medium text-foreground">12 generations</p>
                       <span className="text-[10px] font-semibold text-[#1470AF] bg-[#1470AF]/10 px-2 py-0.5 rounded-full">Most popular</span>
                     </div>
-                    <p className="text-sm font-semibold text-foreground">$20</p>
+                    <p className="text-sm font-semibold text-foreground">$30</p>
                   </button>
                   <button type="button" className="w-full flex items-center justify-between px-5 py-3 hover:bg-muted/50 transition-colors text-left">
                     <p className="text-sm font-medium text-foreground">35 generations</p>

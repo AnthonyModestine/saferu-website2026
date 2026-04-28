@@ -8,13 +8,13 @@ export interface Product {
   images?: string[]
 }
 
-// Base subscription - $20/month includes 30 generations (press releases + community requests)
+// Base subscription - $30/month includes 30 generations (press releases + community requests)
 export const SUBSCRIPTION_PRODUCTS: Product[] = [
   {
     id: "pio-tool-monthly",
     name: "Press Center",
     description: "Press release and community request generator for public safety agencies. Includes 30 generations per month.",
-    priceInCents: 2000, // $20.00/month
+    priceInCents: 3000, // $30.00/month
     interval: "month",
     generations: 30,
   },

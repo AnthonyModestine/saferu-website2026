@@ -67,7 +67,7 @@ export function Pricing() {
             </div>
 
             <div className="mb-8">
-              <span className="text-5xl font-bold text-foreground">$20</span>
+              <span className="text-5xl font-bold text-foreground">$30</span>
               <span className="text-muted-foreground">/month</span>
             </div>
 
