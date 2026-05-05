@@ -23,7 +23,7 @@ import {
 } from "lucide-react"
 import { useAgency } from "@/lib/agency-context"
 import { addPioHistoryItem } from "@/lib/pio-history-store"
-import { PIOPaywall } from "@/components/pio-paywall"
+import { PIOPreviewGate } from "@/components/pio-preview-gate"
 import { track } from "@/lib/track"
 
 const incidentTypes = [
@@ -188,7 +188,7 @@ Do not approach any suspicious individuals. If you see something, call 911.`
   }
 
   return (
-    <PIOPaywall>
+    <PIOPreviewGate>
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Community Request</h1>
@@ -452,6 +452,6 @@ Do not approach any suspicious individuals. If you see something, call 911.`
         </Button>
       </div>
     </div>
-    </PIOPaywall>
+    </PIOPreviewGate>
   )
 }

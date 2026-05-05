@@ -8,7 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { User, CreditCard, Loader2, KeyRound } from "lucide-react"
+import { PasswordInput } from "@/components/ui/password-input"
+import { User, CreditCard, Loader2, KeyRound, Trash2, AlertTriangle } from "lucide-react"
 import Link from "next/link"
 
 export default function AccountPage() {
@@ -22,6 +23,9 @@ export default function AccountPage() {
   const [confirmPassword, setConfirmPassword] = useState("")
   const [passwordLoading, setPasswordLoading] = useState(false)
   const [passwordMessage, setPasswordMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleteLoading, setDeleteLoading] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   useEffect(() => {
     fetch("/api/auth/session")
@@ -85,6 +89,24 @@ export default function AccountPage() {
       setPasswordMessage({ type: "error", text: "Something went wrong. Please try again." })
     } finally {
       setPasswordLoading(false)
+    }
+  }
+
+  const handleDeleteAccount = async () => {
+    setDeleteError(null)
+    setDeleteLoading(true)
+    try {
+      const res = await fetch("/api/account/delete", { method: "POST" })
+      const data = await res.json()
+      if (res.ok) {
+        router.replace("/")
+      } else {
+        setDeleteError(data.error ?? "Something went wrong. Please try again.")
+        setDeleteLoading(false)
+      }
+    } catch {
+      setDeleteError("Something went wrong. Please try again.")
+      setDeleteLoading(false)
     }
   }
 
@@ -157,9 +179,8 @@ export default function AccountPage() {
                 )}
                 <div className="space-y-2">
                   <Label htmlFor="current-password">Current password</Label>
-                  <Input
+                  <PasswordInput
                     id="current-password"
-                    type="password"
                     autoComplete="current-password"
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
@@ -169,9 +190,8 @@ export default function AccountPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="new-password">New password</Label>
-                  <Input
+                  <PasswordInput
                     id="new-password"
-                    type="password"
                     autoComplete="new-password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
@@ -182,9 +202,8 @@ export default function AccountPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="confirm-password">Confirm new password</Label>
-                  <Input
+                  <PasswordInput
                     id="confirm-password"
-                    type="password"
                     autoComplete="new-password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
@@ -245,6 +264,68 @@ export default function AccountPage() {
                 </Link>{" "}
                 from the pricing page.
               </p>
+            </CardContent>
+          </Card>
+          {/* Delete Account */}
+          <Card className="mt-6 border-red-200">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-red-600">
+                <Trash2 className="h-5 w-5" />
+                Delete Account
+              </CardTitle>
+              <CardDescription>
+                Permanently delete your account and all associated data. This cannot be undone.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {!showDeleteConfirm ? (
+                <Button
+                  variant="outline"
+                  className="border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400"
+                  onClick={() => setShowDeleteConfirm(true)}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete my account
+                </Button>
+              ) : (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-5 space-y-4">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="font-semibold text-red-800">Are you sure you want to delete your account?</p>
+                      <p className="text-sm text-red-700 mt-1">
+                        This will permanently remove your account and sign you out. There are no refunds for any remaining subscription period. This action cannot be undone.
+                      </p>
+                    </div>
+                  </div>
+                  {deleteError && (
+                    <p className="text-sm text-red-700 bg-red-100 rounded p-2">{deleteError}</p>
+                  )}
+                  <div className="flex gap-3">
+                    <Button
+                      variant="outline"
+                      onClick={() => { setShowDeleteConfirm(false); setDeleteError(null) }}
+                      disabled={deleteLoading}
+                    >
+                      No, keep my account
+                    </Button>
+                    <Button
+                      className="bg-red-600 text-white hover:bg-red-700"
+                      onClick={handleDeleteAccount}
+                      disabled={deleteLoading}
+                    >
+                      {deleteLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Deleting…
+                        </>
+                      ) : (
+                        "Yes, delete my account"
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

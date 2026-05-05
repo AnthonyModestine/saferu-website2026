@@ -151,7 +151,7 @@ export default function PIODashboardPage() {
       )}
 
       {/* ====== HOW IT WORKS (visible to everyone) ====== */}
-      <div>
+      <div className="pb-10">
         <h2 className="text-lg font-semibold text-foreground mb-6">How It Works</h2>
         <div className="grid gap-8 sm:grid-cols-3">
           <div className="space-y-3">
@@ -183,8 +183,6 @@ export default function PIODashboardPage() {
           </div>
         </div>
       </div>
-
-
     </div>
   )
 }

@@ -29,7 +29,7 @@ import {
 } from "lucide-react"
 import { useAgency } from "@/lib/agency-context"
 import { track } from "@/lib/track"
-import { PIOPaywall } from "@/components/pio-paywall"
+import { PIOPreviewGate } from "@/components/pio-preview-gate"
 import { downloadPressReleasePDF } from "@/lib/pdf-export"
 import { addPioHistoryItem } from "@/lib/pio-history-store"
 import Image from "next/image"
@@ -328,7 +328,7 @@ Email: ${displayEmail}`
   }
 
   return (
-    <PIOPaywall>
+    <PIOPreviewGate>
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground">New Press Release</h1>
@@ -957,6 +957,6 @@ Email: ${displayEmail}`
         </Button>
       </div>
     </div>
-    </PIOPaywall>
+    </PIOPreviewGate>
   )
 }

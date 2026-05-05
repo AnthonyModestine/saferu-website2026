@@ -31,11 +31,11 @@ export function Pricing() {
 
             <ul className="space-y-4 flex-1">
               {[
-                "Browse safety graphics and messaging",
-                "Pre-written social media captions",
-                "Crime prevention, fire safety, and more",
-                "Copy and share content anytime",
-                "New content added regularly",
+                "Full access to SaferU's curated content library",
+                "Ready-to-share social media posts and graphics",
+                "Coverage across seasonal safety topics and awareness campaigns",
+                "Organized by topic so your team can quickly find what they need",
+                "Regularly updated with new content",
               ].map((feature) => (
                 <li key={feature} className="flex items-start gap-3">
                   <Check className="h-5 w-5 text-[#1470AF] mt-0.5 flex-shrink-0" />
@@ -73,12 +73,12 @@ export function Pricing() {
 
             <ul className="space-y-4 flex-1">
               {[
-                "Simple forms—draft press releases and community requests",
-                "Community requests for social media and community platforms—use wherever you post",
-                "Structured wording to protect your agency and limit liability",
-                "Professional tone—reads like official agency communications",
-                "Saves time on first drafts; focus on fact-checking and approval",
-                "Branded PDF with your agency logo, or copy into your workflow",
+                "AI-assisted drafting for press releases and community requests",
+                "Structured, professional output based on your inputs",
+                "Guidance aligned with public safety communication standards",
+                "Export to branded PDF or copy into your workflow",
+                "Translate messaging into Spanish for broader community reach",
+                "Helps your team respond quickly during active incidents",
               ].map((feature) => (
                 <li key={feature} className="flex items-start gap-3">
                   <Check className="h-5 w-5 text-[#1470AF] mt-0.5 flex-shrink-0" />
@@ -92,7 +92,7 @@ export function Pricing() {
               size="lg"
               className="w-full mt-8 py-6 text-base font-semibold bg-[#1470AF] text-white hover:bg-[#1470AF]/90"
             >
-              <Link href="/sign-in?redirect=/pio-tool/subscribe">Select Plan</Link>
+              <Link href="/pio-tool/subscribe">Select Plan</Link>
             </Button>
           </div>
         </div>

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { PasswordInput } from "@/components/ui/password-input"
 import { Shield, Lock, AlertCircle } from "lucide-react"
 import { verifyAdminPassword } from "@/lib/admin-auth"
 
@@ -77,9 +78,8 @@ export default function AdminLoginPage() {
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="password">Password</Label>
-                  <Input
+                  <PasswordInput
                     id="password"
-                    type="password"
                     autoComplete="current-password"
                     placeholder="Enter password"
                     required

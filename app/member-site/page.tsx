@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { PasswordInput } from "@/components/ui/password-input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Shield, CheckCircle, ArrowRight } from "lucide-react"
 
@@ -215,9 +216,8 @@ export default function MemberSitePage() {
                             </div>
                             <div className="space-y-2">
                               <Label htmlFor="signupPassword">Password</Label>
-                              <Input
+                              <PasswordInput
                                 id="signupPassword"
-                                type="password"
                                 placeholder="Create a password"
                                 required
                               />
@@ -248,9 +248,8 @@ export default function MemberSitePage() {
                             </div>
                             <div className="space-y-2">
                               <Label htmlFor="signinPassword">Password</Label>
-                              <Input
+                              <PasswordInput
                                 id="signinPassword"
-                                type="password"
                                 placeholder="Your password"
                                 required
                               />

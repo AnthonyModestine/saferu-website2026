@@ -8,14 +8,21 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Save, Upload, Building2, X, CreditCard, ExternalLink } from "lucide-react"
+import { Save, Upload, Building2, X, CreditCard, ExternalLink, Lock } from "lucide-react"
 import { useAgency } from "@/lib/agency-context"
+import { useSubscription } from "@/lib/use-subscription"
+import { useMemberSession } from "@/lib/use-member-session"
 import Image from "next/image"
+import Link from "next/link"
 
 export default function AgencySettingsPage() {
   const { settings, updateSettings } = useAgency()
   const [saved, setSaved] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const { member, isLoading: sessionLoading } = useMemberSession()
+  const { isSubscribed, isLoading: subLoading } = useSubscription()
+  const isLoading = sessionLoading || subLoading
+  const locked = !isSubscribed
 
   const handleSave = () => {
     setSaved(true)
@@ -40,6 +47,15 @@ export default function AgencySettingsPage() {
     }
   }
 
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[40vh] gap-4">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#1470AF] border-t-transparent" />
+        <p className="text-sm text-muted-foreground">Loading...</p>
+      </div>
+    )
+  }
+
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
@@ -49,6 +65,37 @@ export default function AgencySettingsPage() {
         </p>
       </div>
 
+      {locked && (
+        <div className="rounded-xl border border-[#1470AF]/30 bg-[#1470AF]/5 p-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <Lock className="h-5 w-5 text-[#1470AF] mt-0.5 shrink-0" />
+            <div>
+              <p className="font-semibold text-[#1a365d]">Subscribe to save Agency Settings</p>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                These fields save permanently to your account. Sign in to your paid account to fill them out.
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-3 shrink-0">
+            {member ? (
+              <Button asChild className="bg-[#1470AF] text-white hover:bg-[#1470AF]/90 font-semibold">
+                <Link href="/pio-tool/subscribe">Subscribe — $30/month</Link>
+              </Button>
+            ) : (
+              <>
+                <Button asChild className="bg-[#1470AF] text-white hover:bg-[#1470AF]/90 font-semibold">
+                  <Link href="/sign-in?redirect=/pio-tool/settings">Sign In</Link>
+                </Button>
+                <Button asChild variant="outline">
+                  <Link href="/member-site">Join Free</Link>
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className={locked ? "[&_input]:pointer-events-none [&_input]:opacity-50 [&_textarea]:pointer-events-none [&_textarea]:opacity-50 [&_select]:pointer-events-none [&_select]:opacity-50 [&_button:not([data-unlock])]:pointer-events-none [&_button:not([data-unlock])]:opacity-50" : ""}>
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -266,6 +313,7 @@ export default function AgencySettingsPage() {
           <Save className="mr-2 h-4 w-4" />
           {saved ? "Saved!" : "Save Settings"}
         </Button>
+      </div>
       </div>
     </div>
   )

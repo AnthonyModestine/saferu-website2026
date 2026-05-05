@@ -51,7 +51,7 @@ export function Categories() {
             Browse Our Content Library
           </h2>
           <p className="mt-4 text-lg text-[#4a5568]">
-            Ready-to-use templates designed for public safety professionals.
+            Browse content by topic and quickly find the right message for your community.
           </p>
         </div>
 

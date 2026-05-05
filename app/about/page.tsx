@@ -6,7 +6,7 @@ import { Shield, Users, Clock, CheckCircle, ArrowRight } from "lucide-react"
 
 export const metadata = {
   title: "About - SaferU",
-  description: "Learn about SaferU: ready-to-share safety content and Press Center for confident public safety communication.",
+  description: "SaferU is a public safety communications platform built for police, fire, and emergency management agencies.",
 }
 
 export default function AboutPage() {
@@ -22,7 +22,7 @@ export default function AboutPage() {
                 About SaferU
               </h1>
               <p className="mt-6 text-lg leading-relaxed text-muted-foreground">
-                SaferU helps public safety agencies and local government communicate clearly with their communities. Ready-to-share safety content plus tools to draft press releases and community requests—so you can inform, educate, and protect.
+                SaferU is a public safety communications platform built for police, fire, and emergency management agencies. It helps departments share clear, timely information with their communities without adding to their workload. Designed for teams with limited time and resources, SaferU makes it easier to communicate consistently and professionally.
               </p>
             </div>
           </div>
@@ -34,10 +34,10 @@ export default function AboutPage() {
             <div className="mx-auto max-w-3xl">
               <h2 className="text-3xl font-bold text-foreground">Our Mission</h2>
               <p className="mt-6 text-lg leading-relaxed text-muted-foreground">
-                Creating clear social media content, professional press releases, and community requests takes time many agencies don’t have.
+                Public safety agencies are expected to communicate quickly and clearly, but many teams do not have the time or staffing to manage that process effectively. Writing, reviewing, and sharing information can slow operations and create unnecessary strain.
               </p>
               <p className="mt-4 text-lg leading-relaxed text-muted-foreground">
-                SaferU provides a free content library and Press Center. Press Center helps agencies draft clear, structured public messaging in minutes—without compromising oversight or professionalism.
+                SaferU exists to support agencies in delivering accurate, professional communication—especially those working with limited resources. The platform provides practical tools and ready-to-use content so departments can keep their communities informed without adding to their workload.
               </p>
             </div>
           </div>
@@ -59,9 +59,7 @@ export default function AboutPage() {
                   Free Content Library
                 </h3>
                 <p className="mt-4 text-muted-foreground">
-                  A curated library of ready-to-share social media safety content
-                  and templates. Browse by category, copy captions, and download
-                  graphics instantly.
+                  A curated library of ready-to-share safety messaging designed for public safety agencies. Built to help teams communicate common safety topics quickly, especially when time and resources are limited.
                 </p>
                 <ul className="mt-6 space-y-2">
                   <li className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -99,24 +97,28 @@ export default function AboutPage() {
                   Press Center
                 </h3>
                 <p className="mt-4 text-muted-foreground">
-                  Confident communication for public safety. Draft press releases and community requests with guided drafting and consistent tone. All messaging is reviewed and finalized by your team before distribution. Download a branded PDF that includes your agency logo, or copy into your workflow.
+                  A structured drafting tool that helps agencies create clear, professional messaging for public release. Designed to support your process while saving time.
                 </p>
                 <ul className="mt-6 space-y-2">
                   <li className="flex items-center gap-2 text-sm text-muted-foreground">
                     <CheckCircle className="h-4 w-4 text-primary" />
-                    Press releases for media and public statements
+                    Draft press releases based on key facts
                   </li>
                   <li className="flex items-center gap-2 text-sm text-muted-foreground">
                     <CheckCircle className="h-4 w-4 text-primary" />
-                    Community requests for footage and tips—for social media and community platforms
+                    Create community requests for tips or video
                   </li>
                   <li className="flex items-center gap-2 text-sm text-muted-foreground">
                     <CheckCircle className="h-4 w-4 text-primary" />
-                    Structured wording to protect your agency
+                    Maintain consistent tone and structure
                   </li>
                   <li className="flex items-center gap-2 text-sm text-muted-foreground">
                     <CheckCircle className="h-4 w-4 text-primary" />
-                    Branded PDF with your agency logo; fits your workflow
+                    Export content or copy into your workflow
+                  </li>
+                  <li className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <CheckCircle className="h-4 w-4 text-primary" />
+                    Translate messaging into Spanish
                   </li>
                 </ul>
               </div>
@@ -137,7 +139,7 @@ export default function AboutPage() {
                 Who We Serve
               </h2>
               <p className="mt-6 text-lg text-muted-foreground">
-                SaferU is for PIOs, social media managers, and anyone who communicates for public safety—at police and fire departments, EMS, emergency management, and city or county government.
+                SaferU is built for public safety professionals responsible for communicating with their communities, including agencies with limited staff or dedicated communication resources. It supports teams that need to share information clearly, quickly, and professionally.
               </p>
               <div className="mt-8 flex flex-wrap justify-center gap-3">
                 {[
@@ -164,10 +166,10 @@ export default function AboutPage() {
         <section className="bg-primary py-16">
           <div className="mx-auto max-w-7xl px-4 text-center sm:px-6 lg:px-8">
             <h2 className="text-3xl font-bold text-primary-foreground">
-              Ready to Get Started?
+              Start communicating with confidence
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-primary-foreground/80">
-              Start with ready-to-share safety content, or add Press Center to draft press releases and community requests.
+              Join SaferU and give your team the tools to share clear, accurate information—without adding to your workload.
             </p>
             <Button
               asChild
@@ -175,7 +177,7 @@ export default function AboutPage() {
               className="mt-8 bg-accent text-accent-foreground hover:bg-accent/90"
             >
               <Link href="/member-site">
-                Join Free
+                Join Today
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>

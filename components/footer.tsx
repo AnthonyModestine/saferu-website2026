@@ -57,6 +57,9 @@ export function Footer() {
 
         <div className="mt-6 border-t border-[#2d4a6f] pt-6 text-center">
           <p className="text-sm text-[#a0c4e8]">
+            Clear communication. Trusted by public safety.
+          </p>
+          <p className="text-xs text-[#4a5568] mt-1">
             &copy; {new Date().getFullYear()} SaferU | All rights reserved.
           </p>
         </div>

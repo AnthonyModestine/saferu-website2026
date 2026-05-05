@@ -11,22 +11,22 @@ const features = [
   {
     icon: FileText,
     title: "Press Releases",
-    description: "Draft formal media statements from the facts you enter. Structured format. Professional tone. Ready for internal review before release.",
+    description: "Turn incident details into a complete, professional statement. Organized, consistent, and ready for internal review before release.",
   },
   {
     icon: Sparkles,
     title: "Community Requests",
-    description: "Clear social posts requesting community video or tips—built to follow Neighbors by Ring Community Guidelines when you publish on that platform.",
+    description: "Create clear requests for community video or tips. Formatted for public platforms and aligned with Neighbors by Ring guidelines.",
   },
   {
     icon: Building2,
     title: "Built for Oversight",
-    description: "Press Center supports your communication process—it does not replace it. All messaging is reviewed and finalized by your team before distribution.",
+    description: "Press Center supports your communication process—it does not replace it. Your team reviews, edits, and approves every message before it is shared.",
   },
   {
     icon: Download,
     title: "Ready to Share",
-    description: "Download a branded PDF that includes your agency logo, or copy the text into your existing workflow. Fits how you already operate.",
+    description: "Download a branded PDF with your agency logo or copy the content directly into your existing workflow. No change to how your team operates.",
   },
 ]
 
@@ -73,9 +73,9 @@ export default function SubscribePage() {
   return (
     <div className="mx-auto max-w-3xl space-y-8">
       <div className="text-center">
-        <h1 className="text-3xl font-bold text-[#1a365d]">Confident Communication for Public Safety.</h1>
+        <h1 className="text-3xl font-bold text-[#1a365d]">Confident Communication for Public Safety</h1>
         <p className="mt-2 text-lg text-muted-foreground">
-          Press Center helps agencies draft clear, structured public messaging in minutes—without compromising oversight or professionalism.
+          Press Center helps your agency turn key details into clear, structured public messaging—quickly and without disrupting your approval process.
         </p>
       </div>
 
@@ -101,7 +101,7 @@ export default function SubscribePage() {
       <Card className="border-[#1470AF]/20">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Press Center</CardTitle>
-          <CardDescription>Draft press releases and community requests. Guided drafting with consistent tone.</CardDescription>
+          <CardDescription>Draft press releases and community requests using guided, structured input.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="text-center">
@@ -116,12 +116,13 @@ export default function SubscribePage() {
 
           <ul className="space-y-3 mx-auto max-w-sm">
             {[
-              "Press releases and community requests from simple forms",
-              "Community requests for social media and community platforms—use wherever you post",
-              "Structured wording to protect your agency",
-              "Professional tone—reads like official agency communications",
-              "Saves time on first drafts; focus on fact-checking and approval",
-              "Branded PDF with your agency logo, or copy into your workflow. Cancel anytime.",
+              "Draft press releases and community requests from simple inputs",
+              "Create posts for social media and community platforms",
+              "Structured wording to support clear, consistent communication",
+              "Professional tone aligned with official agency messaging",
+              "Reduce time spent on first drafts so your team can focus on review and approval",
+              "Export as a branded PDF or copy directly into your workflow",
+              "Cancel anytime — no refunds on the current billing period",
             ].map((feature) => (
               <li key={feature} className="flex items-start gap-2 text-sm">
                 <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#1470AF]" />
@@ -146,7 +147,7 @@ export default function SubscribePage() {
 
       {/* Trust */}
       <p className="text-center text-sm text-muted-foreground">
-        Secure payment processing by Stripe. Cancel anytime.
+        Secure payment processing by Stripe. You may cancel anytime. All sales are final — no refunds on the current billing period.
       </p>
     </div>
   )

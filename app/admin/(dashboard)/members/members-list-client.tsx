@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { PasswordInput } from "@/components/ui/password-input"
 import {
   Select,
   SelectContent,
@@ -362,9 +363,8 @@ export function MembersListClient({ initialMembers, total, error }: Props) {
             </div>
             <div className="space-y-2">
               <Label htmlFor="add-password">Temporary password (optional)</Label>
-              <Input
+              <PasswordInput
                 id="add-password"
-                type="password"
                 placeholder="Min 8 characters — never shown in backend"
                 value={addPassword}
                 onChange={(e) => setAddPassword(e.target.value)}

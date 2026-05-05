@@ -5,22 +5,22 @@ import { FileText, Zap, Shield, Download, ArrowRight } from "lucide-react"
 const features = [
   {
     title: "Press Releases",
-    description: "Draft formal media statements directly from the facts you provide. Structured format. Professional tone. Ready for internal review before release.",
+    description: "Turn key facts into a formal statement your leadership can review and approve. Organized, direct, and ready for release.",
     icon: FileText,
   },
   {
     title: "Community Requests",
-    description: "Clear social posts requesting community video or tips—built to follow Neighbors by Ring Community Guidelines when you publish on that platform.",
+    description: "Create clear, compliant requests for community assistance, including video and tips, aligned with platform guidelines such as Neighbors by Ring.",
     icon: Zap,
   },
   {
     title: "Built for Oversight",
-    description: "Press Center supports your communication process — it does not replace it. All messaging is reviewed and finalized by your team before distribution.",
+    description: "Press Center supports your communication process—it does not replace it. All messaging is reviewed and finalized by your team before distribution.",
     icon: Shield,
   },
   {
     title: "Ready to Share",
-    description: "Download a branded PDF that includes your agency logo, or copy the text directly into your existing workflow. Press Center fits how you already operate.",
+    description: "Download a branded document or copy content directly into your existing workflow. Messaging can also be translated into Spanish to better reach your entire community.",
     icon: Download,
   },
 ]
@@ -37,10 +37,10 @@ export function PIOToolSection() {
         <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
           <div>
             <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">
-              Press Center
+              Structured Communication When It Matters Most
             </h2>
             <p className="mt-4 text-xl text-[#a0c4e8]">
-              Confident Communication for Public Safety.
+              Press Center
             </p>
             <p className="mt-6 text-lg text-[#c5d8eb] leading-relaxed">
               Press Center helps agencies draft clear, structured public messaging in minutes — without compromising oversight or professionalism.
@@ -55,7 +55,7 @@ export function PIOToolSection() {
                 size="lg"
                 className="bg-[#f2b233] text-[#1a365d] hover:bg-[#f2b233]/90 font-bold shadow-lg px-8 py-6 text-lg rounded-lg"
               >
-                <Link href="/sign-in?redirect=/pio-tool">
+                <Link href="/pio-tool">
                   Open Press Center
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Link>
@@ -67,7 +67,7 @@ export function PIOToolSection() {
                 className="border-white/30 text-white hover:bg-white/10 bg-transparent px-8 py-6 text-lg rounded-lg"
               >
                 <Link href="/pricing">
-                  View Pricing
+                  See Pricing
                 </Link>
               </Button>
             </div>

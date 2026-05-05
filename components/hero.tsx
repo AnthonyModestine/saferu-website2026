@@ -22,7 +22,7 @@ export function Hero() {
           </h1>
           
           <p className="mt-6 max-w-3xl mx-auto text-xl font-semibold leading-snug text-[#1a365d] sm:text-2xl">
-            From incidents to safety tips. Supporting agencies with graphics, messaging, and official press release support so your community stays informed.
+            SaferU gives your agency a reliable way to communicate with the public—clearly, quickly, and with confidence.
           </p>
 
           <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
@@ -40,7 +40,7 @@ export function Hero() {
               size="lg"
               className="bg-[#1a365d] text-white hover:bg-[#1a365d]/90 font-bold shadow-lg px-8 py-6 text-lg rounded-lg"
             >
-              <Link href="/sign-in?redirect=/pio-tool">
+              <Link href="/pio-tool">
                 Open Press Center
               </Link>
             </Button>
