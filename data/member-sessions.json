@@ -16,5 +16,11 @@
     "email": "caitlinmodestine@gmail.com",
     "name": "Caitlin Modestine",
     "expiresAt": 1774654282
+  },
+  "dbf4950d-9e3a-47db-bd78-3c3c3fe8b89a": {
+    "memberId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "email": "a@saferu.com",
+    "name": "Admin",
+    "expiresAt": 1779151580
   }
 }
