@@ -3,7 +3,8 @@
  * Do not import this from client components or from modules used in the client bundle.
  */
 
-import { readFileSync, writeFile, mkdir } from "fs"
+import { readFileSync } from "fs"
+import { writeFile, mkdir } from "fs/promises"
 import path from "path"
 import { getAdditions, setAdditions, type CmsAdditions } from "@/lib/cms-additions"
 
