@@ -11,7 +11,7 @@ const faqs = [
   {
     question: "How does the AI generate press releases?",
     answer:
-      "The AI uses your structured input to generate professional press releases. It follows strict guidelines to only use facts you provide, never inventing information. The AI automatically removes speculation, opinions, and emotional language to ensure legally safe communications.",
+      "The AI uses your structured input to generate professional press releases. It is designed to only use facts you provide and avoids speculation, opinions, and emotional language. All output should be reviewed by your team before distribution — Press Center is a drafting tool, not a substitute for your approval process.",
   },
   {
     question: "When should I use 'alleged' in my press release?",
@@ -29,14 +29,14 @@ const faqs = [
       "Yes! The generated press release is a starting point. You can copy it and make any necessary edits before distribution. We recommend reviewing all AI-generated content before publication.",
   },
   {
-    question: "What information should I NOT include?",
-    answer:
-      "Avoid including: criminal history of suspects, speculation about intoxication, witness emotions or reactions, unconfirmed identities, and any information that could compromise an ongoing investigation.",
-  },
-  {
     question: "How do I export my press release?",
     answer:
       "After generating a press release, you can export it as PDF from the preview panel. The downloaded PDF includes a finalized version of your press release with your agency's logo on it. You can also view and export past releases from the History page.",
+  },
+  {
+    question: "What is the History section?",
+    answer:
+      "The History section keeps a log of every press release and community request your agency has generated in Press Center. You can revisit past drafts, copy the content, and use them as reference for future releases. History is stored locally in your browser and is only visible to you.",
   },
 ]
 
@@ -75,13 +75,12 @@ export default function HelpPage() {
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
                 <Shield className="h-5 w-5 text-primary" />
               </div>
-              <CardTitle className="text-base">Legal Safety</CardTitle>
+              <CardTitle className="text-base">Professional Tone</CardTitle>
             </div>
           </CardHeader>
           <CardContent>
             <CardDescription>
-              The AI follows strict guardrails to ensure your press releases are
-              legally safe and professionally written.
+              The AI is structured to use factual, neutral language — avoiding speculation, opinion, and emotional wording. Your team reviews and approves everything before it goes out.
             </CardDescription>
           </CardContent>
         </Card>
