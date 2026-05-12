@@ -37,7 +37,7 @@ export default function WhatsNewPage() {
             <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[#f2b233]/20">
               <Lock className="h-10 w-10 text-[#f2b233]" />
             </div>
-            <h1 className="mt-6 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+            <h1 className="mt-6 text-3xl font-bold tracking-tight text-[#1a365d] sm:text-4xl">
               Members Only Content
             </h1>
             <p className="mt-4 text-lg text-muted-foreground">
@@ -110,7 +110,7 @@ export default function WhatsNewPage() {
                 <Star className="h-8 w-8" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-foreground">{category.title}</h1>
+                <h1 className="text-3xl font-bold text-[#1a365d]">{category.title}</h1>
                 <p className="mt-1 text-muted-foreground">{category.description}</p>
               </div>
             </div>
@@ -119,7 +119,7 @@ export default function WhatsNewPage() {
 
         <section className="py-12">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <h2 className="text-xl font-semibold text-foreground mb-6">Articles</h2>
+            <h2 className="text-xl font-semibold text-[#1a365d] mb-6">Articles</h2>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {articles.map((article) => (
                 <Link key={article.id} href={`/whats-new/${article.id}`}>

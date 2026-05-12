@@ -46,7 +46,7 @@ export default function PIODashboardPage() {
 
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Press Center</h1>
+        <h1 className="text-2xl font-bold text-[#1a365d]">Press Center</h1>
         <p className="text-muted-foreground mt-1">
           Confident communication for public safety. Draft press releases and community requests with guided drafting.
         </p>
@@ -152,13 +152,13 @@ export default function PIODashboardPage() {
 
       {/* ====== HOW IT WORKS (visible to everyone) ====== */}
       <div className="pb-10">
-        <h2 className="text-lg font-semibold text-foreground mb-6">How It Works</h2>
+        <h2 className="text-lg font-semibold text-[#1a365d] mb-6">How It Works</h2>
         <div className="grid gap-8 sm:grid-cols-3">
           <div className="space-y-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1470AF]/10">
               <ClipboardList className="h-5 w-5 text-[#1470AF]" />
             </div>
-            <h3 className="font-semibold text-foreground">1. Pick Your Format</h3>
+            <h3 className="font-semibold text-[#1a365d]">1. Pick Your Format</h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
               Choose a formal press release for media or a community request for social media and community platforms.
             </p>
@@ -167,7 +167,7 @@ export default function PIODashboardPage() {
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1470AF]/10">
               <PenLine className="h-5 w-5 text-[#1470AF]" />
             </div>
-            <h3 className="font-semibold text-foreground">2. Answer a Few Questions</h3>
+            <h3 className="font-semibold text-[#1a365d]">2. Answer a Few Questions</h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
               Enter the details—incident type, location, timeframe.
             </p>
@@ -176,7 +176,7 @@ export default function PIODashboardPage() {
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1470AF]/10">
               <Share2 className="h-5 w-5 text-[#1470AF]" />
             </div>
-            <h3 className="font-semibold text-foreground">3. Export or Copy</h3>
+            <h3 className="font-semibold text-[#1a365d]">3. Export or Copy</h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
               Download a branded PDF that includes your agency logo, or copy community requests into your usual channels.
             </p>

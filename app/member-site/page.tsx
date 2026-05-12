@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { PasswordInput } from "@/components/ui/password-input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Shield, CheckCircle, ArrowRight } from "lucide-react"
+import { CheckCircle, ArrowRight } from "lucide-react"
 
 export default function MemberSitePage() {
   const [signUpSuccess, setSignUpSuccess] = useState(false)
@@ -109,30 +109,25 @@ export default function MemberSitePage() {
             <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
               {/* Left Column - Benefits */}
               <div>
-                <div className="flex items-center gap-3">
-                  <Shield className="h-10 w-10 text-primary" />
-                  <span className="text-2xl font-bold text-foreground">SaferU</span>
-                </div>
-                <h1 className="mt-6 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+                <h1 className="text-3xl font-bold tracking-tight text-[#1a365d] sm:text-4xl">
                   Join SaferU for Free
                 </h1>
                 <p className="mt-4 text-lg text-muted-foreground">
-                  Get access to our complete library of ready-to-share safety
-                  content for your agency.
+                  Become a member and get weekly access to What&apos;s New — plus our full library of ready-to-share safety content for your agency.
                 </p>
 
                 <ul className="mt-8 space-y-4">
                   {[
+                    "What's New — fresh content added every week",
                     "Access to all content categories",
                     "Copy captions with one click",
                     "Download high-quality graphics",
                     "Save favorites for quick access",
-                    "New content added regularly",
                     "100% free for public safety agencies",
                   ].map((benefit) => (
                     <li key={benefit} className="flex items-center gap-3">
                       <CheckCircle className="h-5 w-5 text-primary" />
-                      <span className="text-foreground">{benefit}</span>
+                      <span className="text-muted-foreground">{benefit}</span>
                     </li>
                   ))}
                 </ul>

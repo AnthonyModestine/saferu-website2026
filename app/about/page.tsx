@@ -18,7 +18,7 @@ export default function AboutPage() {
         <section className="bg-primary/5 py-20">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-3xl text-center">
-              <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
+              <h1 className="text-4xl font-bold tracking-tight text-[#1a365d] sm:text-5xl">
                 About SaferU
               </h1>
               <p className="mt-6 text-lg leading-relaxed text-muted-foreground">
@@ -32,7 +32,7 @@ export default function AboutPage() {
         <section className="py-20">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-3xl">
-              <h2 className="text-3xl font-bold text-foreground">Our Mission</h2>
+              <h2 className="text-3xl font-bold text-[#1a365d]">Our Mission</h2>
               <p className="mt-6 text-lg leading-relaxed text-muted-foreground">
                 Public safety agencies are expected to communicate quickly and clearly, but many teams do not have the time or staffing to manage that process effectively. Writing, reviewing, and sharing information can slow operations and create unnecessary strain.
               </p>
@@ -46,7 +46,7 @@ export default function AboutPage() {
         {/* Features */}
         <section className="bg-muted py-20">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <h2 className="text-center text-3xl font-bold text-foreground">
+            <h2 className="text-center text-3xl font-bold text-[#1a365d]">
               What We Offer
             </h2>
 
@@ -55,7 +55,7 @@ export default function AboutPage() {
                 <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
                   <Shield className="h-6 w-6 text-primary" />
                 </div>
-                <h3 className="mt-6 text-xl font-semibold text-card-foreground">
+                <h3 className="mt-6 text-xl font-semibold text-[#1a365d]">
                   Free Content Library
                 </h3>
                 <p className="mt-4 text-muted-foreground">
@@ -93,7 +93,7 @@ export default function AboutPage() {
                 <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-accent/30">
                   <Clock className="h-6 w-6 text-accent-foreground" />
                 </div>
-                <h3 className="mt-6 text-xl font-semibold text-card-foreground">
+                <h3 className="mt-6 text-xl font-semibold text-[#1a365d]">
                   Press Center
                 </h3>
                 <p className="mt-4 text-muted-foreground">
@@ -135,7 +135,7 @@ export default function AboutPage() {
                   <Users className="h-7 w-7 text-primary" />
                 </div>
               </div>
-              <h2 className="mt-6 text-3xl font-bold text-foreground">
+              <h2 className="mt-6 text-3xl font-bold text-[#1a365d]">
                 Who We Serve
               </h2>
               <p className="mt-6 text-lg text-muted-foreground">

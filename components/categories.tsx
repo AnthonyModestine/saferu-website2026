@@ -50,7 +50,7 @@ export function Categories() {
           <h2 className="text-3xl font-bold tracking-tight text-[#1a365d] sm:text-4xl">
             Browse Our Content Library
           </h2>
-          <p className="mt-4 text-lg text-[#4a5568]">
+          <p className="mt-4 text-lg text-muted-foreground">
             Browse content by topic and quickly find the right message for your community.
           </p>
         </div>
@@ -82,7 +82,7 @@ export function Categories() {
               </div>
               
               {/* Description */}
-              <p className="mt-3 text-sm text-[#4a5568] leading-relaxed">
+              <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
                 {category.description}
               </p>
             </Link>

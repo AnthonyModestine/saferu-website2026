@@ -11,7 +11,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Check } from "lucide-react"
 
 const benefits = [
-  "Access to free content library",
+  "Access to What's New — updated every week",
+  "Full content library for your agency",
   "Crime prevention templates",
   "Fire safety resources",
   "Weather preparedness guides",
@@ -91,21 +92,22 @@ export default function SignUpPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-[#f0f4f8] to-[#dae6f0] px-4 py-12">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <Link href="/" className="mx-auto mb-4">
+          <Link href="/" className="mx-auto mb-4 flex items-center justify-center">
             <Image
               src="/images/saferu-logo.png"
               alt="SaferU"
-              width={160}
-              height={45}
-              className="h-12 w-auto"
+              width={180}
+              height={52}
+              className="h-13 w-auto"
+              style={{ filter: "brightness(0.4) contrast(1.2)" }}
             />
           </Link>
-          <CardTitle className="text-2xl font-bold text-[#1a365d]">Create Your Account</CardTitle>
-          <CardDescription>Get free access to ready-to-share safety content. Add Press Center later to draft press releases and community requests.</CardDescription>
+          <CardTitle className="text-2xl font-bold text-[#1a365d]">Create Your Free Account</CardTitle>
+          <CardDescription>Become a member and get weekly access to What&apos;s New — plus our full library of ready-to-share safety content.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="rounded-lg bg-primary/5 p-4 space-y-2">
-            <p className="text-sm font-medium text-foreground">Free membership includes:</p>
+            <p className="text-sm font-medium text-foreground">As a free member you get:</p>
             <ul className="space-y-1">
               {benefits.map((benefit) => (
                 <li key={benefit} className="flex items-center gap-2 text-sm text-muted-foreground">

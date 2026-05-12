@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Check, FileText, Sparkles, Download, Building2 } from "lucide-react"
+import { Check, FileText, Zap, Shield, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { PRODUCTS } from "@/lib/products"
@@ -11,22 +11,22 @@ const features = [
   {
     icon: FileText,
     title: "Press Releases",
-    description: "Turn incident details into a complete, professional statement. Organized, consistent, and ready for internal review before release.",
+    description: "Turn key facts into a formal statement your leadership can review and approve. Organized, direct, and ready for release.",
   },
   {
-    icon: Sparkles,
+    icon: Zap,
     title: "Community Requests",
-    description: "Create clear requests for community video or tips. Formatted for public platforms and aligned with Neighbors by Ring guidelines.",
+    description: "Create clear, compliant requests for community assistance, including video and tips, aligned with platform guidelines such as Neighbors by Ring.",
   },
   {
-    icon: Building2,
+    icon: Shield,
     title: "Built for Oversight",
-    description: "Press Center supports your communication process—it does not replace it. Your team reviews, edits, and approves every message before it is shared.",
+    description: "Press Center supports your communication process—it does not replace it. All messaging is reviewed and finalized by your team before distribution.",
   },
   {
     icon: Download,
     title: "Ready to Share",
-    description: "Download a branded PDF with your agency logo or copy the content directly into your existing workflow. No change to how your team operates.",
+    description: "Download a branded document or copy content directly into your existing workflow. Messaging can also be translated into Spanish to better reach your entire community.",
   },
 ]
 
@@ -45,7 +45,7 @@ export default function SubscribePage() {
     return (
       <div className="mx-auto max-w-2xl space-y-6">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-foreground">Complete Your Subscription</h1>
+          <h1 className="text-2xl font-bold text-[#1a365d]">Complete Your Subscription</h1>
           <p className="mt-2 text-muted-foreground">
             Secure checkout powered by Stripe
           </p>
@@ -73,9 +73,9 @@ export default function SubscribePage() {
   return (
     <div className="mx-auto max-w-3xl space-y-8">
       <div className="text-center">
-        <h1 className="text-3xl font-bold text-[#1a365d]">Confident Communication for Public Safety</h1>
+        <h1 className="text-3xl font-bold text-[#1a365d]">Communicate with Confidence</h1>
         <p className="mt-2 text-lg text-muted-foreground">
-          Press Center helps your agency turn key details into clear, structured public messaging—quickly and without disrupting your approval process.
+          Press Center helps your agency turn incident details into clear, professional public messaging — in minutes, not hours.
         </p>
       </div>
 
@@ -101,32 +101,31 @@ export default function SubscribePage() {
       <Card className="border-[#1470AF]/20">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Press Center</CardTitle>
-          <CardDescription>Draft press releases and community requests using guided, structured input.</CardDescription>
+          <CardDescription>Everything you need to communicate with confidence during any incident.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="text-center">
             <div className="flex items-baseline justify-center gap-1">
               <span className="text-5xl font-bold text-foreground">
-                ${monthlyPlan ? (monthlyPlan.priceInCents / 100).toFixed(0) : "20"}
+                ${monthlyPlan ? (monthlyPlan.priceInCents / 100).toFixed(0) : "30"}
               </span>
               <span className="text-muted-foreground">/month</span>
             </div>
-            <p className="mt-1 text-sm text-muted-foreground">30 generations per month included</p>
           </div>
 
           <ul className="space-y-3 mx-auto max-w-sm">
             {[
-              "Draft press releases and community requests from simple inputs",
-              "Create posts for social media and community platforms",
-              "Structured wording to support clear, consistent communication",
-              "Professional tone aligned with official agency messaging",
-              "Reduce time spent on first drafts so your team can focus on review and approval",
-              "Export as a branded PDF or copy directly into your workflow",
-              "Cancel anytime — no refunds on the current billing period",
+              "Professional press releases drafted in minutes — not hours",
+              "Facebook & X posts written and ready to copy",
+              "Talking points so your spokesperson walks in prepared",
+              "Branded PDF with your logo — send it the moment it's done",
+              "Community footage requests drafted and ready to post",
+              "One-click Spanish translation to reach every resident",
+              "Cancel anytime — no contracts",
             ].map((feature) => (
               <li key={feature} className="flex items-start gap-2 text-sm">
                 <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#1470AF]" />
-                <span className="text-foreground">{feature}</span>
+                <span className="text-muted-foreground">{feature}</span>
               </li>
             ))}
           </ul>
@@ -137,17 +136,15 @@ export default function SubscribePage() {
               className="bg-[#f2b233] text-[#1a365d] hover:bg-[#e5a52e] font-semibold px-12"
               onClick={() => handleSubscribe("pio-tool-monthly")}
             >
-              Get Started
+              Get Press Center
             </Button>
           </div>
-
-
         </CardContent>
       </Card>
 
       {/* Trust */}
       <p className="text-center text-sm text-muted-foreground">
-        Secure payment processing by Stripe. You may cancel anytime. All sales are final — no refunds on the current billing period.
+        Cancel anytime. No contracts. Secure payment via Stripe.
       </p>
     </div>
   )

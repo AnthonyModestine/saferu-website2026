@@ -14,7 +14,7 @@ const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   : null
 
 export function Checkout({ productId }: { productId: string }) {
-  const startCheckoutSessionForProduct = useCallback(
+  const fetchClientSecret = useCallback(
     () => startCheckoutSession(productId),
     [productId],
   )
@@ -23,7 +23,7 @@ export function Checkout({ productId }: { productId: string }) {
     <div id="checkout">
       <EmbeddedCheckoutProvider
         stripe={stripePromise}
-        options={{ clientSecret: startCheckoutSessionForProduct }}
+        options={{ fetchClientSecret }}
       >
         <EmbeddedCheckout />
       </EmbeddedCheckoutProvider>

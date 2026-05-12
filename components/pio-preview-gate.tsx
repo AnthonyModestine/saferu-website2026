@@ -5,6 +5,7 @@ import { Lock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useSubscription } from "@/lib/use-subscription"
 import { useMemberSession } from "@/lib/use-member-session"
+import { useRouter } from "next/navigation"
 
 /**
  * Wraps Press Center form content.
@@ -15,6 +16,7 @@ import { useMemberSession } from "@/lib/use-member-session"
 export function PIOPreviewGate({ children }: { children: React.ReactNode }) {
   const { member, isLoading: sessionLoading } = useMemberSession()
   const { isSubscribed, isLoading: subLoading } = useSubscription()
+  const router = useRouter()
 
   const isLoading = sessionLoading || subLoading
 
@@ -70,9 +72,20 @@ export function PIOPreviewGate({ children }: { children: React.ReactNode }) {
         </div>
       </div>
 
-      {/* Form — fully visible, inputs/textareas disabled but tabs remain clickable */}
-      <div className="[&_input]:pointer-events-none [&_input]:opacity-50 [&_textarea]:pointer-events-none [&_textarea]:opacity-50 [&_select]:pointer-events-none [&_select]:opacity-50 [&_[role=combobox]]:pointer-events-none [&_[role=combobox]]:opacity-50">
-        {children}
+      {/* Form — fully visible, inputs/textareas disabled. Clicking anywhere redirects to upgrade. */}
+      <div
+        className="relative cursor-pointer"
+        onClick={() => {
+          if (member) {
+            router.push("/pio-tool/subscribe")
+          } else {
+            router.push("/pricing")
+          }
+        }}
+      >
+        <div className="[&_input]:pointer-events-none [&_input]:opacity-50 [&_textarea]:pointer-events-none [&_textarea]:opacity-50 [&_select]:pointer-events-none [&_select]:opacity-50 [&_[role=combobox]]:pointer-events-none [&_[role=combobox]]:opacity-50 pointer-events-none">
+          {children}
+        </div>
       </div>
     </div>
   )

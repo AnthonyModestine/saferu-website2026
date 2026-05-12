@@ -132,7 +132,7 @@ export function Header() {
                 asChild
                 className="bg-[#f2b233] text-[#1a365d] hover:bg-[#f2b233]/90 font-semibold"
               >
-                <Link href="/sign-up">Sign Up</Link>
+                <Link href="/member-site">Sign Up</Link>
               </Button>
             </>
           )}
@@ -239,7 +239,7 @@ export function Header() {
                     asChild
                     className="w-full bg-[#f2b233] text-[#1a365d] hover:bg-[#f2b233]/90 font-semibold"
                   >
-                    <Link href="/sign-up">Sign Up</Link>
+                    <Link href="/member-site">Sign Up</Link>
                   </Button>
                 </>
               )}

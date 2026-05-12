@@ -49,7 +49,7 @@ export function Benefits() {
           <h2 className="text-3xl font-bold tracking-tight text-[#1a365d] sm:text-4xl">
             Ready-to-Share Safety Content
           </h2>
-          <p className="mt-4 text-lg text-[#4a5568]">
+          <p className="mt-4 text-lg text-muted-foreground">
             Save time and resources with SaferU's FREE curated social media posts designed specifically for public safety agencies.
           </p>
         </div>
@@ -68,7 +68,7 @@ export function Benefits() {
               <h3 className="text-lg font-bold text-[#1a365d]">
                 {benefit.title}
               </h3>
-              <p className="mt-2 text-sm text-[#4a5568] leading-relaxed">
+              <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
                 {benefit.description}
               </p>
             </div>

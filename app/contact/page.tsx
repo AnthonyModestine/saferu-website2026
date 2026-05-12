@@ -74,7 +74,7 @@ export default function ContactPage() {
         <section className="py-20">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-2xl text-center">
-              <h1 className="text-4xl font-bold tracking-tight text-foreground">
+              <h1 className="text-4xl font-bold tracking-tight text-[#1a365d]">
                 Contact Us
               </h1>
               <p className="mt-4 text-lg text-muted-foreground">
@@ -136,7 +136,7 @@ export default function ContactPage() {
                         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
                           <CheckCircle className="h-8 w-8 text-primary" />
                         </div>
-                        <h3 className="mt-4 text-xl font-semibold text-foreground">
+                        <h3 className="mt-4 text-xl font-semibold text-[#1a365d]">
                           Message Sent!
                         </h3>
                         <p className="mt-2 text-muted-foreground">
