@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Save, Upload, Building2, X, CreditCard, ExternalLink, Lock } from "lucide-react"
+import { Save, Upload, Building2, X, CreditCard, ExternalLink } from "lucide-react"
 import { useAgency } from "@/lib/agency-context"
 import { useSubscription } from "@/lib/use-subscription"
 import { useMemberSession } from "@/lib/use-member-session"
@@ -66,32 +66,16 @@ export default function AgencySettingsPage() {
       </div>
 
       {locked && (
-        <div className="rounded-xl border border-[#1470AF]/30 bg-[#1470AF]/5 p-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-3">
-            <Lock className="h-5 w-5 text-[#1470AF] mt-0.5 shrink-0" />
-            <div>
-              <p className="font-semibold text-[#1a365d]">Subscribe to save Agency Settings</p>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                These fields save permanently to your account. Sign in to your paid account to fill them out.
-              </p>
-            </div>
+        <div className="rounded-xl border border-[#1470AF]/20 bg-[#1470AF]/5 p-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="font-bold text-[#1a365d] text-lg">Get started with Press Center</p>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              $30/month. Confident communication for public safety — draft press releases and community requests in minutes without compromising oversight.
+            </p>
           </div>
-          <div className="flex gap-3 shrink-0">
-            {member ? (
-              <Button asChild className="bg-[#1470AF] text-white hover:bg-[#1470AF]/90 font-semibold">
-                <Link href="/pio-tool/subscribe">Subscribe — $30/month</Link>
-              </Button>
-            ) : (
-              <>
-                <Button asChild className="bg-[#1470AF] text-white hover:bg-[#1470AF]/90 font-semibold">
-                  <Link href="/sign-in?redirect=/pio-tool/settings">Sign In</Link>
-                </Button>
-                <Button asChild variant="outline">
-                  <Link href="/member-site">Join Free</Link>
-                </Button>
-              </>
-            )}
-          </div>
+          <Button asChild className="shrink-0 bg-[#f2b233] text-[#1a365d] hover:bg-[#f2b233]/90 font-semibold">
+            <Link href="/pricing">Subscribe Now</Link>
+          </Button>
         </div>
       )}
 

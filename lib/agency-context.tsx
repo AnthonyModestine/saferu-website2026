@@ -33,13 +33,41 @@ const defaultSettings: AgencySettings = {
   contactEmail: "",
 }
 
+const PERSONAL_INFO_REPLACEMENTS: Partial<Record<keyof AgencySettings, string>> = {
+  contactName: "John Smith",
+  contactPhone: "555-555-5555",
+  contactPhone2: "",
+  contactEmail: "John.Smith@DemoAgency.gov",
+}
+
+const PERSONAL_VALUES_TO_REPLACE = [
+  "anthony modestine",
+  "6102205432",
+  "a@saferu.com",
+]
+
+function sanitizeSettings(settings: AgencySettings): AgencySettings {
+  const result = { ...settings }
+  for (const key of Object.keys(PERSONAL_INFO_REPLACEMENTS) as (keyof AgencySettings)[]) {
+    const val = result[key]
+    if (typeof val === "string" && PERSONAL_VALUES_TO_REPLACE.includes(val.toLowerCase().trim())) {
+      (result as Record<string, unknown>)[key] = PERSONAL_INFO_REPLACEMENTS[key]
+    }
+  }
+  return result
+}
+
 function loadStored(): AgencySettings {
   if (typeof window === "undefined") return defaultSettings
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<AgencySettings>
-      return { ...defaultSettings, ...parsed }
+      const merged = { ...defaultSettings, ...parsed }
+      const sanitized = sanitizeSettings(merged)
+      // Persist the sanitized version so it's clean going forward
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized))
+      return sanitized
     }
   } catch {
     // ignore

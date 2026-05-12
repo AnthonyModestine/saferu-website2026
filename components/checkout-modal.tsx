@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog"
 import { Checkout } from "@/components/checkout"
 
-export function CheckoutModal() {
+export function CheckoutModal({ label = "Get Press Center", className }: { label?: string; className?: string }) {
   const [open, setOpen] = useState(false)
 
   return (
@@ -19,9 +19,9 @@ export function CheckoutModal() {
       <DialogTrigger asChild>
         <Button
           size="lg"
-          className="w-full mt-8 py-6 text-base font-semibold bg-[#1470AF] text-white hover:bg-[#1470AF]/90"
+          className={className ?? "w-full mt-8 py-6 text-base font-semibold bg-[#1470AF] text-white hover:bg-[#1470AF]/90"}
         >
-          Get Press Center
+          {label}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">

@@ -38,6 +38,40 @@ export async function startCheckoutSession(productId: string) {
   return session.client_secret
 }
 
+export async function startHostedCheckoutSession(productId: string) {
+  if (!stripe) {
+    throw new Error("Stripe is not configured. Set STRIPE_SECRET_KEY.")
+  }
+  const product = PRODUCTS.find((p) => p.id === productId)
+  if (!product) {
+    throw new Error(`Product with id "${productId}" not found`)
+  }
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+
+  const session = await stripe.checkout.sessions.create({
+    mode: product.interval ? 'subscription' : 'payment',
+    line_items: [
+      {
+        price_data: {
+          currency: 'usd',
+          product_data: {
+            name: product.name,
+            description: product.description,
+          },
+          unit_amount: product.priceInCents,
+          recurring: product.interval ? { interval: product.interval } : undefined,
+        },
+        quantity: 1,
+      },
+    ],
+    success_url: `${appUrl}/pio-tool?subscribed=1`,
+    cancel_url: `${appUrl}/pricing`,
+  })
+
+  return session.url
+}
+
 export async function createCustomerPortalSession(customerId: string) {
   if (!stripe) {
     throw new Error("Stripe is not configured. Set STRIPE_SECRET_KEY.")

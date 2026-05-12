@@ -757,7 +757,7 @@ Email: ${displayEmail}`
                 <Label htmlFor="contactName">Name</Label>
                 <Input
                   id="contactName"
-                  placeholder="Contact Name"
+                  placeholder="e.g. John Smith"
                   className="placeholder:text-muted-foreground/60"
                   value={contactName}
                   onChange={(e) => setContactName(e.target.value)}
@@ -768,7 +768,7 @@ Email: ${displayEmail}`
                   <Label htmlFor="phone">Phone</Label>
                   <Input
                     id="phone"
-                    placeholder="Phone Number"
+                    placeholder="e.g. 555-555-5555"
                     className="placeholder:text-muted-foreground/60"
                     value={contactPhone}
                     onChange={(e) => setContactPhone(e.target.value)}
@@ -778,7 +778,7 @@ Email: ${displayEmail}`
                   <Label htmlFor="phone2">Secondary Phone (optional)</Label>
                   <Input
                     id="phone2"
-                    placeholder="Phone Number"
+                    placeholder="e.g. 555-555-5556"
                     className="placeholder:text-muted-foreground/60"
                     value={contactPhone2}
                     onChange={(e) => setContactPhone2(e.target.value)}
@@ -790,7 +790,7 @@ Email: ${displayEmail}`
                 <Input
                   id="email"
                   type="email"
-                  placeholder="Email Address"
+                  placeholder="e.g. press@agency.gov"
                   className="placeholder:text-muted-foreground/60"
                   value={contactEmail}
                   onChange={(e) => setContactEmail(e.target.value)}

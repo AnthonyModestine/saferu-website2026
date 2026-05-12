@@ -37,13 +37,16 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Search, MoreHorizontal, Download, Copy, FileText, Eye, Trash2 } from "lucide-react"
+import Link from "next/link"
 import {
   getPioHistoryItems,
   deletePioHistoryItem,
   type PioHistoryItem,
 } from "@/lib/pio-history-store"
+import { useSubscription } from "@/lib/use-subscription"
 
 export default function HistoryPage() {
+  const { isSubscribed } = useSubscription()
   const [items, setItems] = useState<PioHistoryItem[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedItem, setSelectedItem] = useState<PioHistoryItem | null>(null)
@@ -87,8 +90,22 @@ export default function HistoryPage() {
 
   return (
     <div className="space-y-6">
+      {!isSubscribed && (
+        <div className="rounded-xl border border-[#1470AF]/20 bg-[#1470AF]/5 p-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="font-bold text-[#1a365d] text-lg">Get started with Press Center</p>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              $30/month. Confident communication for public safety — draft press releases and community requests in minutes without compromising oversight.
+            </p>
+          </div>
+          <Button asChild className="shrink-0 bg-[#f2b233] text-[#1a365d] hover:bg-[#f2b233]/90 font-semibold">
+            <Link href="/pricing">Subscribe Now</Link>
+          </Button>
+        </div>
+      )}
+
       <div>
-        <h1 className="text-2xl font-bold text-foreground">History</h1>
+        <h1 className="text-2xl font-bold text-[#1a365d]">History</h1>
         <p className="text-muted-foreground">
           View, export, and manage your press releases and community requests from the past 30 days. Items older than 30 days are automatically removed.
         </p>

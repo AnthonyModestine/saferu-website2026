@@ -1,20 +1,13 @@
 "use client"
 
 import Link from "next/link"
-import { Lock } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useRouter } from "next/navigation"
 import { useSubscription } from "@/lib/use-subscription"
 import { useMemberSession } from "@/lib/use-member-session"
-import { useRouter } from "next/navigation"
 
-/**
- * Wraps Press Center form content.
- * - Subscribed users: full interactive form.
- * - Everyone else: form is fully visible but all inputs are disabled.
- *   A banner at the top explains how to unlock.
- */
 export function PIOPreviewGate({ children }: { children: React.ReactNode }) {
-  const { member, isLoading: sessionLoading } = useMemberSession()
+  const { isLoading: sessionLoading } = useMemberSession()
   const { isSubscribed, isLoading: subLoading } = useSubscription()
   const router = useRouter()
 
@@ -33,59 +26,36 @@ export function PIOPreviewGate({ children }: { children: React.ReactNode }) {
     return <>{children}</>
   }
 
+  function handleGreyClick(e: React.MouseEvent<HTMLDivElement>) {
+    const target = e.target as HTMLElement
+    if (target.closest('[role="tab"]')) return
+    router.push("/pricing")
+  }
+
   return (
     <div className="space-y-6">
-      {/* Unlock banner */}
-      <div className="rounded-xl border border-[#1470AF]/30 bg-[#1470AF]/5 p-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-start gap-3">
-          <Lock className="h-5 w-5 text-[#1470AF] mt-0.5 shrink-0" />
-          <div>
-            <p className="font-semibold text-[#1a365d]">
-              Subscribe to access Press Center
-            </p>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              Preview how it works below. Sign in to your account to begin drafting.
-            </p>
-          </div>
+      {/* Banner */}
+      <div className="rounded-xl border border-[#1470AF]/20 bg-[#1470AF]/5 p-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="font-bold text-[#1a365d] text-lg">Get started with Press Center</p>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            $30/month. Confident communication for public safety — draft press releases and community requests in minutes without compromising oversight.
+          </p>
         </div>
-        <div className="flex gap-3 shrink-0">
-          {member ? (
-            <Button
-              asChild
-              className="bg-[#1470AF] text-white hover:bg-[#1470AF]/90 font-semibold"
-            >
-              <Link href="/pio-tool/subscribe">Subscribe — $30/month</Link>
-            </Button>
-          ) : (
-            <>
-              <Button
-                asChild
-                className="bg-[#1470AF] text-white hover:bg-[#1470AF]/90 font-semibold"
-              >
-                <Link href="/sign-in?redirect=/pio-tool/subscribe">Sign In</Link>
-              </Button>
-              <Button asChild variant="outline">
-                <Link href="/member-site">Join Free</Link>
-              </Button>
-            </>
-          )}
-        </div>
+        <Button
+          asChild
+          className="shrink-0 bg-[#f2b233] text-[#1a365d] hover:bg-[#f2b233]/90 font-semibold"
+        >
+          <Link href="/pricing">Subscribe Now</Link>
+        </Button>
       </div>
 
-      {/* Form — fully visible, inputs/textareas disabled. Clicking anywhere redirects to upgrade. */}
+      {/* Form — tabs are clickable; clicking any input/textarea goes straight to Stripe */}
       <div
-        className="relative cursor-pointer"
-        onClick={() => {
-          if (member) {
-            router.push("/pio-tool/subscribe")
-          } else {
-            router.push("/pricing")
-          }
-        }}
+        className="cursor-pointer [&_input]:pointer-events-none [&_input]:opacity-50 [&_textarea]:pointer-events-none [&_textarea]:opacity-50 [&_select]:pointer-events-none [&_select]:opacity-50 [&_[role=combobox]]:pointer-events-none [&_[role=combobox]]:opacity-50 [&_button:not([role=tab])]:pointer-events-none [&_button:not([role=tab])]:opacity-50"
+        onClick={handleGreyClick}
       >
-        <div className="[&_input]:pointer-events-none [&_input]:opacity-50 [&_textarea]:pointer-events-none [&_textarea]:opacity-50 [&_select]:pointer-events-none [&_select]:opacity-50 [&_[role=combobox]]:pointer-events-none [&_[role=combobox]]:opacity-50 pointer-events-none">
-          {children}
-        </div>
+        {children}
       </div>
     </div>
   )

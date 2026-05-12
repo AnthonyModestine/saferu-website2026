@@ -345,7 +345,7 @@ Do not approach any suspicious individuals. If you see something, call 911.`
                 <Label htmlFor="contactDetails">Who Should Residents Contact</Label>
                 <Input
                   id="contactDetails"
-                  placeholder="e.g., Det. Smith at (555) 123-4567 or tips@agency.gov"
+                  placeholder="e.g. John Smith — 555-555-5555 — press@agency.gov"
                   className="placeholder:text-muted-foreground/60"
                   value={contactDetails}
                   onChange={(e) => setContactDetails(e.target.value)}

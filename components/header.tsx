@@ -58,7 +58,7 @@ export function Header() {
           </Link>
 
           <DropdownMenu>
-            <DropdownMenuTrigger className="flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+            <DropdownMenuTrigger suppressHydrationWarning className="flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
               Templates
               <ChevronDown className="h-4 w-4" />
             </DropdownMenuTrigger>
