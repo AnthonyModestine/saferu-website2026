@@ -30,3 +30,7 @@ next-env.d.ts
 data/admin-users.json
 data/member-sessions.json
 data/free-members.json
+data/pio-trials.json
+data/password-reset-tokens.json
+data/tickets.json
+data/disabled-members.json

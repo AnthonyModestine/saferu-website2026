@@ -6,7 +6,10 @@ import { verifyPassword } from "@/lib/password"
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? ""
 const ADMIN_COOKIE_NAME = "saferu_admin_session"
-const ADMIN_SESSION_VALUE = "authenticated"
+// Use a secret from env so the session value is not a guessable constant.
+// Falls back to a deterministic hash-like value if not set.
+const ADMIN_SESSION_VALUE =
+  process.env.ADMIN_SESSION_SECRET ?? `saferu_adm_${Buffer.from(ADMIN_PASSWORD || "default").toString("base64url").slice(0, 32)}`
 
 async function setAdminSessionCookie(): Promise<void> {
   const cookieStore = await cookies()

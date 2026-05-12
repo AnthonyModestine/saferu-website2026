@@ -1,46 +1,75 @@
 import { NextResponse } from "next/server"
 import { generateMultiOutput } from "@/lib/multi-output-ai"
 import { getMemberSession } from "@/lib/member-session"
+import { getIsPaidByEmail } from "@/lib/member-access"
+import { isOnActiveTrial } from "@/lib/pio-trial"
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
+
+const MAX = 1000 // max chars for free-text fields
+
+function cap(val: unknown, max = MAX): string {
+  return String(val ?? "").trim().slice(0, max)
+}
 
 export async function POST(request: Request) {
   const session = await getMemberSession()
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
+
+  const [stripePaid, trialActive] = await Promise.all([
+    getIsPaidByEmail(session.email),
+    isOnActiveTrial(session.email),
+  ])
+  if (!stripePaid && !trialActive) {
+    return NextResponse.json({ error: "Press Center subscription required" }, { status: 403 })
+  }
+
+  // Rate limit: 30 AI requests per hour per user
+  if (!checkRateLimit(`pio-all:${session.email}`, 30, 60 * 60 * 1000)) {
+    return NextResponse.json({ error: "Too many requests. Please slow down." }, { status: 429 })
+  }
+
+  // Rate limit by IP as secondary check
+  const ip = getClientIp(request)
+  if (!checkRateLimit(`pio-all-ip:${ip}`, 60, 60 * 60 * 1000)) {
+    return NextResponse.json({ error: "Too many requests." }, { status: 429 })
+  }
+
   try {
     const body = await request.json()
     const payload = {
-      agencyName: String(body.agencyName ?? "").trim() || "Agency Name",
-      city: String(body.city ?? "").trim() || "City",
-      state: String(body.state ?? "").trim() || "State",
-      incidentType: String(body.incidentType ?? "").trim() || "incident",
-      incidentSummary: body.incidentSummary != null ? String(body.incidentSummary).trim() : undefined,
-      incidentDate: body.incidentDate != null ? String(body.incidentDate).trim() : undefined,
-      incidentTime: body.incidentTime != null ? String(body.incidentTime).trim() : undefined,
-      location: body.location != null ? String(body.location).trim() : undefined,
+      agencyName: cap(body.agencyName, 100) || "Agency Name",
+      city: cap(body.city, 100) || "City",
+      state: cap(body.state, 50) || "State",
+      incidentType: cap(body.incidentType, 100) || "incident",
+      incidentSummary: body.incidentSummary != null ? cap(body.incidentSummary, 2000) : undefined,
+      incidentDate: body.incidentDate != null ? cap(body.incidentDate, 20) : undefined,
+      incidentTime: body.incidentTime != null ? cap(body.incidentTime, 20) : undefined,
+      location: body.location != null ? cap(body.location, 200) : undefined,
       investigationOngoing: Boolean(body.investigationOngoing),
-      persons: Array.isArray(body.persons) ? body.persons.map((p: { name?: string; isMinor?: boolean; description?: string }) => ({
-        name: String(p?.name ?? "").trim(),
+      persons: Array.isArray(body.persons) ? body.persons.slice(0, 10).map((p: { name?: string; isMinor?: boolean; description?: string }) => ({
+        name: cap(p?.name, 100),
         isMinor: Boolean(p?.isMinor),
-        description: String(p?.description ?? "").trim(),
+        description: cap(p?.description, 500),
       })) : [],
-      entryType: String(body.entryType ?? "none").trim(),
-      arrests: Array.isArray(body.arrests) ? body.arrests.map((a: { name?: string; details?: string }) => ({
-        name: String(a?.name ?? "").trim(),
-        details: String(a?.details ?? "").trim(),
+      entryType: cap(body.entryType, 20) || "none",
+      arrests: Array.isArray(body.arrests) ? body.arrests.slice(0, 10).map((a: { name?: string; details?: string }) => ({
+        name: cap(a?.name, 100),
+        details: cap(a?.details, 500),
       })) : [],
-      propertyDamage: body.propertyDamage != null ? String(body.propertyDamage).trim() : undefined,
-      tipLine: body.tipLine != null ? String(body.tipLine).trim() : undefined,
-      detectiveContact: body.detectiveContact != null ? String(body.detectiveContact).trim() : undefined,
-      resolutionText: body.resolutionText != null ? String(body.resolutionText).trim() : undefined,
-      boilerplate: body.boilerplate != null ? String(body.boilerplate).trim() : undefined,
-      contactName: String(body.contactName ?? "").trim() || "Contact Name",
-      contactPhone: String(body.contactPhone ?? "").trim() || "Phone Number",
-      contactPhone2: body.contactPhone2 != null ? String(body.contactPhone2).trim() || undefined : undefined,
-      contactEmail: String(body.contactEmail ?? "").trim() || "email@agency.gov",
+      propertyDamage: body.propertyDamage != null ? cap(body.propertyDamage, 500) : undefined,
+      tipLine: body.tipLine != null ? cap(body.tipLine, 100) : undefined,
+      detectiveContact: body.detectiveContact != null ? cap(body.detectiveContact, 200) : undefined,
+      resolutionText: body.resolutionText != null ? cap(body.resolutionText, 500) : undefined,
+      boilerplate: body.boilerplate != null ? cap(body.boilerplate, 1000) : undefined,
+      contactName: cap(body.contactName, 100) || "Contact Name",
+      contactPhone: cap(body.contactPhone, 30) || "Phone Number",
+      contactPhone2: body.contactPhone2 != null ? cap(body.contactPhone2, 30) || undefined : undefined,
+      contactEmail: cap(body.contactEmail, 100) || "email@agency.gov",
       requestFootage: Boolean(body.requestFootage),
-      footageTimeframe: body.footageTimeframe != null ? String(body.footageTimeframe).trim() : undefined,
-      whatToLookFor: body.whatToLookFor != null ? String(body.whatToLookFor).trim() : undefined,
+      footageTimeframe: body.footageTimeframe != null ? cap(body.footageTimeframe, 200) : undefined,
+      whatToLookFor: body.whatToLookFor != null ? cap(body.whatToLookFor, 500) : undefined,
     }
 
     const result = await generateMultiOutput(payload)
