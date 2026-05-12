@@ -41,7 +41,7 @@ export async function POST(request: Request) {
       city: cap(body.city, 100) || "City",
       state: cap(body.state, 50) || "State",
       incidentType: cap(body.incidentType, 100) || "incident",
-      incidentSummary: body.incidentSummary != null ? cap(body.incidentSummary, 2000) : undefined,
+      incidentSummary: body.incidentSummary != null ? cap(body.incidentSummary, 4500) : undefined,
       incidentDate: body.incidentDate != null ? cap(body.incidentDate, 20) : undefined,
       incidentTime: body.incidentTime != null ? cap(body.incidentTime, 20) : undefined,
       location: body.location != null ? cap(body.location, 200) : undefined,

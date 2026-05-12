@@ -469,15 +469,19 @@ Email: ${displayEmail}`
               <div className="space-y-2">
                 <Label htmlFor="summary">Incident Summary</Label>
                 <p className="text-sm text-muted-foreground">
-                  Provide a summary of what happened. The AI uses only these facts.
+                  Provide a summary of what happened. The AI uses only these facts. Aim for 2,000–4,500 characters for best results.
                 </p>
                 <Textarea
                   id="summary"
                   placeholder="Describe what happened..."
                   className="min-h-[200px] w-full resize-y placeholder:text-muted-foreground/60"
                   value={incidentSummary}
+                  maxLength={4500}
                   onChange={(e) => setIncidentSummary(e.target.value)}
                 />
+                <p className={`text-xs text-right ${incidentSummary.length > 4000 ? "text-amber-600" : "text-muted-foreground"}`}>
+                  {incidentSummary.length.toLocaleString()} / 4,500
+                </p>
               </div>
             </CardContent>
           </Card>

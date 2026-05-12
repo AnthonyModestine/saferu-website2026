@@ -42,7 +42,7 @@ export async function POST(request: Request) {
       otherIncidentType: body.otherIncidentType != null ? cap(body.otherIncidentType, 100) : undefined,
       address: body.address != null ? cap(body.address, 200) : undefined,
       incidentDate: body.incidentDate != null ? cap(body.incidentDate, 20) : undefined,
-      description: body.description != null ? cap(body.description, 2000) : undefined,
+      description: body.description != null ? cap(body.description, 4500) : undefined,
       footageTimeframe: body.footageTimeframe != null ? cap(body.footageTimeframe, 200) : undefined,
       whatToLookFor: body.whatToLookFor != null ? cap(body.whatToLookFor, 500) : undefined,
       contactDetails: body.contactDetails != null ? cap(body.contactDetails, 200) : undefined,
