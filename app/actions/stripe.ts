@@ -2,6 +2,7 @@
 
 import { stripe } from '../../lib/stripe'
 import { PRODUCTS } from '../../lib/products'
+import { getMemberSession } from '../../lib/member-session'
 
 export async function startCheckoutSession(productId: string) {
   if (!stripe) {
@@ -12,10 +13,14 @@ export async function startCheckoutSession(productId: string) {
     throw new Error(`Product with id "${productId}" not found`)
   }
 
-  // Create Checkout Sessions from body params.
-  const session = await stripe.checkout.sessions.create({
+  // Link checkout to the logged-in member's email if available
+  const session = await getMemberSession()
+  const customerEmail = session?.email ?? undefined
+
+  const checkoutSession = await stripe.checkout.sessions.create({
     ui_mode: 'embedded',
     redirect_on_completion: 'never',
+    customer_email: customerEmail,
     line_items: [
       {
         price_data: {
@@ -33,9 +38,14 @@ export async function startCheckoutSession(productId: string) {
       },
     ],
     mode: product.interval ? 'subscription' : 'payment',
+    metadata: {
+      memberId: session?.memberId ?? '',
+      memberEmail: session?.email ?? '',
+      productId,
+    },
   })
 
-  return session.client_secret
+  return checkoutSession.client_secret
 }
 
 export async function startHostedCheckoutSession(productId: string) {
@@ -47,10 +57,13 @@ export async function startHostedCheckoutSession(productId: string) {
     throw new Error(`Product with id "${productId}" not found`)
   }
 
+  const session = await getMemberSession()
+  const customerEmail = session?.email ?? undefined
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 
-  const session = await stripe.checkout.sessions.create({
+  const checkoutSession = await stripe.checkout.sessions.create({
     mode: product.interval ? 'subscription' : 'payment',
+    customer_email: customerEmail,
     line_items: [
       {
         price_data: {
@@ -67,16 +80,20 @@ export async function startHostedCheckoutSession(productId: string) {
     ],
     success_url: `${appUrl}/pio-tool?subscribed=1`,
     cancel_url: `${appUrl}/pricing`,
+    metadata: {
+      memberId: session?.memberId ?? '',
+      memberEmail: session?.email ?? '',
+      productId,
+    },
   })
 
-  return session.url
+  return checkoutSession.url
 }
 
 export async function createCustomerPortalSession(customerId: string) {
   if (!stripe) {
     throw new Error("Stripe is not configured. Set STRIPE_SECRET_KEY.")
   }
-  // Create a customer portal session for managing subscriptions
   const session = await stripe.billingPortal.sessions.create({
     customer: customerId,
     return_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/account`,

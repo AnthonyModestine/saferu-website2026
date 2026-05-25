@@ -4,6 +4,7 @@ import { getMemberSession } from "@/lib/member-session"
 import { getIsPaidByEmail } from "@/lib/member-access"
 import { isOnActiveTrial } from "@/lib/pio-trial"
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
+import { consumeGeneration } from "@/lib/pio-generations"
 
 const MAX = 1000 // max chars for free-text fields
 
@@ -34,6 +35,15 @@ export async function POST(request: Request) {
   const ip = getClientIp(request)
   if (!checkRateLimit(`pio-all-ip:${ip}`, 60, 60 * 60 * 1000)) {
     return NextResponse.json({ error: "Too many requests." }, { status: 429 })
+  }
+
+  // Check and consume one generation
+  const allowed = await consumeGeneration(session.email)
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "You have used all your generations for this month. Purchase a generation pack to continue." },
+      { status: 403 }
+    )
   }
 
   try {

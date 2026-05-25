@@ -69,6 +69,7 @@ export function Pricing() {
 
             <ul className="space-y-4 flex-1">
               {[
+                "30 AI generations per month included",
                 "Professional press releases drafted in minutes — not hours",
                 "Facebook & X posts written and ready to copy",
                 "Talking points so your spokesperson walks in prepared",

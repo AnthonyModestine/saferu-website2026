@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useEffect, useState } from "react"
 import {
   Card,
   CardContent,
@@ -13,20 +14,54 @@ import {
   ClipboardList,
   PenLine,
   Share2,
+  Loader2,
 } from "lucide-react"
 import { useSubscription } from "@/lib/use-subscription"
+import { startHostedCheckoutSession } from "@/app/actions/stripe"
+
+interface GenerationStatus {
+  used: number
+  quota: number
+  packs: number
+  remaining: number
+}
 
 export default function PIODashboardPage() {
   const { isSubscribed } = useSubscription()
-  // In production, this would pull from the user's account
-  const totalGenerations = 30
-  const usedGenerations = 12
-  const remainingGenerations = totalGenerations - usedGenerations
-  const isOutOfGenerations = isSubscribed && remainingGenerations === 0
+  const [genStatus, setGenStatus] = useState<GenerationStatus | null>(null)
+  const [packLoading, setPackLoading] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!isSubscribed) return
+    fetch("/api/pio/generations")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.remaining !== undefined) setGenStatus(data)
+      })
+      .catch(() => {})
+  }, [isSubscribed])
+
+  const isOutOfGenerations = isSubscribed && genStatus !== null && genStatus.remaining === 0
+
+  async function handlePackPurchase(productId: string) {
+    setPackLoading(productId)
+    try {
+      const url = await startHostedCheckoutSession(productId)
+      if (url) window.location.href = url
+    } catch {
+      setPackLoading(null)
+    }
+  }
+
+  const packs = [
+    { id: "generations-5", label: "5 generations", price: "$10" },
+    { id: "generations-12", label: "12 generations", price: "$20", popular: true },
+    { id: "generations-35", label: "35 generations", price: "$50" },
+  ]
 
   return (
     <div className="space-y-10">
-      {/* Subscribe CTA (non-subscribers only) - prominent yellow banner at top */}
+      {/* Subscribe CTA (non-subscribers only) */}
       {!isSubscribed && (
         <div className="rounded-xl border border-[#1470AF]/20 bg-[#1470AF]/5 p-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -52,8 +87,35 @@ export default function PIODashboardPage() {
       {/* ====== SUBSCRIBER VIEW ====== */}
       {isSubscribed && (
         <>
+          {/* Generation usage bar */}
+          {genStatus && (
+            <div className="rounded-xl border border-border bg-card p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-foreground">Generations this month</p>
+                <p className="text-sm font-semibold text-foreground">
+                  {genStatus.used} / {genStatus.quota} used
+                  {genStatus.packs > 0 && (
+                    <span className="ml-2 text-[#1470AF]">+{genStatus.packs} extra</span>
+                  )}
+                </p>
+              </div>
+              <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                <div
+                  className={`h-2 rounded-full transition-all ${
+                    genStatus.used >= genStatus.quota ? "bg-red-500" : "bg-[#1470AF]"
+                  }`}
+                  style={{ width: `${Math.min(100, (genStatus.used / genStatus.quota) * 100)}%` }}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {genStatus.remaining > 0
+                  ? `${genStatus.remaining} generation${genStatus.remaining === 1 ? "" : "s"} remaining — resets on the 1st of next month`
+                  : "No generations remaining this month"}
+              </p>
+            </div>
+          )}
 
-          {/* Out of Generations */}
+          {/* Out of Generations — buy a pack */}
           {isOutOfGenerations && (
             <Card className="border-[#f2b233]/40 bg-[#f2b233]/5">
               <CardContent className="py-5 space-y-4">
@@ -64,21 +126,34 @@ export default function PIODashboardPage() {
                   </p>
                 </div>
                 <div className="rounded-lg border border-border bg-card overflow-hidden divide-y divide-border">
-                  <button type="button" className="w-full flex items-center justify-between px-5 py-3 hover:bg-muted/50 transition-colors text-left">
-                    <p className="text-sm font-medium text-foreground">5 generations</p>
-                    <p className="text-sm font-semibold text-foreground">$10</p>
-                  </button>
-                  <button type="button" className="w-full flex items-center justify-between px-5 py-3 bg-[#1470AF]/5 hover:bg-[#1470AF]/10 transition-colors text-left">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-foreground">12 generations</p>
-                      <span className="text-[10px] font-semibold text-[#1470AF] bg-[#1470AF]/10 px-2 py-0.5 rounded-full">Most popular</span>
-                    </div>
-                    <p className="text-sm font-semibold text-foreground">$30</p>
-                  </button>
-                  <button type="button" className="w-full flex items-center justify-between px-5 py-3 hover:bg-muted/50 transition-colors text-left">
-                    <p className="text-sm font-medium text-foreground">35 generations</p>
-                    <p className="text-sm font-semibold text-foreground">$50</p>
-                  </button>
+                  {packs.map((pack) => (
+                    <button
+                      key={pack.id}
+                      type="button"
+                      disabled={packLoading !== null}
+                      onClick={() => handlePackPurchase(pack.id)}
+                      className={`w-full flex items-center justify-between px-5 py-3 transition-colors text-left disabled:opacity-60 ${
+                        pack.popular
+                          ? "bg-[#1470AF]/5 hover:bg-[#1470AF]/10"
+                          : "hover:bg-muted/50"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-foreground">{pack.label}</p>
+                        {pack.popular && (
+                          <span className="text-[10px] font-semibold text-[#1470AF] bg-[#1470AF]/10 px-2 py-0.5 rounded-full">
+                            Most popular
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-foreground">{pack.price}</p>
+                        {packLoading === pack.id && (
+                          <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                        )}
+                      </div>
+                    </button>
+                  ))}
                 </div>
               </CardContent>
             </Card>
@@ -118,36 +193,33 @@ export default function PIODashboardPage() {
 
       {/* ====== NON-SUBSCRIBER VIEW ====== */}
       {!isSubscribed && (
-        <>
-          {/* Feature Preview Cards */}
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Card className="border-border">
-              <CardContent className="pt-6 pb-6 space-y-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#1470AF]/10">
-                  <Newspaper className="h-5 w-5 text-[#1470AF]" />
-                </div>
-                <h2 className="font-semibold text-foreground">Press Release</h2>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  Draft formal media statements from the facts you enter. Structured format. Professional tone. Ready for internal review before release.
-                </p>
-              </CardContent>
-            </Card>
-            <Card className="border-border">
-              <CardContent className="pt-6 pb-6 space-y-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#4a9d6b]/10">
-                  <MessageSquare className="h-5 w-5 text-[#4a9d6b]" />
-                </div>
-                <h2 className="font-semibold text-foreground">Community Request</h2>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  Clear social posts requesting community video or tips—built to follow Neighbors by Ring Community Guidelines when you publish on that platform.
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        </>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Card className="border-border">
+            <CardContent className="pt-6 pb-6 space-y-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#1470AF]/10">
+                <Newspaper className="h-5 w-5 text-[#1470AF]" />
+              </div>
+              <h2 className="font-semibold text-foreground">Press Release</h2>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Draft formal media statements from the facts you enter. Structured format. Professional tone. Ready for internal review before release.
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="border-border">
+            <CardContent className="pt-6 pb-6 space-y-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#4a9d6b]/10">
+                <MessageSquare className="h-5 w-5 text-[#4a9d6b]" />
+              </div>
+              <h2 className="font-semibold text-foreground">Community Request</h2>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Clear social posts requesting community video or tips—built to follow Neighbors by Ring Community Guidelines when you publish on that platform.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
-      {/* ====== HOW IT WORKS (visible to everyone) ====== */}
+      {/* ====== HOW IT WORKS (everyone) ====== */}
       <div className="pb-10">
         <h2 className="text-lg font-semibold text-[#1a365d] mb-6">How It Works</h2>
         <div className="grid gap-8 sm:grid-cols-3">

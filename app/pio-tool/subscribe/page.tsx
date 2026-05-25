@@ -115,6 +115,7 @@ export default function SubscribePage() {
 
           <ul className="space-y-3 mx-auto max-w-sm">
             {[
+              "30 AI generations per month included",
               "Professional press releases drafted in minutes — not hours",
               "Facebook & X posts written and ready to copy",
               "Talking points so your spokesperson walks in prepared",
