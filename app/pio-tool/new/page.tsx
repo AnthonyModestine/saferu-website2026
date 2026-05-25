@@ -30,6 +30,7 @@ import {
 import { useAgency } from "@/lib/agency-context"
 import { track } from "@/lib/track"
 import { PIOPreviewGate } from "@/components/pio-preview-gate"
+import { GenerationLimitModal } from "@/components/generation-limit-modal"
 import { downloadPressReleasePDF } from "@/lib/pdf-export"
 import { addPioHistoryItem } from "@/lib/pio-history-store"
 import Image from "next/image"
@@ -71,6 +72,7 @@ export default function NewPressReleasePage() {
   const [generating, setGenerating] = useState(false)
   const [generated, setGenerated] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [showGenLimitModal, setShowGenLimitModal] = useState(false)
   const [incidentType, setIncidentType] = useState("")
   const [entryType, setEntryType] = useState("none")
   const [arrestsMade, setArrestsMade] = useState(false)
@@ -223,6 +225,12 @@ export default function NewPressReleasePage() {
         setGenerating(false)
         return
       }
+      // Out of generations — show purchase modal, keep form intact
+      if (res.status === 403 && data?.error?.includes("generations")) {
+        setGenerating(false)
+        setShowGenLimitModal(true)
+        return
+      }
     } catch {
       // Fall through to template
     }
@@ -329,6 +337,7 @@ Email: ${displayEmail}`
 
   return (
     <PIOPreviewGate>
+    <GenerationLimitModal open={showGenLimitModal} onOpenChange={setShowGenLimitModal} />
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground">New Press Release</h1>

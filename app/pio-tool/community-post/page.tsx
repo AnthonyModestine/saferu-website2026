@@ -24,6 +24,7 @@ import {
 import { useAgency } from "@/lib/agency-context"
 import { addPioHistoryItem } from "@/lib/pio-history-store"
 import { PIOPreviewGate } from "@/components/pio-preview-gate"
+import { GenerationLimitModal } from "@/components/generation-limit-modal"
 import { track } from "@/lib/track"
 
 const incidentTypes = [
@@ -55,6 +56,7 @@ export default function CommunityPostPage() {
   const [generated, setGenerated] = useState(false)
   const [copied, setCopied] = useState(false)
   const [activeTab, setActiveTab] = useState("incident")
+  const [showGenLimitModal, setShowGenLimitModal] = useState(false)
 
   // Incident fields
   const [incidentType, setIncidentType] = useState("")
@@ -137,6 +139,12 @@ export default function CommunityPostPage() {
         track("pio_generate", { source: "community_post" })
         return
       }
+      // Out of generations — show purchase modal, keep form intact
+      if (res.status === 403 && data?.error?.includes("generations")) {
+        setGenerating(false)
+        setShowGenLimitModal(true)
+        return
+      }
     } catch {
       // Fall through to template
     }
@@ -189,6 +197,7 @@ Do not approach any suspicious individuals. If you see something, call 911.`
 
   return (
     <PIOPreviewGate>
+    <GenerationLimitModal open={showGenLimitModal} onOpenChange={setShowGenLimitModal} />
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Community Request</h1>
