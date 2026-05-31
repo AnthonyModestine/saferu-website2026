@@ -1,6 +1,7 @@
 "use server"
 
 import { stripe } from "@/lib/stripe"
+import { stripeListAll } from "@/lib/stripe-list-all"
 import { checkAdminSession } from "@/lib/admin-auth"
 import { getFreeMembers, deleteFreeMember, addFreeMember } from "@/lib/members-store"
 import { setTrial, getTrialEnd } from "@/lib/pio-trial"
@@ -56,8 +57,9 @@ export async function getMembersList(): Promise<MembersResult> {
 
   if (stripeClient) {
     try {
+      const customerRows = await stripeListAll((params) => stripeClient.customers.list(params))
       const customers: { id: string; email: string | null; name: string | null; created: number }[] = []
-      for await (const c of stripeClient.customers.list({ limit: 100 }).autoPagingIter()) {
+      for (const c of customerRows) {
         customers.push({
           id: c.id,
           email: c.email ?? null,
@@ -67,7 +69,10 @@ export async function getMembersList(): Promise<MembersResult> {
         if (c.email) stripeEmails.add(c.email.toLowerCase())
       }
       const subsByCustomer = new Map<string, { status: string; product?: string }>()
-      for await (const sub of stripeClient.subscriptions.list({ status: "all", limit: 100 }).autoPagingIter()) {
+      const subscriptionRows = await stripeListAll((params) =>
+        stripeClient.subscriptions.list({ status: "all", ...params })
+      )
+      for (const sub of subscriptionRows) {
         if (sub.customer && typeof sub.customer === "string") {
           const existing = subsByCustomer.get(sub.customer)
           if (!existing || sub.status === "active") {
@@ -77,7 +82,8 @@ export async function getMembersList(): Promise<MembersResult> {
         }
       }
       const paidCustomerIds = new Set<string>()
-      for await (const charge of stripeClient.charges.list({ limit: 100 }).autoPagingIter()) {
+      const chargeRows = await stripeListAll((params) => stripeClient.charges.list(params))
+      for (const charge of chargeRows) {
         if (charge.customer && typeof charge.customer === "string" && charge.paid) {
           paidCustomerIds.add(charge.customer)
         }
@@ -148,16 +154,21 @@ export async function getMembersCounts(): Promise<{
 
   if (stripeClient) {
     try {
-      for await (const c of stripeClient.customers.list({ limit: 100 }).autoPagingIter()) {
-        stripeCount++
+      const customerRows = await stripeListAll((params) => stripeClient.customers.list(params))
+      stripeCount = customerRows.length
+      for (const c of customerRows) {
         if (c.email) stripeEmails.add(c.email.toLowerCase())
       }
-      for await (const sub of stripeClient.subscriptions.list({ status: "all", limit: 100 }).autoPagingIter()) {
+      const subscriptionRows = await stripeListAll((params) =>
+        stripeClient.subscriptions.list({ status: "all", ...params })
+      )
+      for (const sub of subscriptionRows) {
         if (sub.customer && typeof sub.customer === "string" && sub.status === "active") {
           paidCustomerIds.add(sub.customer)
         }
       }
-      for await (const charge of stripeClient.charges.list({ limit: 100 }).autoPagingIter()) {
+      const chargeRows = await stripeListAll((params) => stripeClient.charges.list(params))
+      for (const charge of chargeRows) {
         if (charge.customer && typeof charge.customer === "string" && charge.paid) {
           paidCustomerIds.add(charge.customer)
         }
@@ -185,7 +196,8 @@ export async function getRevenueSummary(): Promise<RevenueResult> {
     const availableCents = balance.available.reduce((sum, b) => sum + b.amount, 0)
     const pendingCents = balance.pending.reduce((sum, b) => sum + b.amount, 0)
     let totalRevenueCents = 0
-    for await (const charge of stripeClient.charges.list({ limit: 100 }).autoPagingIter()) {
+    const chargeRows = await stripeListAll((params) => stripeClient.charges.list(params))
+    for (const charge of chargeRows) {
       if (charge.paid && charge.amount) totalRevenueCents += charge.amount
     }
     const currency = balance.available[0]?.currency ?? "usd"
