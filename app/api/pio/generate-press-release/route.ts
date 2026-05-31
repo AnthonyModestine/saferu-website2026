@@ -79,7 +79,7 @@ export async function POST(request: Request) {
     const content = await generatePressReleaseWithAI(payload)
     if (!content) {
       return NextResponse.json(
-        { error: "AI generation unavailable. Add OPENAI_API_KEY in Vercel (or .env.local) and try again." },
+        { error: "Drafting is temporarily unavailable. Please try again in a few minutes." },
         { status: 503 }
       )
     }

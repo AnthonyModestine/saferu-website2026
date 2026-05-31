@@ -9,24 +9,24 @@ import { HelpCircle, FileText, Shield, AlertTriangle, Mail } from "lucide-react"
 
 const faqs = [
   {
-    question: "How does the AI generate press releases?",
+    question: "How does Press Center generate press releases?",
     answer:
-      "The AI uses your structured input to generate professional press releases. It is designed to only use facts you provide and avoids speculation, opinions, and emotional language. All output should be reviewed by your team before distribution — Press Center is a drafting tool, not a substitute for your approval process.",
+      "Press Center uses your structured input to draft professional press releases. It is designed to only use facts you provide and avoids speculation, opinions, and emotional language. All output should be reviewed by your team before distribution — Press Center is a drafting tool, not a substitute for your approval process.",
   },
   {
     question: "When should I use 'alleged' in my press release?",
     answer:
-      "Use 'alleged' when actions are unconfirmed. If actions are confirmed by officers, video evidence, or reliable witnesses and you indicate this in the form, the AI will write them as facts without 'alleged.' For unconfirmed actions, the AI automatically uses 'alleged' or neutral language.",
+      "Use 'alleged' when actions are unconfirmed. If actions are confirmed by officers, video evidence, or reliable witnesses and you indicate this in the form, Press Center will write them as facts without 'alleged.' For unconfirmed actions, Press Center automatically uses 'alleged' or neutral language.",
   },
   {
     question: "How do I protect a minor's identity?",
     answer:
-      "When adding a person entry, check the 'Minor (do not release name)' checkbox. The AI will automatically exclude the minor's name and use appropriate language like 'a juvenile' or 'a minor.'",
+      "When adding a person entry, check the 'Minor (do not release name)' checkbox. Press Center will automatically exclude the minor's name and use appropriate language like 'a juvenile' or 'a minor.'",
   },
   {
     question: "Can I edit the generated press release?",
     answer:
-      "Yes! The generated press release is a starting point. You can copy it and make any necessary edits before distribution. We recommend reviewing all AI-generated content before publication.",
+      "Yes! The generated press release is a starting point. You can copy it and make any necessary edits before distribution. We recommend reviewing all drafted content before publication.",
   },
   {
     question: "How do I export my press release?",
@@ -63,7 +63,7 @@ export default function HelpPage() {
           </CardHeader>
           <CardContent>
             <CardDescription>
-              Enter only confirmed facts. The AI will not invent information and
+              Enter only confirmed facts. Press Center will not invent information and
               will automatically clean speculation from your input.
             </CardDescription>
           </CardContent>
@@ -80,7 +80,7 @@ export default function HelpPage() {
           </CardHeader>
           <CardContent>
             <CardDescription>
-              The AI is structured to use factual, neutral language — avoiding speculation, opinion, and emotional wording. Your team reviews and approves everything before it goes out.
+              Press Center is structured to use factual, neutral language — avoiding speculation, opinion, and emotional wording. Your team reviews and approves everything before it goes out.
             </CardDescription>
           </CardContent>
         </Card>
@@ -96,7 +96,7 @@ export default function HelpPage() {
           </CardHeader>
           <CardContent>
             <CardDescription>
-              Always review AI-generated content before distribution. Make any
+              Always review drafted content before distribution. Make any
               necessary edits to ensure accuracy.
             </CardDescription>
           </CardContent>

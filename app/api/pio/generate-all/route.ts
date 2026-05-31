@@ -26,7 +26,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Press Center subscription required" }, { status: 403 })
   }
 
-  // Rate limit: 30 AI requests per hour per user
+  // Rate limit: 30 generation requests per hour per user
   if (!checkRateLimit(`pio-all:${session.email}`, 30, 60 * 60 * 1000)) {
     return NextResponse.json({ error: "Too many requests. Please slow down." }, { status: 429 })
   }
@@ -85,7 +85,7 @@ export async function POST(request: Request) {
     const result = await generateMultiOutput(payload)
     if (!result) {
       return NextResponse.json(
-        { error: "AI generation unavailable. Add OPENAI_API_KEY in Vercel (or .env.local) and try again." },
+        { error: "Drafting is temporarily unavailable. Please try again in a few minutes." },
         { status: 503 }
       )
     }

@@ -22,8 +22,16 @@ function SignInForm() {
     const form = e.currentTarget
     const email = (form.querySelector("#email") as HTMLInputElement)?.value?.trim()
     const password = (form.querySelector("#password") as HTMLInputElement)?.value ?? ""
-    if (!email || !password) {
+    if (!email && !password) {
       setError("Email and password are required")
+      return
+    }
+    if (!email) {
+      setError("Email is required")
+      return
+    }
+    if (!password) {
+      setError("Password is required")
       return
     }
     setLoading(true)
@@ -64,7 +72,7 @@ function SignInForm() {
           <CardDescription>Sign in to access your account</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} noValidate className="space-y-4">
             {error && (
               <p className="rounded-lg bg-destructive/10 p-2 text-sm text-destructive">{error}</p>
             )}
@@ -75,7 +83,7 @@ function SignInForm() {
                 type="email"
                 placeholder="you@agency.gov"
                 className="placeholder:text-muted-foreground/60"
-                required
+                autoComplete="email"
               />
             </div>
             <div className="space-y-2">
@@ -89,7 +97,7 @@ function SignInForm() {
                 id="password"
                 placeholder="Enter your password"
                 className="placeholder:text-muted-foreground/60"
-                required
+                autoComplete="current-password"
               />
             </div>
             <Button

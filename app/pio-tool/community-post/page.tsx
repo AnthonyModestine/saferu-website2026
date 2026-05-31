@@ -149,7 +149,7 @@ export default function CommunityPostPage() {
       // Fall through to template
     }
 
-    // Fallback template when AI is unavailable or fails
+    // Fallback template when drafting is unavailable or fails
     const post = `${displayAgency.toUpperCase()} - REQUESTING COMMUNITY ASSISTANCE
 
 The ${displayAgency} is investigating a ${displayIncident.toLowerCase()} that occurred on ${displayDate} in the area of ${displayAddress}.

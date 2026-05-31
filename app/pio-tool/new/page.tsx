@@ -478,7 +478,7 @@ Email: ${displayEmail}`
               <div className="space-y-2">
                 <Label htmlFor="summary">Incident Summary</Label>
                 <p className="text-sm text-muted-foreground">
-                  Provide a summary of what happened. The AI uses only these facts. Aim for 2,000–4,500 characters for best results.
+                  Provide a summary of what happened. Press Center uses only the facts you provide. Aim for 2,000–4,500 characters for best results.
                 </p>
                 <Textarea
                   id="summary"

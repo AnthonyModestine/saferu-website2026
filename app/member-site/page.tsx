@@ -12,14 +12,32 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { PasswordInput } from "@/components/ui/password-input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { FormErrorBanner, FieldError } from "@/components/form-messages"
+import {
+  validateSignupFields,
+  hasSignupErrors,
+  mapSignupApiError,
+  invalidFieldClass,
+  type SignupFieldErrors,
+} from "@/lib/signup-validation"
+import { cn } from "@/lib/utils"
 import { CheckCircle, ArrowRight } from "lucide-react"
 
 export default function MemberSitePage() {
   const [signUpSuccess, setSignUpSuccess] = useState(false)
-  const [signUpError, setSignUpError] = useState<string | null>(null)
+  const [signUpFieldErrors, setSignUpFieldErrors] = useState<SignupFieldErrors>({})
   const [signUpLoading, setSignUpLoading] = useState(false)
   const [signInError, setSignInError] = useState<string | null>(null)
   const [signInLoading, setSignInLoading] = useState(false)
+
+  const clearSignUpFieldError = (field: keyof SignupFieldErrors) => {
+    setSignUpFieldErrors((prev) => {
+      if (!prev[field]) return prev
+      const next = { ...prev }
+      delete next[field]
+      return next
+    })
+  }
 
   const handleSignIn = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -27,7 +45,18 @@ export default function MemberSitePage() {
     const form = e.currentTarget
     const email = (form.querySelector("#signinEmail") as HTMLInputElement)?.value?.trim()
     const password = (form.querySelector("#signinPassword") as HTMLInputElement)?.value ?? ""
-    if (!email || !password) return
+    if (!email && !password) {
+      setSignInError("Email and password are required")
+      return
+    }
+    if (!email) {
+      setSignInError("Email is required")
+      return
+    }
+    if (!password) {
+      setSignInError("Password is required")
+      return
+    }
     setSignInLoading(true)
     try {
       const res = await fetch("/api/members/login", {
@@ -50,37 +79,38 @@ export default function MemberSitePage() {
 
   const handleSignUp = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    setSignUpError(null)
+    setSignUpFieldErrors({})
     const form = e.currentTarget
-    const email = (form.querySelector("#signupEmail") as HTMLInputElement)?.value?.trim()
-    const firstName = (form.querySelector("#firstName") as HTMLInputElement)?.value?.trim()
-    const lastName = (form.querySelector("#lastName") as HTMLInputElement)?.value?.trim()
-    const agency = (form.querySelector("#agency") as HTMLInputElement)?.value?.trim()
+    const email = (form.querySelector("#signupEmail") as HTMLInputElement)?.value?.trim() ?? ""
+    const firstName = (form.querySelector("#firstName") as HTMLInputElement)?.value?.trim() ?? ""
+    const lastName = (form.querySelector("#lastName") as HTMLInputElement)?.value?.trim() ?? ""
+    const agency = (form.querySelector("#agency") as HTMLInputElement)?.value?.trim() ?? ""
     const password = (form.querySelector("#signupPassword") as HTMLInputElement)?.value ?? ""
-    if (!email) {
-      setSignUpError("Email is required")
+
+    const validationErrors = validateSignupFields({
+      email,
+      password,
+      firstName,
+      lastName,
+      agency,
+      requireNames: true,
+      requireAgency: true,
+    })
+    if (hasSignupErrors(validationErrors)) {
+      setSignUpFieldErrors(validationErrors)
       return
     }
-    if (password.length < 8) {
-      setSignUpError("Password must be at least 8 characters")
-      return
-    }
+
     setSignUpLoading(true)
     try {
       const res = await fetch("/api/members/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email,
-          firstName: (form.querySelector("#firstName") as HTMLInputElement)?.value?.trim() ?? "",
-          lastName: (form.querySelector("#lastName") as HTMLInputElement)?.value?.trim() ?? "",
-          agency,
-          password,
-        }),
+        body: JSON.stringify({ email, firstName, lastName, agency, password }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setSignUpError(data.error || "Sign up failed")
+        setSignUpFieldErrors(mapSignupApiError(data.error || "Sign up failed"))
         return
       }
       const loginRes = await fetch("/api/members/login", {
@@ -94,7 +124,7 @@ export default function MemberSitePage() {
       }
       setSignUpSuccess(true)
     } catch {
-      setSignUpError("Something went wrong. Please try again.")
+      setSignUpFieldErrors({ form: "Something went wrong. Please try again." })
     } finally {
       setSignUpLoading(false)
     }
@@ -170,26 +200,30 @@ export default function MemberSitePage() {
                         </TabsList>
 
                         <TabsContent value="signup" className="mt-6">
-                          <form onSubmit={handleSignUp} className="space-y-4">
-                            {signUpError && (
-                              <p className="rounded-lg bg-red-50 p-2 text-sm text-red-800">{signUpError}</p>
-                            )}
+                          <form onSubmit={handleSignUp} noValidate className="space-y-4">
+                            <FormErrorBanner message={signUpFieldErrors.form} />
                             <div className="grid gap-4 sm:grid-cols-2">
                               <div className="space-y-2">
                                 <Label htmlFor="firstName">First Name</Label>
                                 <Input
                                   id="firstName"
                                   placeholder="John"
-                                  required
+                                  aria-invalid={Boolean(signUpFieldErrors.firstName)}
+                                  className={signUpFieldErrors.firstName ? invalidFieldClass : undefined}
+                                  onChange={() => clearSignUpFieldError("firstName")}
                                 />
+                                <FieldError message={signUpFieldErrors.firstName} />
                               </div>
                               <div className="space-y-2">
                                 <Label htmlFor="lastName">Last Name</Label>
                                 <Input
                                   id="lastName"
                                   placeholder="Smith"
-                                  required
+                                  aria-invalid={Boolean(signUpFieldErrors.lastName)}
+                                  className={signUpFieldErrors.lastName ? invalidFieldClass : undefined}
+                                  onChange={() => clearSignUpFieldError("lastName")}
                                 />
+                                <FieldError message={signUpFieldErrors.lastName} />
                               </div>
                             </div>
                             <div className="space-y-2">
@@ -198,24 +232,35 @@ export default function MemberSitePage() {
                                 id="signupEmail"
                                 type="email"
                                 placeholder="you@agency.gov"
-                                required
+                                autoComplete="email"
+                                aria-invalid={Boolean(signUpFieldErrors.email)}
+                                className={signUpFieldErrors.email ? invalidFieldClass : undefined}
+                                onChange={() => clearSignUpFieldError("email")}
                               />
+                              <FieldError message={signUpFieldErrors.email} />
                             </div>
                             <div className="space-y-2">
                               <Label htmlFor="agency">Agency Name</Label>
                               <Input
                                 id="agency"
                                 placeholder="Metro Police Department"
-                                required
+                                aria-invalid={Boolean(signUpFieldErrors.agency)}
+                                className={signUpFieldErrors.agency ? invalidFieldClass : undefined}
+                                onChange={() => clearSignUpFieldError("agency")}
                               />
+                              <FieldError message={signUpFieldErrors.agency} />
                             </div>
                             <div className="space-y-2">
-                              <Label htmlFor="signupPassword">Password</Label>
+                              <Label htmlFor="signupPassword">Password (min 8 characters)</Label>
                               <PasswordInput
                                 id="signupPassword"
                                 placeholder="Create a password"
-                                required
+                                autoComplete="new-password"
+                                aria-invalid={Boolean(signUpFieldErrors.password)}
+                                className={signUpFieldErrors.password ? invalidFieldClass : undefined}
+                                onChange={() => clearSignUpFieldError("password")}
                               />
+                              <FieldError message={signUpFieldErrors.password} />
                             </div>
                             <Button type="submit" className="w-full" disabled={signUpLoading}>
                               {signUpLoading ? "Creating…" : "Create Free Account"}
@@ -228,7 +273,7 @@ export default function MemberSitePage() {
                         </TabsContent>
 
                         <TabsContent value="signin" className="mt-6">
-                          <form onSubmit={handleSignIn} className="space-y-4">
+                          <form onSubmit={handleSignIn} noValidate className="space-y-4">
                             {signInError && (
                               <p className="rounded-lg bg-red-50 p-2 text-sm text-red-800">{signInError}</p>
                             )}

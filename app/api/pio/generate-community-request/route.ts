@@ -62,7 +62,7 @@ export async function POST(request: Request) {
     const content = await generateCommunityRequestWithAI(payload)
     if (!content) {
       return NextResponse.json(
-        { error: "AI generation unavailable. Check OPENAI_API_KEY in Vercel or use the template." },
+        { error: "Drafting is temporarily unavailable. Please try again in a few minutes." },
         { status: 503 }
       )
     }

@@ -8,6 +8,15 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { PasswordInput } from "@/components/ui/password-input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { FormErrorBanner, FieldError } from "@/components/form-messages"
+import {
+  validateSignupFields,
+  hasSignupErrors,
+  mapSignupApiError,
+  invalidFieldClass,
+  type SignupFieldErrors,
+} from "@/lib/signup-validation"
+import { cn } from "@/lib/utils"
 import { Check } from "lucide-react"
 
 const benefits = [
@@ -20,26 +29,34 @@ const benefits = [
 
 export default function SignUpPage() {
   const [success, setSuccess] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<SignupFieldErrors>({})
   const [loading, setLoading] = useState(false)
+
+  const clearFieldError = (field: keyof SignupFieldErrors) => {
+    setFieldErrors((prev) => {
+      if (!prev[field]) return prev
+      const next = { ...prev }
+      delete next[field]
+      return next
+    })
+  }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    setError(null)
+    setFieldErrors({})
     const form = e.currentTarget
-    const email = (form.querySelector("#email") as HTMLInputElement)?.value?.trim()
+    const email = (form.querySelector("#email") as HTMLInputElement)?.value?.trim() ?? ""
     const firstName = (form.querySelector("#firstName") as HTMLInputElement)?.value?.trim()
     const lastName = (form.querySelector("#lastName") as HTMLInputElement)?.value?.trim()
     const agency = (form.querySelector("#agency") as HTMLInputElement)?.value?.trim()
     const password = (form.querySelector("#password") as HTMLInputElement)?.value ?? ""
-    if (!email) {
-      setError("Email is required")
+
+    const validationErrors = validateSignupFields({ email, password })
+    if (hasSignupErrors(validationErrors)) {
+      setFieldErrors(validationErrors)
       return
     }
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters")
-      return
-    }
+
     setLoading(true)
     try {
       const res = await fetch("/api/members/signup", {
@@ -49,7 +66,7 @@ export default function SignUpPage() {
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setError(data.error || "Sign up failed")
+        setFieldErrors(mapSignupApiError(data.error || "Sign up failed"))
         return
       }
       const loginRes = await fetch("/api/members/login", {
@@ -63,7 +80,7 @@ export default function SignUpPage() {
       }
       setSuccess(true)
     } catch {
-      setError("Something went wrong. Please try again.")
+      setFieldErrors({ form: "Something went wrong. Please try again." })
     } finally {
       setLoading(false)
     }
@@ -118,10 +135,8 @@ export default function SignUpPage() {
             </ul>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
-              <p className="rounded-lg bg-red-50 p-2 text-sm text-red-800">{error}</p>
-            )}
+          <form onSubmit={handleSubmit} noValidate className="space-y-4">
+            <FormErrorBanner message={fieldErrors.form} />
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="firstName">First Name</Label>
@@ -154,19 +169,30 @@ export default function SignUpPage() {
                 id="email"
                 type="email"
                 placeholder="you@agency.gov"
-                className="placeholder:text-muted-foreground/60"
-                required
+                autoComplete="email"
+                aria-invalid={Boolean(fieldErrors.email)}
+                className={cn(
+                  "placeholder:text-muted-foreground/60",
+                  fieldErrors.email && invalidFieldClass
+                )}
+                onChange={() => clearFieldError("email")}
               />
+              <FieldError message={fieldErrors.email} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password (min 8 characters)</Label>
               <PasswordInput
                 id="password"
                 placeholder="Create a password"
-                className="placeholder:text-muted-foreground/60"
-                minLength={8}
-                required
+                autoComplete="new-password"
+                aria-invalid={Boolean(fieldErrors.password)}
+                className={cn(
+                  "placeholder:text-muted-foreground/60",
+                  fieldErrors.password && invalidFieldClass
+                )}
+                onChange={() => clearFieldError("password")}
               />
+              <FieldError message={fieldErrors.password} />
             </div>
             <Button
               type="submit"

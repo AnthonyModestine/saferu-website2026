@@ -6,6 +6,15 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { PasswordInput } from "@/components/ui/password-input"
+import { FormErrorBanner, FieldError } from "@/components/form-messages"
+import {
+  validateSignupFields,
+  hasSignupErrors,
+  mapSignupApiError,
+  invalidFieldClass,
+  type SignupFieldErrors,
+} from "@/lib/signup-validation"
+import { cn } from "@/lib/utils"
 import {
   Dialog,
   DialogContent,
@@ -19,21 +28,33 @@ import { Check } from "lucide-react"
 export function SignUpModal() {
   const [open, setOpen] = useState(false)
   const [success, setSuccess] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<SignupFieldErrors>({})
   const [loading, setLoading] = useState(false)
+
+  const clearFieldError = (field: keyof SignupFieldErrors) => {
+    setFieldErrors((prev) => {
+      if (!prev[field]) return prev
+      const next = { ...prev }
+      delete next[field]
+      return next
+    })
+  }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    setError(null)
+    setFieldErrors({})
     const form = e.currentTarget
-    const email = (form.querySelector("#modal-email") as HTMLInputElement)?.value?.trim()
+    const email = (form.querySelector("#modal-email") as HTMLInputElement)?.value?.trim() ?? ""
     const firstName = (form.querySelector("#modal-firstName") as HTMLInputElement)?.value?.trim()
     const lastName = (form.querySelector("#modal-lastName") as HTMLInputElement)?.value?.trim()
     const agency = (form.querySelector("#modal-agency") as HTMLInputElement)?.value?.trim()
     const password = (form.querySelector("#modal-password") as HTMLInputElement)?.value ?? ""
 
-    if (!email) { setError("Email is required"); return }
-    if (password.length < 8) { setError("Password must be at least 8 characters"); return }
+    const validationErrors = validateSignupFields({ email, password })
+    if (hasSignupErrors(validationErrors)) {
+      setFieldErrors(validationErrors)
+      return
+    }
 
     setLoading(true)
     try {
@@ -43,7 +64,10 @@ export function SignUpModal() {
         body: JSON.stringify({ email, firstName, lastName, agency, password }),
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) { setError(data.error || "Sign up failed"); return }
+      if (!res.ok) {
+        setFieldErrors(mapSignupApiError(data.error || "Sign up failed"))
+        return
+      }
 
       const loginRes = await fetch("/api/members/login", {
         method: "POST",
@@ -53,7 +77,7 @@ export function SignUpModal() {
       if (loginRes.ok) { window.location.href = "/"; return }
       setSuccess(true)
     } catch {
-      setError("Something went wrong. Please try again.")
+      setFieldErrors({ form: "Something went wrong. Please try again." })
     } finally {
       setLoading(false)
     }
@@ -92,10 +116,8 @@ export function SignUpModal() {
               </DialogDescription>
             </DialogHeader>
 
-            <form onSubmit={handleSubmit} className="space-y-4 mt-2">
-              {error && (
-                <p className="rounded-lg bg-red-50 p-2 text-sm text-red-800">{error}</p>
-              )}
+            <form onSubmit={handleSubmit} noValidate className="space-y-4 mt-2">
+              <FormErrorBanner message={fieldErrors.form} />
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label htmlFor="modal-firstName">First Name</Label>
@@ -112,11 +134,28 @@ export function SignUpModal() {
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="modal-email">Email</Label>
-                <Input id="modal-email" type="email" placeholder="you@agency.gov" required />
+                <Input
+                  id="modal-email"
+                  type="email"
+                  placeholder="you@agency.gov"
+                  autoComplete="email"
+                  aria-invalid={Boolean(fieldErrors.email)}
+                  className={fieldErrors.email ? invalidFieldClass : undefined}
+                  onChange={() => clearFieldError("email")}
+                />
+                <FieldError message={fieldErrors.email} />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="modal-password">Password</Label>
-                <PasswordInput id="modal-password" placeholder="Min. 8 characters" minLength={8} required />
+                <Label htmlFor="modal-password">Password (min 8 characters)</Label>
+                <PasswordInput
+                  id="modal-password"
+                  placeholder="Create a password"
+                  autoComplete="new-password"
+                  aria-invalid={Boolean(fieldErrors.password)}
+                  className={fieldErrors.password ? invalidFieldClass : undefined}
+                  onChange={() => clearFieldError("password")}
+                />
+                <FieldError message={fieldErrors.password} />
               </div>
               <Button
                 type="submit"
