@@ -17,6 +17,7 @@ import {
   Loader2,
 } from "lucide-react"
 import { useSubscription } from "@/lib/use-subscription"
+import { useMemberSession } from "@/lib/use-member-session"
 import { startHostedCheckoutSession } from "@/app/actions/stripe"
 
 interface GenerationStatus {
@@ -27,6 +28,7 @@ interface GenerationStatus {
 }
 
 export default function PIODashboardPage() {
+  const { member } = useMemberSession()
   const { isSubscribed } = useSubscription()
   const [genStatus, setGenStatus] = useState<GenerationStatus | null>(null)
   const [packLoading, setPackLoading] = useState<string | null>(null)
@@ -65,13 +67,19 @@ export default function PIODashboardPage() {
       {!isSubscribed && (
         <div className="rounded-xl border border-[#1470AF]/20 bg-[#1470AF]/5 p-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="font-bold text-[#1a365d] text-lg">Get started with Press Center</p>
+            <p className="font-bold text-[#1a365d] text-lg">
+              {member ? "Upgrade to Press Center" : "Get started with Press Center"}
+            </p>
             <p className="text-sm text-muted-foreground mt-0.5">
-              $30/month. Confident communication for public safety — draft press releases and community requests in minutes without compromising oversight.
+              {member
+                ? "You're signed in with a free account. Subscribe to unlock press release and community request drafting."
+                : "$30/month. Confident communication for public safety — draft press releases and community requests in minutes without compromising oversight."}
             </p>
           </div>
           <Button asChild className="shrink-0 bg-[#f2b233] text-[#1a365d] hover:bg-[#f2b233]/90 font-semibold">
-            <Link href="/pricing">Subscribe Now</Link>
+            <Link href={member ? "/pio-tool/subscribe" : "/pricing"}>
+              {member ? "Subscribe Now" : "See plans"}
+            </Link>
           </Button>
         </div>
       )}

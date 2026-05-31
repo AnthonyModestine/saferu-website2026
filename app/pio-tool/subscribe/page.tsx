@@ -1,11 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Check, FileText, Zap, Shield, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { PRODUCTS } from "@/lib/products"
 import { Checkout } from "@/components/checkout"
+import { useMemberSession } from "@/lib/use-member-session"
+import { useSubscription } from "@/lib/use-subscription"
 
 const features = [
   {
@@ -31,14 +34,37 @@ const features = [
 ]
 
 export default function SubscribePage() {
+  const router = useRouter()
+  const { member, isLoading: sessionLoading } = useMemberSession()
+  const { isSubscribed, isLoading: subLoading } = useSubscription()
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null)
   const [showCheckout, setShowCheckout] = useState(false)
 
   const monthlyPlan = PRODUCTS.find((p) => p.id === "pio-tool-monthly")
 
+  useEffect(() => {
+    if (sessionLoading || subLoading) return
+    if (isSubscribed) {
+      router.replace("/pio-tool")
+      return
+    }
+    if (!member) {
+      router.replace("/sign-in?returnUrl=%2Fpio-tool%2Fsubscribe")
+    }
+  }, [member, isSubscribed, sessionLoading, subLoading, router])
+
   const handleSubscribe = (productId: string) => {
     setSelectedPlan(productId)
     setShowCheckout(true)
+  }
+
+  if (sessionLoading || subLoading || !member || isSubscribed) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[40vh] gap-4">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#1470AF] border-t-transparent" />
+        <p className="text-sm text-muted-foreground">Loading...</p>
+      </div>
+    )
   }
 
   if (showCheckout && selectedPlan) {
@@ -73,9 +99,9 @@ export default function SubscribePage() {
   return (
     <div className="mx-auto max-w-3xl space-y-8">
       <div className="text-center">
-        <h1 className="text-3xl font-bold text-[#1a365d]">Communicate with Confidence</h1>
+        <h1 className="text-3xl font-bold text-[#1a365d]">Upgrade to Press Center</h1>
         <p className="mt-2 text-lg text-muted-foreground">
-          Press Center helps your agency turn incident details into clear, professional public messaging — in minutes, not hours.
+          Signed in as {member.email}. Subscribe to unlock press release and community request drafting.
         </p>
       </div>
 
@@ -137,7 +163,7 @@ export default function SubscribePage() {
               className="bg-[#f2b233] text-[#1a365d] hover:bg-[#e5a52e] font-semibold px-12"
               onClick={() => handleSubscribe("pio-tool-monthly")}
             >
-              Get Press Center
+              Subscribe — $30/month
             </Button>
           </div>
         </CardContent>
