@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Copy, Check, Download, Heart, ImageIcon } from "lucide-react"
 import type { PostPack } from "@/lib/data/post-packs"
+import { copyTextToClipboard } from "@/lib/copy-to-clipboard"
 
 interface PostPackModalProps {
   pack: PostPack | null
@@ -26,7 +27,8 @@ export function PostPackModal({ pack, open, onOpenChange }: PostPackModalProps) 
   if (!pack) return null
 
   const handleCopyCaption = async (platform: string, caption: string) => {
-    await navigator.clipboard.writeText(caption)
+    const ok = await copyTextToClipboard(caption)
+    if (!ok) return
     setCopiedCaption(platform)
     setTimeout(() => setCopiedCaption(null), 2000)
   }

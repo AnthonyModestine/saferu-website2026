@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Copy, Check, ExternalLink } from "lucide-react"
 import type { PostPack } from "@/lib/data/post-packs"
+import { copyTextToClipboard } from "@/lib/copy-to-clipboard"
 
 interface PostPackCardProps {
   pack: PostPack
@@ -17,7 +18,8 @@ export function PostPackCard({ pack, onOpenPack }: PostPackCardProps) {
 
   const handleCopyCaptions = async () => {
     const allCaptions = `FACEBOOK:\n${pack.captions.facebook}\n\nINSTAGRAM:\n${pack.captions.instagram}\n\nTWITTER/X:\n${pack.captions.twitter}`
-    await navigator.clipboard.writeText(allCaptions)
+    const ok = await copyTextToClipboard(allCaptions)
+    if (!ok) return
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }

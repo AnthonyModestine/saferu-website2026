@@ -5,6 +5,8 @@ import Link from "next/link"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { track } from "@/lib/track"
+import { copyTextToClipboard } from "@/lib/copy-to-clipboard"
+import { getPostMessage } from "@/lib/post-message"
 import type { ImageOverrides } from "@/lib/content-overrides"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
@@ -84,6 +86,7 @@ export function ArticleDetailPage({
   const pathname = usePathname()
   const CategoryIcon = categoryIconMap[category.id] || Shield
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [copyErrorId, setCopyErrorId] = useState<string | null>(null)
   const [imageOverrides, setImageOverrides] = useState<ImageOverrides>({})
 
   useEffect(() => {
@@ -94,14 +97,21 @@ export function ArticleDetailPage({
   }, [])
 
   const copyToClipboard = async (text: string, id: string, postTitle?: string) => {
-    try {
-      await navigator.clipboard.writeText(text)
-      setCopiedId(id)
-      setTimeout(() => setCopiedId(null), 2000)
-      track("copy", { path: pathname ?? undefined, postId: id, postTitle })
-    } catch (err) {
-      console.error("Failed to copy text:", err)
+    setCopyErrorId(null)
+    if (!text.trim()) {
+      setCopyErrorId(id)
+      setTimeout(() => setCopyErrorId(null), 2500)
+      return
     }
+    const ok = await copyTextToClipboard(text)
+    if (!ok) {
+      setCopyErrorId(id)
+      setTimeout(() => setCopyErrorId(null), 2500)
+      return
+    }
+    setCopiedId(id)
+    setTimeout(() => setCopiedId(null), 2000)
+    track("copy", { path: pathname ?? undefined, postId: id, postTitle })
   }
 
   return (
@@ -152,8 +162,8 @@ export function ArticleDetailPage({
         <section className="py-10">
           <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
             <div className="grid gap-8 md:grid-cols-2">
-              {article.posts.map((post, index) => {
-                const message = post.message ?? post.captions?.facebook ?? ""
+              {article.posts.map((post) => {
+                const message = getPostMessage(post)
                 const overrideUrl = imageOverrides[category.id]?.[subcategory.id]?.[article.id]?.[post.id]
                 const imageSrc = overrideUrl ?? post.image ?? null
                 
@@ -219,6 +229,7 @@ export function ArticleDetailPage({
 
                       {/* Copy Button */}
                       <Button
+                        type="button"
                         onClick={() => copyToClipboard(message, post.id, post.title)}
                         className="w-full bg-[#f2b233] text-[#1a365d] hover:bg-[#f2b233]/90 font-semibold mb-3"
                       >
@@ -227,6 +238,8 @@ export function ArticleDetailPage({
                             <Check className="h-4 w-4 mr-2" />
                             Copied!
                           </>
+                        ) : copyErrorId === post.id ? (
+                          "Copy failed — select text manually"
                         ) : (
                           <>
                             <Copy className="h-4 w-4 mr-2" />
