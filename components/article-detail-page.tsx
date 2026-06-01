@@ -11,7 +11,8 @@ import type { ImageOverrides } from "@/lib/content-overrides"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
-import { ChevronRight, ArrowLeft, Copy, Check, Download, ExternalLink, ShieldCheck, Flame, Star, CloudLightning, AlertTriangle, Users, Shield } from "lucide-react"
+import { ChevronRight, ArrowLeft, Download, ExternalLink, ShieldCheck, Flame, Star, CloudLightning, AlertTriangle, Users, Shield } from "lucide-react"
+import { PostMessageBlock } from "@/components/post-message-block"
 import type { Article, Subcategory, Category } from "@/lib/data/content-library"
 import type { LucideIcon } from "lucide-react"
 
@@ -220,33 +221,14 @@ export function ArticleDetailPage({
 
                     {/* Content */}
                     <div className="flex flex-col flex-1 p-4">
-                      {/* Message */}
-                      <div className="flex-1 rounded-xl bg-gray-50 p-3 mb-3">
-                        <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap line-clamp-6">
-                          {message}
-                        </p>
-                      </div>
-
-                      {/* Copy Button */}
-                      <Button
-                        type="button"
-                        onClick={() => copyToClipboard(message, post.id, post.title)}
-                        className="w-full bg-[#f2b233] text-[#1a365d] hover:bg-[#f2b233]/90 font-semibold mb-3"
-                      >
-                        {copiedId === post.id ? (
-                          <>
-                            <Check className="h-4 w-4 mr-2" />
-                            Copied!
-                          </>
-                        ) : copyErrorId === post.id ? (
-                          "Copy failed — select text manually"
-                        ) : (
-                          <>
-                            <Copy className="h-4 w-4 mr-2" />
-                            Copy Message
-                          </>
-                        )}
-                      </Button>
+                      <PostMessageBlock
+                        postId={post.id}
+                        postTitle={post.title}
+                        message={message}
+                        copiedId={copiedId}
+                        copyErrorId={copyErrorId}
+                        onCopy={copyToClipboard}
+                      />
 
                       {/* Platform Links */}
                       <div className="grid grid-cols-4 gap-2">
