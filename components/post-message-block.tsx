@@ -35,7 +35,7 @@ export function PostMessageBlock({
 
   return (
     <>
-      <div className="rounded-xl bg-gray-50 p-3 mb-2">
+      <div className="relative rounded-xl bg-gray-50 p-3 pb-8 mb-2">
         <p
           className={`text-sm text-gray-700 leading-relaxed whitespace-pre-wrap ${
             long && !expanded ? "line-clamp-6" : ""
@@ -47,18 +47,14 @@ export function PostMessageBlock({
           <button
             type="button"
             onClick={() => setExpanded((open) => !open)}
-            className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-[#1470AF] hover:underline"
+            aria-label={expanded ? "Collapse message" : "Expand message"}
+            aria-expanded={expanded}
+            className="absolute bottom-2 right-2 flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 bg-white text-[#1470AF] shadow-sm hover:bg-gray-50 transition-colors"
           >
             {expanded ? (
-              <>
-                <ChevronUp className="h-4 w-4" />
-                Show less
-              </>
+              <ChevronUp className="h-4 w-4" />
             ) : (
-              <>
-                <ChevronDown className="h-4 w-4" />
-                Show full message
-              </>
+              <ChevronDown className="h-4 w-4" />
             )}
           </button>
         )}
