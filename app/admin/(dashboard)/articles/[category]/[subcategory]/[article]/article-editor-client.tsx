@@ -69,6 +69,7 @@ export default function ArticleEditorClient({
   const [saving, setSaving] = useState(false)
   const [savingPost, setSavingPost] = useState(false)
   const [uploadingImage, setUploadingImage] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
   const [dragOverPostIndex, setDragOverPostIndex] = useState<number | null>(null)
 
   // Keep in sync when server re-fetches (e.g. after adding a post)
@@ -127,6 +128,7 @@ export default function ArticleEditorClient({
     const file = e.target.files?.[0]
     if (!file) return
     setUploadingImage(true)
+    setUploadError(null)
     try {
       const formData = new FormData()
       formData.set("file", file)
@@ -134,7 +136,11 @@ export default function ArticleEditorClient({
       const data = await res.json().catch(() => ({}))
       if (res.ok && data.url) {
         setNewPost((prev) => ({ ...prev, image: data.url }))
+      } else {
+        setUploadError(data.error || "Upload failed. Try a smaller image or paste a URL.")
       }
+    } catch {
+      setUploadError("Upload failed. Check your connection and try again.")
     } finally {
       setUploadingImage(false)
       e.target.value = ""
@@ -343,7 +349,7 @@ export default function ArticleEditorClient({
                         width={192}
                         height={128}
                         className="h-full w-full object-cover rounded-lg"
-                        unoptimized={newPost.image.startsWith("/images/")}
+                        unoptimized={newPost.image.startsWith("/images/") || newPost.image.startsWith("http")}
                       />
                     ) : (
                       <div className="text-center">
@@ -369,13 +375,16 @@ export default function ArticleEditorClient({
                         <span className="text-sm text-gray-500">Uploading…</span>
                       )}
                     </div>
+                    {uploadError && (
+                      <p className="text-sm text-red-600">{uploadError}</p>
+                    )}
                     <Input
                       placeholder="/images/posts/your-image.jpg or paste URL"
                       value={newPost.image}
                       onChange={(e) => setNewPost({ ...newPost, image: e.target.value })}
                     />
                     <p className="text-xs text-gray-500">
-                      Upload a file (JPG, PNG, WebP, GIF, max 5MB) or paste an image URL
+                      Upload a file (JPG, PNG, WebP, GIF, max 10MB) or paste an image URL
                     </p>
                   </div>
                 </div>

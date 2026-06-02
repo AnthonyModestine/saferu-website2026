@@ -157,7 +157,7 @@ export default function MediaLibraryPage() {
             <DialogHeader>
               <DialogTitle>Upload Images</DialogTitle>
               <DialogDescription>
-                PNG, JPG, WebP, or GIF — max 5MB each. Recommended: 1920×1080 (16:9).
+                PNG, JPG, WebP, or GIF — max 10MB each. Recommended: 1920×1080 (16:9).
               </DialogDescription>
             </DialogHeader>
 
