@@ -13,7 +13,7 @@ const FILE_PATH = path.join(DATA_DIR, "cms-additions.json")
 
 const EMPTY: CmsAdditions = { subcategories: [], articles: [], posts: [] }
 
-let loaded = false
+let loadPromise: Promise<void> | null = null
 
 // ── Database helpers ────────────────────────────────────────────────────────
 
@@ -64,18 +64,21 @@ async function fileSave(data: CmsAdditions): Promise<void> {
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**
- * Load additions into memory. Async when using DB, sync fallback for file.
- * Call before any read or mutation.
+ * Load additions into memory. Returns the same Promise if a load is already
+ * in-flight, so concurrent callers all wait for the same fetch.
  */
-export async function loadCmsAdditions(): Promise<void> {
-  if (loaded) return
-  loaded = true
-  setAdditions({ ...EMPTY })
-  if (isDatabaseConfigured()) {
-    await dbLoad()
-  } else {
-    fileLoad()
+export function loadCmsAdditions(): Promise<void> {
+  if (!loadPromise) {
+    loadPromise = (async () => {
+      setAdditions({ ...EMPTY })
+      if (isDatabaseConfigured()) {
+        await dbLoad()
+      } else {
+        fileLoad()
+      }
+    })()
   }
+  return loadPromise
 }
 
 /** Persist current in-memory additions. Call after addArticle / addPost / addSubcategory. */
@@ -86,4 +89,6 @@ export async function persistAdditions(): Promise<void> {
   } else {
     await fileSave(data)
   }
+  // Reset so the next request re-reads from DB (other Lambda instances need fresh data)
+  loadPromise = null
 }

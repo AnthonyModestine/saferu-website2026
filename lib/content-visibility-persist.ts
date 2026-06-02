@@ -11,7 +11,7 @@ import { isDatabaseConfigured, getSql, ensureSchema } from "@/lib/db"
 const DATA_DIR = path.join(process.cwd(), "data")
 const FILE_PATH = path.join(DATA_DIR, "content-visibility.json")
 
-let loaded = false
+let loadPromise: Promise<void> | null = null
 
 // ── Database helpers ─────────────────────────────────────────────────────────
 
@@ -55,15 +55,18 @@ async function fileSave(arr: string[]): Promise<void> {
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-/** Load visibility state into memory. Call from server layout or before mutations. */
-export async function loadVisibility(): Promise<void> {
-  if (loaded) return
-  loaded = true
-  if (isDatabaseConfigured()) {
-    await dbLoad()
-  } else {
-    fileLoad()
+/** Load visibility state into memory. Returns the same Promise if a load is already in-flight. */
+export function loadVisibility(): Promise<void> {
+  if (!loadPromise) {
+    loadPromise = (async () => {
+      if (isDatabaseConfigured()) {
+        await dbLoad()
+      } else {
+        fileLoad()
+      }
+    })()
   }
+  return loadPromise
 }
 
 /** Persist unpublished keys. Call from API after setArticlePublished. */
@@ -74,4 +77,5 @@ export async function persistVisibility(): Promise<void> {
   } else {
     await fileSave(arr)
   }
+  loadPromise = null
 }
