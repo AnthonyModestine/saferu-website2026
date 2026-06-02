@@ -33,16 +33,25 @@ export interface CmsPost {
   captions: { facebook: string; instagram: string; twitter: string }
 }
 
+export interface CmsDeletedPost {
+  categoryId: string
+  subcategoryId: string
+  articleId: string
+  postId: string
+}
+
 export interface CmsAdditions {
   subcategories: CmsSubcategory[]
   articles: CmsArticle[]
   posts: CmsPost[]
+  deletedPosts?: CmsDeletedPost[]
 }
 
 let additions: CmsAdditions = {
   subcategories: [],
   articles: [],
   posts: [],
+  deletedPosts: [],
 }
 
 export function getAdditions(): CmsAdditions {
@@ -50,6 +59,7 @@ export function getAdditions(): CmsAdditions {
     subcategories: [...additions.subcategories],
     articles: [...additions.articles],
     posts: [...additions.posts],
+    deletedPosts: [...(additions.deletedPosts || [])],
   }
 }
 
@@ -58,6 +68,7 @@ export function setAdditions(data: CmsAdditions): void {
     subcategories: data.subcategories || [],
     articles: data.articles || [],
     posts: data.posts || [],
+    deletedPosts: data.deletedPosts || [],
   }
 }
 
@@ -71,6 +82,37 @@ export function addArticle(art: CmsArticle): void {
 
 export function addPost(post: CmsPost): void {
   additions.posts.push(post)
+}
+
+export function removePost(
+  categoryId: string,
+  subcategoryId: string,
+  articleId: string,
+  postId: string
+): void {
+  const cmsIndex = additions.posts.findIndex(
+    (p) =>
+      p.categoryId === categoryId &&
+      p.subcategoryId === subcategoryId &&
+      p.articleId === articleId &&
+      p.id === postId
+  )
+  if (cmsIndex >= 0) {
+    additions.posts.splice(cmsIndex, 1)
+    return
+  }
+
+  if (!additions.deletedPosts) additions.deletedPosts = []
+  const already = additions.deletedPosts.some(
+    (d) =>
+      d.categoryId === categoryId &&
+      d.subcategoryId === subcategoryId &&
+      d.articleId === articleId &&
+      d.postId === postId
+  )
+  if (!already) {
+    additions.deletedPosts.push({ categoryId, subcategoryId, articleId, postId })
+  }
 }
 
 function slugify(s: string): string {

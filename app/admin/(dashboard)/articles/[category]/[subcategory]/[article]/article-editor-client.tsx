@@ -203,6 +203,31 @@ export default function ArticleEditorClient({
     await applyPostOrder(reorderPosts(fromIndex, toIndex))
   }
 
+  const handleDeletePost = async (postId: string, postTitle: string) => {
+    if (
+      !window.confirm(
+        `Delete "${postTitle || "this post"}"? This cannot be undone.`
+      )
+    ) {
+      return
+    }
+    try {
+      const res = await fetch("/api/cms/post", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ categoryId, subcategoryId, articleId, postId }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        window.alert(data.error || "Failed to delete post")
+        return
+      }
+      router.refresh()
+    } catch {
+      window.alert("Failed to delete post. Check your connection and try again.")
+    }
+  }
+
   const handleSavePost = async () => {
     if (!newPost.title?.trim()) return
     setSavingPost(true)
@@ -513,7 +538,16 @@ export default function ArticleEditorClient({
                   >
                     <Pencil className="h-4 w-4" />
                   </Button>
-                  <Button size="icon" variant="destructive" className="h-8 w-8">
+                  <Button
+                    size="icon"
+                    variant="destructive"
+                    className="h-8 w-8"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      handleDeletePost(post.id, post.title)
+                    }}
+                    aria-label="Delete post"
+                  >
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>

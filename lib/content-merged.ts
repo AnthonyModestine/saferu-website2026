@@ -11,7 +11,7 @@ import {
 } from "@/lib/data/content-library"
 
 export { contentLibrary } from "@/lib/data/content-library"
-import { getAdditions } from "@/lib/cms-additions"
+import { getAdditions, type CmsAdditions } from "@/lib/cms-additions"
 import {
   getSubcategoryOrder,
   getArticleOrder,
@@ -22,6 +22,25 @@ import { isArticlePublished } from "@/lib/content-visibility"
 
 function deepCloneCategory(cat: Category): Category {
   return JSON.parse(JSON.stringify(cat))
+}
+
+function applyDeletedPosts(categoryId: string, merged: Category, add: CmsAdditions): void {
+  const deleted = add.deletedPosts ?? []
+  if (deleted.length === 0) return
+  for (const sub of merged.subcategories) {
+    for (const art of sub.articles) {
+      art.posts = art.posts.filter(
+        (p) =>
+          !deleted.some(
+            (d) =>
+              d.categoryId === categoryId &&
+              d.subcategoryId === sub.id &&
+              d.articleId === art.id &&
+              d.postId === p.id
+          )
+      )
+    }
+  }
 }
 
 export type GetCategoryOptions = { includeUnpublished?: boolean }
@@ -115,6 +134,8 @@ export function getCategoryById(
       articles,
     })
   }
+
+  applyDeletedPosts(categoryId, merged, add)
 
   // Apply order overrides
   const subOrder = getSubcategoryOrder(categoryId)

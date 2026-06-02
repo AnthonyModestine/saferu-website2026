@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { addPost, generateId } from "@/lib/cms-additions"
+import { addPost, generateId, removePost } from "@/lib/cms-additions"
 import { loadCmsAdditions, persistAdditions } from "@/lib/cms-additions-persist"
 import { unauthorizedIfNotAdmin } from "@/lib/require-admin-api"
 
@@ -40,7 +40,41 @@ export async function POST(request: NextRequest) {
     })
     await persistAdditions()
     return NextResponse.json({ ok: true })
-  } catch {
-    return NextResponse.json({ error: "Invalid request" }, { status: 400 })
+  } catch (err) {
+    console.error("[cms/post] POST error:", err)
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Invalid request" },
+      { status: 500 }
+    )
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  const denied = await unauthorizedIfNotAdmin()
+  if (denied) return denied
+  try {
+    const body = await request.json()
+    const { categoryId, subcategoryId, articleId, postId } = body as {
+      categoryId: string
+      subcategoryId: string
+      articleId: string
+      postId: string
+    }
+    if (!categoryId || !subcategoryId || !articleId || !postId) {
+      return NextResponse.json(
+        { error: "categoryId, subcategoryId, articleId, and postId required" },
+        { status: 400 }
+      )
+    }
+    await loadCmsAdditions()
+    removePost(categoryId, subcategoryId, articleId, postId)
+    await persistAdditions()
+    return NextResponse.json({ ok: true })
+  } catch (err) {
+    console.error("[cms/post] DELETE error:", err)
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Failed to delete post" },
+      { status: 500 }
+    )
   }
 }

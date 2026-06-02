@@ -1,8 +1,12 @@
 import { ArticleDetailPage } from "@/components/article-detail-page"
 import { getCategoryById, getArticleById } from "@/lib/content-merged"
+import { loadCmsAdditions } from "@/lib/cms-additions-persist"
+import { loadVisibility } from "@/lib/content-visibility-persist"
 import { notFound } from "next/navigation"
 
 const WHATS_NEW_SUBCATEGORY_ID = "latest"
+
+export const dynamic = "force-dynamic"
 
 interface Props {
   params: Promise<{ article: string }>
@@ -18,6 +22,7 @@ export async function generateMetadata({ params }: Props) {
 }
 
 export default async function WhatsNewArticlePage({ params }: Props) {
+  await Promise.all([loadCmsAdditions(), loadVisibility()])
   const { article: articleId } = await params
   const category = getCategoryById("whats-new")
   const subcategory = category?.subcategories.find((s) => s.id === WHATS_NEW_SUBCATEGORY_ID)
