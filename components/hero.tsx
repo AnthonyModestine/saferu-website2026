@@ -21,6 +21,9 @@ export function Hero() {
             Now every agency can communicate like one.
           </h1>
 
+          <p className="mt-6 max-w-2xl mx-auto text-lg leading-relaxed text-[#1a365d]/80 sm:text-xl">
+            When something happens, your community is already watching. SaferU drafts your press release, social posts, and community alerts in minutes — structured, professional, and ready for your approval.
+          </p>
 
           <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
             <Button
