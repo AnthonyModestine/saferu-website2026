@@ -51,8 +51,17 @@ export function getUnpublishedArticleTriples(): {
   subcategoryId: string
   articleId: string
 }[] {
-  return getUnpublishedArticleKeys().map((k) => {
-    const [categoryId, subcategoryId, articleId] = k.split(SEP)
-    return { categoryId, subcategoryId, articleId }
-  })
+  return getUnpublishedArticleKeys()
+    .map((k) => {
+      const first = k.indexOf(SEP)
+      if (first === -1) return null
+      const second = k.indexOf(SEP, first + SEP.length)
+      if (second === -1) return null
+      return {
+        categoryId: k.slice(0, first),
+        subcategoryId: k.slice(first + SEP.length, second),
+        articleId: k.slice(second + SEP.length),
+      }
+    })
+    .filter((t): t is { categoryId: string; subcategoryId: string; articleId: string } => t !== null)
 }

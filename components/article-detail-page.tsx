@@ -6,6 +6,7 @@ import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { track } from "@/lib/track"
 import { copyTextToClipboard } from "@/lib/copy-to-clipboard"
+import { downloadImageFile } from "@/lib/download-image"
 import { getPostMessage } from "@/lib/post-message"
 import type { ImageOverrides } from "@/lib/content-overrides"
 import { Header } from "@/components/header"
@@ -88,6 +89,7 @@ export function ArticleDetailPage({
   const CategoryIcon = categoryIconMap[category.id] || Shield
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [copyErrorId, setCopyErrorId] = useState<string | null>(null)
+  const [downloadingPostId, setDownloadingPostId] = useState<string | null>(null)
   const [imageOverrides, setImageOverrides] = useState<ImageOverrides>({})
 
   useEffect(() => {
@@ -199,22 +201,30 @@ export function ArticleDetailPage({
                       {imageSrc ? (
                         <button
                           type="button"
-                          onClick={() => {
-                            const link = document.createElement("a")
-                            link.href = imageSrc
-                            link.download = `${post.title.toLowerCase().replace(/\s+/g, "-")}.jpg`
-                            link.click()
-                            track("download", {
-                              path: pathname ?? undefined,
-                              name: post.title,
-                              postId: post.id,
-                              postTitle: post.title,
-                            })
+                          disabled={downloadingPostId === post.id}
+                          onClick={async () => {
+                            setDownloadingPostId(post.id)
+                            try {
+                              await downloadImageFile(
+                                imageSrc,
+                                post.title.toLowerCase().replace(/\s+/g, "-")
+                              )
+                              track("download", {
+                                path: pathname ?? undefined,
+                                name: post.title,
+                                postId: post.id,
+                                postTitle: post.title,
+                              })
+                            } catch {
+                              window.alert("Could not download this image. Try again in a moment.")
+                            } finally {
+                              setDownloadingPostId(null)
+                            }
                           }}
-                          className="absolute bottom-3 right-3 z-10 flex items-center gap-1.5 rounded-lg bg-white/95 backdrop-blur-sm px-3 py-2 text-sm font-medium text-[#1a365d] shadow-lg hover:bg-white transition-colors"
+                          className="absolute bottom-3 right-3 z-10 flex items-center gap-1.5 rounded-lg bg-white/95 backdrop-blur-sm px-3 py-2 text-sm font-medium text-[#1a365d] shadow-lg hover:bg-white transition-colors disabled:opacity-70"
                         >
                           <Download className="h-4 w-4" />
-                          Download
+                          {downloadingPostId === post.id ? "Downloading…" : "Download"}
                         </button>
                       ) : null}
                     </div>

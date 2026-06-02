@@ -28,8 +28,10 @@ export async function POST(request: NextRequest) {
     await loadVisibility()
     setArticlePublished(categoryId, subcategoryId, articleId, published)
     await persistVisibility()
-    return NextResponse.json({ ok: true })
-  } catch {
-    return NextResponse.json({ error: "Invalid request" }, { status: 400 })
+    return NextResponse.json({ ok: true, published })
+  } catch (err) {
+    console.error("[content/visibility] error:", err)
+    const message = err instanceof Error ? err.message : "Failed to update visibility"
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

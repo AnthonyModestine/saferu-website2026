@@ -36,10 +36,18 @@ async function dbLoad(): Promise<string[]> {
 async function dbSave(arr: string[]): Promise<void> {
   await ensureSchema()
   const db = getSql()
+  const payload = JSON.stringify(arr)
   await db`
-    INSERT INTO content_visibility (id, unpublished_keys) VALUES ('singleton', ${arr})
+    INSERT INTO content_visibility (id, unpublished_keys)
+    VALUES ('singleton', ${payload}::jsonb)
     ON CONFLICT (id) DO UPDATE SET unpublished_keys = EXCLUDED.unpublished_keys
   `
+}
+
+function keysMatch(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false
+  const setB = new Set(b)
+  return a.every((k) => setB.has(k))
 }
 
 function fileLoad(): void {
@@ -76,12 +84,16 @@ export async function loadVisibility(): Promise<void> {
   await fileLoadPromise
 }
 
-/** Persist unpublished keys. */
+/** Persist unpublished keys. Verifies DB round-trip when configured. */
 export async function persistVisibility(): Promise<void> {
   const arr = getUnpublishedArticleKeys()
   if (isDatabaseConfigured()) {
     await dbSave(arr)
-    setUnpublishedKeys(await dbLoad())
+    const saved = await dbLoad()
+    if (!keysMatch(arr, saved)) {
+      throw new Error("Visibility save verification failed: unpublished keys mismatch after persist")
+    }
+    setUnpublishedKeys(saved)
     return
   }
   await fileSave(arr)

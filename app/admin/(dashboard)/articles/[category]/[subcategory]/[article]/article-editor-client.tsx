@@ -38,6 +38,9 @@ import {
 } from "lucide-react"
 import type { ImageOverrides } from "@/lib/content-overrides"
 import type { Article, Category, Subcategory } from "@/lib/data/content-library"
+import { Checkbox } from "@/components/ui/checkbox"
+import { BulkActionBar } from "@/components/admin/bulk-action-bar"
+import { setArticleVisibility } from "@/lib/admin-visibility-client"
 
 type ArticleEditorClientProps = {
   category: Category
@@ -71,11 +74,15 @@ export default function ArticleEditorClient({
   const [uploadingImage, setUploadingImage] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [dragOverPostIndex, setDragOverPostIndex] = useState<number | null>(null)
+  const [selectedPostIds, setSelectedPostIds] = useState<Set<string>>(new Set())
+  const [bulkDeletingPosts, setBulkDeletingPosts] = useState(false)
+  const [visibilitySaving, setVisibilitySaving] = useState(false)
 
   // Keep in sync when server re-fetches (e.g. after adding a post)
   useEffect(() => {
     setArticle(initialArticle)
     setPublished(initialPublished)
+    setSelectedPostIds(new Set())
   }, [initialArticle, initialPublished])
 
   useEffect(() => {
@@ -103,6 +110,7 @@ export default function ArticleEditorClient({
           imageUrl: editImageUrl.trim() || null,
         }),
       })
+      const data = await res.json().catch(() => ({}))
       if (res.ok) {
         setImageOverrides((prev) => {
           const next = JSON.parse(JSON.stringify(prev))
@@ -118,6 +126,8 @@ export default function ArticleEditorClient({
         })
         setEditingPostId(null)
         setEditImageUrl("")
+      } else {
+        window.alert((data as { error?: string }).error || "Failed to save image")
       }
     } finally {
       setSaving(false)
@@ -148,13 +158,16 @@ export default function ArticleEditorClient({
   }
 
   const setVisibility = async (publish: boolean) => {
-    await fetch("/api/content/visibility", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ categoryId, subcategoryId, articleId, published: publish }),
-    })
-    setPublished(publish)
-    router.refresh()
+    setVisibilitySaving(true)
+    try {
+      await setArticleVisibility(categoryId, subcategoryId, articleId, publish)
+      setPublished(publish)
+      router.refresh()
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Failed to update article visibility")
+    } finally {
+      setVisibilitySaving(false)
+    }
   }
 
   const reorderPosts = (fromIndex: number, toIndex: number): string[] => {
@@ -166,7 +179,7 @@ export default function ArticleEditorClient({
   }
 
   const applyPostOrder = async (newOrder: string[]) => {
-    await fetch("/api/content/order", {
+    const res = await fetch("/api/content/order", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -177,6 +190,11 @@ export default function ArticleEditorClient({
         orderedIds: newOrder,
       }),
     })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      window.alert((data as { error?: string }).error || "Failed to reorder posts")
+      return
+    }
     router.refresh()
   }
 
@@ -229,6 +247,61 @@ export default function ArticleEditorClient({
     }
   }
 
+  const togglePostSelection = (postId: string) => {
+    setSelectedPostIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(postId)) next.delete(postId)
+      else next.add(postId)
+      return next
+    })
+  }
+
+  const allPostsSelected =
+    article.posts.length > 0 && article.posts.every((p) => selectedPostIds.has(p.id))
+
+  const toggleAllPosts = () => {
+    if (allPostsSelected) {
+      setSelectedPostIds(new Set())
+    } else {
+      setSelectedPostIds(new Set(article.posts.map((p) => p.id)))
+    }
+  }
+
+  const handleBulkDeletePosts = async () => {
+    const ids = Array.from(selectedPostIds)
+    if (
+      !window.confirm(
+        `Delete ${ids.length} post${ids.length !== 1 ? "s" : ""}? This cannot be undone.`
+      )
+    ) {
+      return
+    }
+    setBulkDeletingPosts(true)
+    try {
+      const res = await fetch("/api/cms/posts/bulk-delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          posts: ids.map((postId) => ({
+            categoryId,
+            subcategoryId,
+            articleId,
+            postId,
+          })),
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        window.alert(data.error || "Bulk delete failed")
+        return
+      }
+      setSelectedPostIds(new Set())
+      router.refresh()
+    } finally {
+      setBulkDeletingPosts(false)
+    }
+  }
+
   const handleDeletePost = async (postId: string, postTitle: string) => {
     if (
       !window.confirm(
@@ -273,10 +346,13 @@ export default function ArticleEditorClient({
           twitter: newPost.message.trim() || undefined,
         }),
       })
+      const data = await res.json().catch(() => ({}))
       if (res.ok) {
         setIsAddPostOpen(false)
         setNewPost({ title: "", image: "", message: "" })
         router.refresh()
+      } else {
+        window.alert((data as { error?: string }).error || "Failed to save post")
       }
     } finally {
       setSavingPost(false)
@@ -349,20 +425,22 @@ export default function ArticleEditorClient({
             <Button
               type="button"
               variant="outline"
+              disabled={visibilitySaving}
               onClick={() => setVisibility(false)}
               className="gap-2"
             >
               <EyeOff className="h-4 w-4" />
-              Move to Drafts
+              {visibilitySaving ? "Saving…" : "Move to Drafts"}
             </Button>
           ) : (
             <Button
               type="button"
+              disabled={visibilitySaving}
               onClick={() => setVisibility(true)}
               className="bg-green-600 hover:bg-green-700 gap-2"
             >
               <Send className="h-4 w-4" />
-              Publish
+              {visibilitySaving ? "Publishing…" : "Publish"}
             </Button>
           )}
           <Button
@@ -509,7 +587,22 @@ export default function ArticleEditorClient({
         </DialogContent>
       </Dialog>
 
-      {/* Posts Grid */}
+      {/* Posts */}
+      {article.posts.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+            <Checkbox checked={allPostsSelected} onCheckedChange={toggleAllPosts} />
+            Select all posts
+          </label>
+        </div>
+      )}
+      <BulkActionBar
+        selectedCount={selectedPostIds.size}
+        onDelete={handleBulkDeletePosts}
+        deleting={bulkDeletingPosts}
+        label="post"
+      />
+
       <div className="grid gap-6 md:grid-cols-2">
         {article.posts.map((post, index) => {
           const message = post.message || post.captions.facebook
@@ -531,13 +624,25 @@ export default function ArticleEditorClient({
                     className="object-cover"
                     unoptimized={displayImage.startsWith("/images/")}
                   />
-                  <div
-                    className="absolute left-2 top-2 z-10 flex cursor-grab active:cursor-grabbing touch-none items-center justify-center rounded bg-white/90 p-1.5 text-gray-500 shadow hover:bg-white hover:text-gray-700"
-                    draggable
-                    onDragStart={(e) => handlePostDragStart(e, index)}
-                    title="Drag to reorder"
-                  >
-                    <GripVertical className="h-4 w-4" />
+                  <div className="absolute left-2 top-2 z-10 flex items-center gap-1">
+                    <div
+                      className="flex cursor-grab active:cursor-grabbing touch-none items-center justify-center rounded bg-white/90 p-1.5 text-gray-500 shadow hover:bg-white hover:text-gray-700"
+                      draggable
+                      onDragStart={(e) => handlePostDragStart(e, index)}
+                      title="Drag to reorder"
+                    >
+                      <GripVertical className="h-4 w-4" />
+                    </div>
+                    <div
+                      className="rounded bg-white/90 p-1 shadow"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Checkbox
+                        checked={selectedPostIds.has(post.id)}
+                        onCheckedChange={() => togglePostSelection(post.id)}
+                        aria-label={`Select ${post.title}`}
+                      />
+                    </div>
                   </div>
                   <div className="absolute right-2 top-2 flex flex-col gap-1">
                     <div className="flex gap-1">

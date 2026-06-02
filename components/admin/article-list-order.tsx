@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { FileText, ImageIcon, ChevronUp, ChevronDown, ChevronRight, Send, EyeOff, GripVertical } from "lucide-react"
 import type { Article } from "@/lib/data/content-library"
+import { setArticleVisibility } from "@/lib/admin-visibility-client"
 
 function reorderIds(ids: string[], fromIndex: number, toIndex: number): string[] {
   if (fromIndex === toIndex) return ids
@@ -27,24 +28,33 @@ interface Props {
 export function ArticleListOrder({ categoryId, subcategoryId, articles, publishedByArticleId }: Props) {
   const router = useRouter()
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+  const [visibilityArticleId, setVisibilityArticleId] = useState<string | null>(null)
   const ids = articles.map((a) => a.id)
   const isPublished = (articleId: string) => publishedByArticleId?.[articleId] !== false
 
   const setVisibility = async (articleId: string, published: boolean) => {
-    await fetch("/api/content/visibility", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ categoryId, subcategoryId, articleId, published }),
-    })
-    router.refresh()
+    setVisibilityArticleId(articleId)
+    try {
+      await setArticleVisibility(categoryId, subcategoryId, articleId, published)
+      router.refresh()
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Failed to update article visibility")
+    } finally {
+      setVisibilityArticleId(null)
+    }
   }
 
   const applyOrder = async (newOrder: string[]) => {
-    await fetch("/api/content/order", {
+    const res = await fetch("/api/content/order", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ type: "articles", categoryId, subcategoryId, orderedIds: newOrder }),
     })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      window.alert((data as { error?: string }).error || "Failed to reorder articles")
+      return
+    }
     router.refresh()
   }
 
@@ -134,34 +144,38 @@ export function ArticleListOrder({ categoryId, subcategoryId, articles, publishe
                 <span className="text-sm text-gray-500">
                   {article.posts.length} post{article.posts.length !== 1 ? "s" : ""}
                 </span>
-                {publishedByArticleId && (
-                  isPublished(article.id) ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-8 gap-1"
-                      onClick={(e) => { e.preventDefault(); setVisibility(article.id, false) }}
-                    >
-                      <EyeOff className="h-3.5 w-3.5" />
-                      Unpublish
-                    </Button>
-                  ) : (
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="h-8 gap-1 bg-green-600 hover:bg-green-700"
-                      onClick={(e) => { e.preventDefault(); setVisibility(article.id, true) }}
-                    >
-                      <Send className="h-3.5 w-3.5" />
-                      Publish
-                    </Button>
-                  )
-                )}
                 <ChevronRight className="h-5 w-5 text-gray-400" />
               </div>
             </Link>
           </div>
+          {publishedByArticleId && (
+            <div className="flex shrink-0 items-center gap-2">
+              {isPublished(article.id) ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1"
+                  disabled={visibilityArticleId === article.id}
+                  onClick={() => setVisibility(article.id, false)}
+                >
+                  <EyeOff className="h-3.5 w-3.5" />
+                  {visibilityArticleId === article.id ? "Saving…" : "Unpublish"}
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-8 gap-1 bg-green-600 hover:bg-green-700"
+                  disabled={visibilityArticleId === article.id}
+                  onClick={() => setVisibility(article.id, true)}
+                >
+                  <Send className="h-3.5 w-3.5" />
+                  {visibilityArticleId === article.id ? "Publishing…" : "Publish"}
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       ))}
     </div>
