@@ -16,6 +16,8 @@ import {
 } from "lucide-react"
 import { getCategoryById } from "@/lib/content-merged"
 import { SubcategoryListOrder } from "@/components/admin/subcategory-list-order"
+import { loadCmsAdditions } from "@/lib/cms-additions-persist"
+import { loadVisibility } from "@/lib/content-visibility-persist"
 
 const categoryIcons: Record<string, React.ElementType> = {
   "crime-prevention": ShieldCheck,
@@ -33,6 +35,7 @@ interface PageProps {
 }
 
 export default async function CategoryDetailPage({ params }: PageProps) {
+  await Promise.all([loadCmsAdditions(), loadVisibility()])
   const { category: categoryId } = await params
   
   const category = getCategoryById(categoryId, { includeUnpublished: true })

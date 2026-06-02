@@ -6,6 +6,8 @@ import { Plus, ArrowLeft, ChevronRight, FileText } from "lucide-react"
 import { getCategoryById, getSubcategory } from "@/lib/content-merged"
 import { isArticlePublished } from "@/lib/content-visibility"
 import { ArticleListOrder } from "@/components/admin/article-list-order"
+import { loadCmsAdditions } from "@/lib/cms-additions-persist"
+import { loadVisibility } from "@/lib/content-visibility-persist"
 
 interface PageProps {
   params: Promise<{
@@ -15,6 +17,7 @@ interface PageProps {
 }
 
 export default async function SubcategoryDetailPage({ params }: PageProps) {
+  await Promise.all([loadCmsAdditions(), loadVisibility()])
   const { category: categoryId, subcategory: subcategoryId } = await params
   
   const category = getCategoryById(categoryId, { includeUnpublished: true })

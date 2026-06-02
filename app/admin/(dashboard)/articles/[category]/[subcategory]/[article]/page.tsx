@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation"
 import { getCategoryById, getArticle } from "@/lib/content-merged"
 import { isArticlePublished } from "@/lib/content-visibility"
+import { loadCmsAdditions } from "@/lib/cms-additions-persist"
+import { loadVisibility } from "@/lib/content-visibility-persist"
 import ArticleEditorClient from "./article-editor-client"
 
 interface PageProps {
@@ -8,6 +10,7 @@ interface PageProps {
 }
 
 export default async function ArticleEditorPage({ params }: PageProps) {
+  await Promise.all([loadCmsAdditions(), loadVisibility()])
   const { category: categoryId, subcategory: subcategoryId, article: articleId } = await params
 
   const category = getCategoryById(categoryId, { includeUnpublished: true })

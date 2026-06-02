@@ -3,8 +3,11 @@ import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
 import { getAllCategories } from "@/lib/content-merged"
 import { ArticlesListClient } from "./articles-list-client"
+import { loadCmsAdditions } from "@/lib/cms-additions-persist"
+import { loadVisibility } from "@/lib/content-visibility-persist"
 
-export default function ArticlesPage() {
+export default async function ArticlesPage() {
+  await Promise.all([loadCmsAdditions(), loadVisibility()])
   const allArticles = getAllCategories({ includeUnpublished: true }).flatMap(category =>
     category.subcategories.flatMap(subcategory =>
       subcategory.articles.map(article => ({

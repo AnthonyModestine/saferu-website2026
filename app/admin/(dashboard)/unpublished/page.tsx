@@ -5,8 +5,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { FileText, Send } from "lucide-react"
 import { UnpublishedListClient } from "./unpublished-list-client"
+import { loadCmsAdditions } from "@/lib/cms-additions-persist"
+import { loadVisibility } from "@/lib/content-visibility-persist"
 
 export default async function UnpublishedPage() {
+  await Promise.all([loadCmsAdditions(), loadVisibility()])
   const triples = getUnpublishedArticleTriples()
   const items = triples.map(({ categoryId, subcategoryId, articleId }) => {
     const category = getCategoryById(categoryId, { includeUnpublished: true })
