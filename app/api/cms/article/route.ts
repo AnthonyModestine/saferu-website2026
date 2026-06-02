@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     const id = slug?.trim()
       ? sanitizeSlug(slug) || generateId("art", title)
       : generateId("art", title)
-    loadCmsAdditions()
+    await loadCmsAdditions()
     addArticle({
       categoryId,
       subcategoryId,

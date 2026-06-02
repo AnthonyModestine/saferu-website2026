@@ -1,41 +1,77 @@
 /**
- * Server-only: load/save content visibility (published/unpublished) to data/content-visibility.json.
- * Do not import this from client components or from modules used in the client bundle.
+ * Server-only: load/save content visibility (published/unpublished).
+ * Uses Neon Postgres when DATABASE_URL / POSTGRES_URL is set (production),
+ * otherwise falls back to data/content-visibility.json (local dev).
  */
 
-import { readFileSync } from "fs"
-import { writeFile, mkdir } from "fs/promises"
 import path from "path"
-import {
-  setUnpublishedKeys,
-  getUnpublishedArticleKeys,
-} from "@/lib/content-visibility"
+import { setUnpublishedKeys, getUnpublishedArticleKeys } from "@/lib/content-visibility"
+import { isDatabaseConfigured, getSql, ensureSchema } from "@/lib/db"
 
 const DATA_DIR = path.join(process.cwd(), "data")
 const FILE_PATH = path.join(DATA_DIR, "content-visibility.json")
 
 let loaded = false
 
-/** Load visibility state from file into memory. Call from server layout or before mutations. */
-export function loadVisibility(): void {
-  if (loaded) return
-  loaded = true
+// ── Database helpers ─────────────────────────────────────────────────────────
+
+async function dbLoad(): Promise<void> {
+  await ensureSchema()
+  const db = getSql()
+  const rows = await db`SELECT unpublished_keys FROM content_visibility WHERE id = 'singleton'`
+  if (rows.length > 0) {
+    const arr = rows[0].unpublished_keys as string[]
+    if (Array.isArray(arr)) setUnpublishedKeys(arr)
+  }
+}
+
+async function dbSave(arr: string[]): Promise<void> {
+  await ensureSchema()
+  const db = getSql()
+  await db`
+    INSERT INTO content_visibility (id, unpublished_keys) VALUES ('singleton', ${JSON.stringify(arr)}::jsonb)
+    ON CONFLICT (id) DO UPDATE SET unpublished_keys = EXCLUDED.unpublished_keys
+  `
+}
+
+// ── File helpers ─────────────────────────────────────────────────────────────
+
+function fileLoad(): void {
   try {
-    const raw = readFileSync(FILE_PATH, "utf-8")
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const raw = require("fs").readFileSync(FILE_PATH, "utf-8")
     const arr = JSON.parse(raw) as string[]
-    if (Array.isArray(arr)) {
-      setUnpublishedKeys(arr)
-    }
+    if (Array.isArray(arr)) setUnpublishedKeys(arr)
   } catch {
     // No file or invalid: keep default empty
   }
 }
 
-/** Persist unpublished keys to disk. Call from API after setArticlePublished. */
-export function persistVisibility(): Promise<void> {
-  loadVisibility()
+async function fileSave(arr: string[]): Promise<void> {
+  const { mkdir, writeFile } = await import("fs/promises")
+  await mkdir(DATA_DIR, { recursive: true })
+  await writeFile(FILE_PATH, JSON.stringify(arr, null, 2), "utf-8")
+}
+
+// ── Public API ────────────────────────────────────────────────────────────────
+
+/** Load visibility state into memory. Call from server layout or before mutations. */
+export async function loadVisibility(): Promise<void> {
+  if (loaded) return
+  loaded = true
+  if (isDatabaseConfigured()) {
+    await dbLoad()
+  } else {
+    fileLoad()
+  }
+}
+
+/** Persist unpublished keys. Call from API after setArticlePublished. */
+export async function persistVisibility(): Promise<void> {
   const arr = getUnpublishedArticleKeys()
-  return mkdir(DATA_DIR, { recursive: true }).then(() =>
-    writeFile(FILE_PATH, JSON.stringify(arr, null, 2), "utf-8")
-  )
+  if (isDatabaseConfigured()) {
+    await dbSave(arr)
+  } else {
+    await fileSave(arr)
+  }
 }

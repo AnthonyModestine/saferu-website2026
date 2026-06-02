@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     if (!categoryId || !subcategoryId || !articleId || !title?.trim()) {
       return NextResponse.json({ error: "categoryId, subcategoryId, articleId, and title required" }, { status: 400 })
     }
-    loadCmsAdditions()
+    await loadCmsAdditions()
     const caption = (message || facebook || "").trim() || "Share this with your community. #SaferU"
     addPost({
       categoryId,

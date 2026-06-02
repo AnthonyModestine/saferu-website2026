@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
-    loadVisibility()
+    await loadVisibility()
     setArticlePublished(categoryId, subcategoryId, articleId, published)
     await persistVisibility()
     return NextResponse.json({ ok: true })

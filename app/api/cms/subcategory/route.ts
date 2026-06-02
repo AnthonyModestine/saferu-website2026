@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     if (!categoryId || !title?.trim()) {
       return NextResponse.json({ error: "categoryId and title required" }, { status: 400 })
     }
-    loadCmsAdditions()
+    await loadCmsAdditions()
     const id = generateId("sub", title) // e.g. sub-vacation-tips-abc123
     addSubcategory({
       categoryId,

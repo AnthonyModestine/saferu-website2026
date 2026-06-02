@@ -6,9 +6,6 @@ import { loadCmsAdditions } from "@/lib/cms-additions-persist"
 import { loadVisibility } from "@/lib/content-visibility-persist"
 import './globals.css'
 
-loadCmsAdditions()
-loadVisibility()
-
 export const metadata: Metadata = {
   title: 'SaferU - Public Safety Content & Communications Platform',
   description: 'Your trusted partner in public safety communications. Ready-to-share safety content and Press Center for confident, professional messaging.',
@@ -32,11 +29,13 @@ export const metadata: Metadata = {
   },
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  await loadCmsAdditions()
+  await loadVisibility()
   return (
     <html lang="en">
       <body className={`font-sans antialiased`}>

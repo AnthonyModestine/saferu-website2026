@@ -23,7 +23,7 @@ export function getSql(): NeonQueryFunction<false, false> {
   return sql
 }
 
-/** Create members + sessions tables if they do not exist yet. Safe to call repeatedly. */
+/** Create members + sessions + cms tables if they do not exist yet. Safe to call repeatedly. */
 export async function ensureSchema(): Promise<void> {
   if (schemaReady) return
   const db = getSql()
@@ -46,6 +46,20 @@ export async function ensureSchema(): Promise<void> {
       email TEXT NOT NULL,
       name TEXT,
       expires_at BIGINT NOT NULL
+    )
+  `
+
+  await db`
+    CREATE TABLE IF NOT EXISTS cms_additions (
+      id TEXT PRIMARY KEY DEFAULT 'singleton',
+      data JSONB NOT NULL DEFAULT '{}'
+    )
+  `
+
+  await db`
+    CREATE TABLE IF NOT EXISTS content_visibility (
+      id TEXT PRIMARY KEY DEFAULT 'singleton',
+      unpublished_keys JSONB NOT NULL DEFAULT '[]'
     )
   `
 
