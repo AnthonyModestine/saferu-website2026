@@ -36,7 +36,7 @@ const faqs = [
   {
     question: "What is the History section?",
     answer:
-      "The History section keeps a log of every press release and community request your agency has generated in Press Center. You can revisit past drafts, copy the content, and use them as reference for future releases. History is stored locally in your browser and is only visible to you.",
+      "The History section keeps a log of every press release and video request your agency has generated in Press Center. You can revisit past drafts, copy the content, and use them as reference for future releases. History is stored locally in your browser and is only visible to you.",
   },
 ]
 

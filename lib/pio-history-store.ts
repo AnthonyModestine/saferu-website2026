@@ -1,5 +1,5 @@
 /**
- * PIO Tool history: press releases and community requests.
+ * PIO Tool history: press releases and video requests.
  * Stored in localStorage (key: pio_history). Client-only.
  * Items older than 30 days are excluded and removed on load.
  */
@@ -11,7 +11,7 @@ export type PioHistoryItem = {
   id: string
   title: string
   type: string
-  format: "Press Release" | "Community Request"
+  format: "Press Release" | "Video Request"
   date: string
   lastModified: string
   content: string
@@ -57,7 +57,7 @@ export function getPioHistoryItems(): PioHistoryItem[] {
 export function addPioHistoryItem(params: {
   title: string
   type: string
-  format: "Press Release" | "Community Request"
+  format: "Press Release" | "Video Request"
   content: string
 }): PioHistoryItem {
   const now = new Date()

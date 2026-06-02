@@ -61,7 +61,7 @@ export default function AgencySettingsPage() {
       <div>
         <h1 className="text-2xl font-bold text-foreground">Agency Settings</h1>
         <p className="text-muted-foreground">
-          Set defaults for your press releases and community requests. These details auto-fill in Press Center so you can draft faster.
+          Set defaults for your press releases and video requests. These details auto-fill in Press Center so you can draft faster.
         </p>
       </div>
 

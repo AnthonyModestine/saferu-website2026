@@ -18,7 +18,7 @@ const features = [
   },
   {
     icon: Zap,
-    title: "Community Requests",
+    title: "Video Requests",
     description: "Create clear, compliant requests for community assistance, including video and tips, aligned with platform guidelines such as Neighbors by Ring.",
   },
   {
@@ -101,7 +101,7 @@ export default function SubscribePage() {
       <div className="text-center">
         <h1 className="text-3xl font-bold text-[#1a365d]">Upgrade to Press Center</h1>
         <p className="mt-2 text-lg text-muted-foreground">
-          Signed in as {member.email}. Subscribe to unlock press release and community request drafting.
+          Signed in as {member.email}. Subscribe to unlock press release and video request drafting.
         </p>
       </div>
 

@@ -128,9 +128,9 @@ export default function CommunityPostPage() {
       if (res.ok && data.content) {
         setGeneratedPost(data.content)
         addPioHistoryItem({
-          title: `${displayIncident || "Incident"} - Community Request`,
+          title: `${displayIncident || "Incident"} - Video Request`,
           type: displayIncident || "Incident",
-          format: "Community Request",
+          format: "Video Request",
           content: data.content,
         })
         setGenerating(false)
@@ -150,7 +150,7 @@ export default function CommunityPostPage() {
     }
 
     // Fallback template when drafting is unavailable or fails
-    const post = `${displayAgency.toUpperCase()} - REQUESTING COMMUNITY ASSISTANCE
+    const post = `${displayAgency.toUpperCase()} - REQUESTING VIDEO ASSISTANCE
 
 The ${displayAgency} is investigating a ${displayIncident.toLowerCase()} that occurred on ${displayDate} in the area of ${displayAddress}.
 
@@ -162,9 +162,9 @@ Do not approach any suspicious individuals. If you see something, call 911.`
 
     setGeneratedPost(post)
     addPioHistoryItem({
-      title: `${displayIncident || "Incident"} - Community Request`,
+      title: `${displayIncident || "Incident"} - Video Request`,
       type: displayIncident || "Incident",
-      format: "Community Request",
+      format: "Video Request",
       content: post,
     })
     setGenerating(false)
@@ -200,7 +200,7 @@ Do not approach any suspicious individuals. If you see something, call 911.`
     <GenerationLimitModal open={showGenLimitModal} onOpenChange={setShowGenLimitModal} />
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Community Request</h1>
+        <h1 className="text-2xl font-bold text-foreground">Video Request</h1>
         <p className="text-muted-foreground">
           Draft a direct message requesting video footage or community assistance. Use on Neighbors by Ring, social media, or your usual channels.
         </p>
@@ -392,7 +392,7 @@ Do not approach any suspicious individuals. If you see something, call 911.`
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <MessageSquare className="h-5 w-5" />
-                Generated Community Request
+                Generated Video Request
               </CardTitle>
               <CardDescription>
                 Switch platforms, edit if needed, and copy when ready
@@ -404,7 +404,7 @@ Do not approach any suspicious individuals. If you see something, call 911.`
                   value={generatedPost}
                   onChange={(e) => setGeneratedPost(e.target.value)}
                   className="w-full min-h-[400px] whitespace-pre-wrap text-sm text-foreground font-sans leading-relaxed bg-transparent border-0 focus:outline-none focus:ring-0 resize-none"
-                  placeholder="Your generated community request will appear here..."
+                  placeholder="Your generated video request will appear here..."
                 />
               </div>
 

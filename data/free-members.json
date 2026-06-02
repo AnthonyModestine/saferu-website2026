@@ -15,6 +15,14 @@
       "agency": "SaferU",
       "createdAt": 1746403200,
       "passwordHash": "bd5bbe3f17371c7860d1c3c35d5e3dac:ad40e037c064255a7215e9803ab63412471f10adbcfc4e0d863d2df4c304b77da83987fc5e16711c5898a0d506cc3d63c43dd8374c31fa2ffc4a3a8e002758c6"
+    },
+    {
+      "id": "d36cbd6a-dec6-478d-9f36-1cb44db121bf",
+      "email": "local-test-20260531190356@example.com",
+      "name": "Test User",
+      "agency": "Test Agency",
+      "createdAt": 1780268642,
+      "passwordHash": "689878310c2f816153fdc28c123553de:4c44408a0fe6e857692d003f12de277df0f09fe4f80a8f19d62f2f58f91a606b5521cad8ee730428f22d1637f355565a23b299ebb90f636f06c6e2b4a5c81644"
     }
   ]
 }

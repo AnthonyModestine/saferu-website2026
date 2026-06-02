@@ -72,8 +72,8 @@ export default function PIODashboardPage() {
             </p>
             <p className="text-sm text-muted-foreground mt-0.5">
               {member
-                ? "You're signed in with a free account. Subscribe to unlock press release and community request drafting."
-                : "$30/month. Confident communication for public safety — draft press releases and community requests in minutes without compromising oversight."}
+                ? "You're signed in with a free account. Subscribe to unlock press release and video request drafting."
+                : "$30/month. Confident communication for public safety — draft press releases and video requests in minutes without compromising oversight."}
             </p>
           </div>
           <Button asChild className="shrink-0 bg-[#f2b233] text-[#1a365d] hover:bg-[#f2b233]/90 font-semibold">
@@ -88,7 +88,7 @@ export default function PIODashboardPage() {
       <div>
         <h1 className="text-2xl font-bold text-[#1a365d]">Press Center</h1>
         <p className="text-muted-foreground mt-1">
-          Confident communication for public safety. Draft press releases and community requests with guided drafting.
+          Confident communication for public safety. Draft press releases and video requests with guided drafting.
         </p>
       </div>
 
@@ -115,11 +115,6 @@ export default function PIODashboardPage() {
                   style={{ width: `${Math.min(100, (genStatus.used / genStatus.quota) * 100)}%` }}
                 />
               </div>
-              <p className="text-xs text-muted-foreground">
-                {genStatus.remaining > 0
-                  ? `${genStatus.remaining} generation${genStatus.remaining === 1 ? "" : "s"} remaining — resets on the 1st of next month`
-                  : "No generations remaining this month"}
-              </p>
             </div>
           )}
 
@@ -190,7 +185,7 @@ export default function PIODashboardPage() {
                 <MessageSquare className="h-6 w-6 text-[#4a9d6b]" />
               </div>
               <div className="flex-1">
-                <p className="font-semibold text-foreground">New Community Request</p>
+                <p className="font-semibold text-foreground">New Video Request</p>
                 <p className="text-sm text-muted-foreground">Alerts and footage requests for social media and community platforms</p>
               </div>
               <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-[#4a9d6b] transition-colors" />
@@ -218,7 +213,7 @@ export default function PIODashboardPage() {
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#4a9d6b]/10">
                 <MessageSquare className="h-5 w-5 text-[#4a9d6b]" />
               </div>
-              <h2 className="font-semibold text-foreground">Community Request</h2>
+              <h2 className="font-semibold text-foreground">Video Request</h2>
               <p className="text-sm text-muted-foreground leading-relaxed">
                 Clear social posts requesting community video or tips—built to follow Neighbors by Ring Community Guidelines when you publish on that platform.
               </p>
@@ -237,7 +232,7 @@ export default function PIODashboardPage() {
             </div>
             <h3 className="font-semibold text-[#1a365d]">1. Pick Your Format</h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Choose a formal press release for media or a community request for social media and community platforms.
+              Choose a formal press release for media or a video request for social media and community platforms.
             </p>
           </div>
           <div className="space-y-3">
@@ -255,7 +250,7 @@ export default function PIODashboardPage() {
             </div>
             <h3 className="font-semibold text-[#1a365d]">3. Export or Copy</h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Download a branded PDF that includes your agency logo, or copy community requests into your usual channels.
+              Download a branded PDF that includes your agency logo, or copy video requests into your usual channels.
             </p>
           </div>
         </div>

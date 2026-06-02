@@ -342,7 +342,7 @@ Email: ${displayEmail}`
       <div>
         <h1 className="text-2xl font-bold text-foreground">New Press Release</h1>
         <p className="text-muted-foreground">
-          Fill in the details below. Press Center will generate a press release, Facebook post, X/Twitter post, talking points, and a community request (if selected)—review and edit before you export or share.
+          Fill in the details below. Press Center will generate a press release, Facebook post, X/Twitter post, talking points, and a video request (if selected)—review and edit before you export or share.
         </p>
       </div>
 
@@ -833,7 +833,7 @@ Email: ${displayEmail}`
                   <TabsTrigger value="twitter" className="text-xs sm:text-sm">X / Twitter</TabsTrigger>
                   <TabsTrigger value="talking-points" className="text-xs sm:text-sm">Talking Points</TabsTrigger>
                   {generatedCommunityRequest && (
-                    <TabsTrigger value="community-request" className="text-xs sm:text-sm">Community Request</TabsTrigger>
+                    <TabsTrigger value="community-request" className="text-xs sm:text-sm">Video Request</TabsTrigger>
                   )}
                 </TabsList>
 
@@ -921,7 +921,7 @@ Email: ${displayEmail}`
                   </div>
                 </TabsContent>
 
-                {/* Community Request */}
+                {/* Video Request */}
                 {generatedCommunityRequest && (
                   <TabsContent value="community-request" className="mt-4">
                     <div className="rounded-lg border border-border bg-card p-6">
@@ -934,7 +934,7 @@ Email: ${displayEmail}`
                     </div>
                     <div className="flex flex-wrap gap-2 mt-3">
                       <Button variant="outline" size="sm" onClick={() => handleCopyField(generatedCommunityRequest || "", "community-request")} className="bg-transparent">
-                        {copiedField === "community-request" ? <><Check className="mr-2 h-4 w-4" />Copied!</> : <><Copy className="mr-2 h-4 w-4" />Copy Community Request</>}
+                        {copiedField === "community-request" ? <><Check className="mr-2 h-4 w-4" />Copied!</> : <><Copy className="mr-2 h-4 w-4" />Copy Video Request</>}
                       </Button>
                     </div>
                   </TabsContent>

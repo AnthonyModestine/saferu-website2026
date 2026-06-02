@@ -26,7 +26,7 @@ const sidebarItems = [
     icon: FilePlus,
   },
   {
-    title: "Community Request",
+    title: "Video Request",
     href: "/pio-tool/community-post",
     icon: MessageSquare,
   },

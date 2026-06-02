@@ -9,7 +9,7 @@ const features = [
     icon: FileText,
   },
   {
-    title: "Community Requests",
+    title: "Video Requests",
     description: "Create clear, compliant requests for community assistance, including video and tips, aligned with platform guidelines such as Neighbors by Ring.",
     icon: Zap,
   },
@@ -46,7 +46,7 @@ export function PIOToolSection() {
               Press Center helps agencies draft clear, structured public messaging in minutes — without compromising oversight or professionalism.
             </p>
             <p className="mt-4 text-lg text-[#c5d8eb] leading-relaxed">
-              Whether preparing a press release or a community request, Press Center provides guided drafting with consistent tone and structured language designed for public safety communication.
+              Whether preparing a press release or a video request, Press Center provides guided drafting with consistent tone and structured language designed for public safety communication.
             </p>
             
             <div className="mt-8 flex flex-col gap-4 sm:flex-row">

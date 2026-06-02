@@ -15,14 +15,14 @@ export function Hero() {
       <div className="relative mx-auto max-w-7xl px-4 py-24 sm:px-6 sm:py-32 lg:px-8 lg:py-40">
         <div className="mx-auto max-w-3xl text-center">
           <h1 className="text-balance text-4xl font-bold tracking-tight text-[#1a365d] sm:text-5xl lg:text-6xl">
-            Not every agency has a PIO.
+            Your Trusted Partner in
           </h1>
           <h1 className="text-balance text-4xl font-bold tracking-tight text-[#1a365d] sm:text-5xl lg:text-6xl">
-            Now every agency can communicate like one.
+            Public Safety Communications
           </h1>
 
-          <p className="mt-6 max-w-2xl mx-auto text-lg leading-relaxed text-[#1a365d]/80 sm:text-xl">
-            When something happens, your community is already watching. SaferU drafts your press release, social posts, and community alerts in minutes — structured, professional, and ready for your approval.
+          <p className="mt-6 max-w-3xl mx-auto text-xl font-semibold leading-snug text-[#1a365d] sm:text-2xl">
+            Not every agency has a PIO. Now every agency can communicate like one.
           </p>
 
           <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">

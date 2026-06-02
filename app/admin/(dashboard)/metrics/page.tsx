@@ -304,7 +304,7 @@ export default function AdminMetricsPage() {
       <Card className="mb-8">
         <CardHeader>
           <CardTitle>Press Center — Generate button</CardTitle>
-          <CardDescription>How many times users hit Generate (Press Release vs Community Request)</CardDescription>
+          <CardDescription>How many times users hit Generate (Press Release vs Video Request)</CardDescription>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-gray-600 mb-3">
@@ -330,7 +330,7 @@ export default function AdminMetricsPage() {
         <CardHeader>
           <CardTitle>Press Center usage by period</CardTitle>
           <CardDescription>
-            Press generator and community request usage broken down by day, week, month, quarter, or year
+            Press generator and video request usage broken down by day, week, month, quarter, or year
           </CardDescription>
           <div className="flex flex-wrap gap-2 pt-2">
             {(["day", "week", "month", "quarter", "year"] as const).map((period) => (
@@ -368,7 +368,7 @@ export default function AdminMetricsPage() {
                       : metrics.pioGenerateByYearBySource
             const periodKeys = Object.keys(byPeriod).sort()
             const pressLabel = "Press Release"
-            const communityLabel = "Community Request"
+            const communityLabel = "Video Request"
             if (periodKeys.length === 0) {
               return <p className="text-sm text-gray-500">No Press Center generate events yet for this period.</p>
             }

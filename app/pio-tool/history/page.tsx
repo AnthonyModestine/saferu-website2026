@@ -95,7 +95,7 @@ export default function HistoryPage() {
           <div>
             <p className="font-bold text-[#1a365d] text-lg">Get started with Press Center</p>
             <p className="text-sm text-muted-foreground mt-0.5">
-              $30/month. Confident communication for public safety — draft press releases and community requests in minutes without compromising oversight.
+              $30/month. Confident communication for public safety — draft press releases and video requests in minutes without compromising oversight.
             </p>
           </div>
           <Button asChild className="shrink-0 bg-[#f2b233] text-[#1a365d] hover:bg-[#f2b233]/90 font-semibold">
@@ -107,7 +107,7 @@ export default function HistoryPage() {
       <div>
         <h1 className="text-2xl font-bold text-[#1a365d]">History</h1>
         <p className="text-muted-foreground">
-          View, export, and manage your press releases and community requests from the past 30 days. Items older than 30 days are automatically removed.
+          View, export, and manage your press releases and video requests from the past 30 days. Items older than 30 days are automatically removed.
         </p>
       </div>
 
@@ -197,7 +197,7 @@ export default function HistoryPage() {
               <p className="text-muted-foreground">
                 {searchQuery
                   ? "No items found matching your search."
-                  : "Nothing here yet. Create your first press release or community request. Items appear here for 30 days."}
+                  : "Nothing here yet. Create your first press release or video request. Items appear here for 30 days."}
               </p>
             </div>
           )}
