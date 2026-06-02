@@ -1,6 +1,7 @@
 /**
  * Server-only image storage.
- * Uses Vercel Blob in production (BLOB_READ_WRITE_TOKEN), local public/images/posts in dev.
+ * Uses Vercel Blob in production (BLOB_READ_WRITE_TOKEN or BLOB_STORE_ID + OIDC on Vercel).
+ * Local dev without Blob env falls back to public/images/posts.
  */
 
 import { writeFile, mkdir, readdir, stat, unlink } from "fs/promises"
@@ -20,7 +21,7 @@ export interface StoredImage {
 }
 
 export function isBlobStorageConfigured(): boolean {
-  return Boolean(process.env.BLOB_READ_WRITE_TOKEN)
+  return Boolean(process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID)
 }
 
 function sanitizeFilename(originalName: string): string {
@@ -51,7 +52,7 @@ export async function storeImage(file: File): Promise<StoredImage> {
 
   if (process.env.VERCEL) {
     throw new Error(
-      "Image storage is not configured. In Vercel, go to Storage → Create Blob store and connect it to this project."
+      "Image storage is not linked to this site. In Vercel: open SaferU-Images → Projects tab → Connect to Project (your website). Then redeploy."
     )
   }
 
