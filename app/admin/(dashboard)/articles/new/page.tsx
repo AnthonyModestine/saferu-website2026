@@ -87,7 +87,7 @@ function NewArticleForm() {
         <CardHeader>
           <CardTitle>Article Details</CardTitle>
           <CardDescription>
-            Enter the basic information for your new article
+            New articles start as drafts (not live). Add posts, then publish from the article editor or Drafts.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">

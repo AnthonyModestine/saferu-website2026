@@ -203,6 +203,32 @@ export default function ArticleEditorClient({
     await applyPostOrder(reorderPosts(fromIndex, toIndex))
   }
 
+  const handleDeleteArticle = async () => {
+    if (
+      !window.confirm(
+        `Permanently delete "${article.title}" and all its posts? This cannot be undone.`
+      )
+    ) {
+      return
+    }
+    try {
+      const res = await fetch("/api/cms/article", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ categoryId, subcategoryId, articleId }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        window.alert(data.error || "Failed to delete article")
+        return
+      }
+      router.push(published ? "/admin/articles" : "/admin/unpublished")
+      router.refresh()
+    } catch {
+      window.alert("Failed to delete article. Check your connection and try again.")
+    }
+  }
+
   const handleDeletePost = async (postId: string, postTitle: string) => {
     if (
       !window.confirm(
@@ -318,7 +344,7 @@ export default function ArticleEditorClient({
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {published ? (
             <Button
               type="button"
@@ -327,7 +353,7 @@ export default function ArticleEditorClient({
               className="gap-2"
             >
               <EyeOff className="h-4 w-4" />
-              Unpublish
+              Move to Drafts
             </Button>
           ) : (
             <Button
@@ -339,6 +365,15 @@ export default function ArticleEditorClient({
               Publish
             </Button>
           )}
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={handleDeleteArticle}
+            className="gap-2"
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete Article
+          </Button>
           <Dialog open={isAddPostOpen} onOpenChange={setIsAddPostOpen}>
             <DialogTrigger asChild>
               <Button className="bg-[#1470AF] text-white hover:bg-[#1470AF]/90">

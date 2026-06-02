@@ -11,7 +11,13 @@ import { isDatabaseConfigured, getSql, ensureSchema } from "@/lib/db"
 const DATA_DIR = path.join(process.cwd(), "data")
 const FILE_PATH = path.join(DATA_DIR, "cms-additions.json")
 
-const EMPTY: CmsAdditions = { subcategories: [], articles: [], posts: [], deletedPosts: [] }
+const EMPTY: CmsAdditions = {
+  subcategories: [],
+  articles: [],
+  posts: [],
+  deletedPosts: [],
+  deletedArticles: [],
+}
 
 let fileLoadPromise: Promise<void> | null = null
 
@@ -33,6 +39,7 @@ function parseCmsData(raw: unknown): CmsAdditions {
     articles: Array.isArray(data.articles) ? data.articles : [],
     posts: Array.isArray(data.posts) ? data.posts : [],
     deletedPosts: Array.isArray(data.deletedPosts) ? data.deletedPosts : [],
+    deletedArticles: Array.isArray(data.deletedArticles) ? data.deletedArticles : [],
   }
 }
 

@@ -28,19 +28,19 @@ export default async function UnpublishedPage() {
   return (
     <div className="p-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Unpublished articles</h1>
+        <h1 className="text-3xl font-bold text-gray-900">Drafts</h1>
         <p className="mt-1 text-gray-500">
-          Articles that are turned off and not visible to your audience. Publish when ready to push live.
+          Articles that are not live on the site. New articles start here until you publish them.
         </p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Draft / offline</CardTitle>
+          <CardTitle>Draft articles</CardTitle>
           <CardDescription>
             {items.length === 0
-              ? "No unpublished articles."
-              : `${items.length} article${items.length !== 1 ? "s" : ""} stored here.`}
+              ? "No drafts right now."
+              : `${items.length} draft article${items.length !== 1 ? "s" : ""} — not visible to members until published.`}
           </CardDescription>
         </CardHeader>
         <CardContent>

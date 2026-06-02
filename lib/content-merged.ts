@@ -24,6 +24,28 @@ function deepCloneCategory(cat: Category): Category {
   return JSON.parse(JSON.stringify(cat))
 }
 
+function isArticleDeleted(
+  categoryId: string,
+  subcategoryId: string,
+  articleId: string,
+  add: CmsAdditions
+): boolean {
+  return (add.deletedArticles ?? []).some(
+    (d) =>
+      d.categoryId === categoryId &&
+      d.subcategoryId === subcategoryId &&
+      d.articleId === articleId
+  )
+}
+
+function applyDeletedArticles(categoryId: string, merged: Category, add: CmsAdditions): void {
+  for (const sub of merged.subcategories) {
+    sub.articles = sub.articles.filter(
+      (art) => !isArticleDeleted(categoryId, sub.id, art.id, add)
+    )
+  }
+}
+
 function applyDeletedPosts(categoryId: string, merged: Category, add: CmsAdditions): void {
   const deleted = add.deletedPosts ?? []
   if (deleted.length === 0) return
@@ -135,6 +157,7 @@ export function getCategoryById(
     })
   }
 
+  applyDeletedArticles(categoryId, merged, add)
   applyDeletedPosts(categoryId, merged, add)
 
   // Apply order overrides

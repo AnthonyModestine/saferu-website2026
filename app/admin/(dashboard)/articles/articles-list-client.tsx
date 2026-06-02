@@ -47,11 +47,11 @@ export function ArticlesListClient({ articles }: { articles: ArticleItem[] }) {
       {/* Articles List */}
       <Card>
         <CardHeader>
-          <CardTitle>Articles</CardTitle>
+          <CardTitle>Live on site</CardTitle>
           <CardDescription>
             {filtered.length === articles.length
-              ? "Click an article to view and edit its posts"
-              : `${filtered.length} of ${articles.length} articles match`}
+              ? "Only published articles appear here. Drafts are under Drafts in the sidebar."
+              : `${filtered.length} of ${articles.length} live articles match`}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">

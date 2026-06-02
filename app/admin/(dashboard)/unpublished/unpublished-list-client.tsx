@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { FileText, Send, ChevronRight } from "lucide-react"
+import { FileText, Send, ChevronRight, Trash2 } from "lucide-react"
 
 interface Item {
   categoryId: string
@@ -30,6 +30,28 @@ export function UnpublishedListClient({ items }: Props) {
     router.refresh()
   }
 
+  const handleDelete = async (
+    categoryId: string,
+    subcategoryId: string,
+    articleId: string,
+    title: string
+  ) => {
+    if (!window.confirm(`Delete draft "${title}" permanently? This cannot be undone.`)) {
+      return
+    }
+    const res = await fetch("/api/cms/article", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ categoryId, subcategoryId, articleId }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      window.alert(data.error || "Failed to delete article")
+      return
+    }
+    router.refresh()
+  }
+
   return (
     <ul className="divide-y">
       {items.map((item) => (
@@ -52,15 +74,34 @@ export function UnpublishedListClient({ items }: Props) {
             </div>
             <ChevronRight className="h-5 w-5 shrink-0 text-gray-400" />
           </Link>
-          <Button
-            type="button"
-            size="sm"
-            className="shrink-0 bg-green-600 hover:bg-green-700 gap-1"
-            onClick={() => handlePublish(item.categoryId, item.subcategoryId, item.articleId)}
-          >
-            <Send className="h-3.5 w-3.5" />
-            Publish
-          </Button>
+          <div className="flex shrink-0 items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              className="gap-1 bg-green-600 hover:bg-green-700"
+              onClick={() => handlePublish(item.categoryId, item.subcategoryId, item.articleId)}
+            >
+              <Send className="h-3.5 w-3.5" />
+              Publish
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="destructive"
+              className="gap-1"
+              onClick={() =>
+                handleDelete(
+                  item.categoryId,
+                  item.subcategoryId,
+                  item.articleId,
+                  item.articleTitle
+                )
+              }
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Delete
+            </Button>
+          </div>
         </li>
       ))}
     </ul>

@@ -40,11 +40,18 @@ export interface CmsDeletedPost {
   postId: string
 }
 
+export interface CmsDeletedArticle {
+  categoryId: string
+  subcategoryId: string
+  articleId: string
+}
+
 export interface CmsAdditions {
   subcategories: CmsSubcategory[]
   articles: CmsArticle[]
   posts: CmsPost[]
   deletedPosts?: CmsDeletedPost[]
+  deletedArticles?: CmsDeletedArticle[]
 }
 
 let additions: CmsAdditions = {
@@ -52,6 +59,7 @@ let additions: CmsAdditions = {
   articles: [],
   posts: [],
   deletedPosts: [],
+  deletedArticles: [],
 }
 
 export function getAdditions(): CmsAdditions {
@@ -60,6 +68,7 @@ export function getAdditions(): CmsAdditions {
     articles: [...additions.articles],
     posts: [...additions.posts],
     deletedPosts: [...(additions.deletedPosts || [])],
+    deletedArticles: [...(additions.deletedArticles || [])],
   }
 }
 
@@ -69,6 +78,7 @@ export function setAdditions(data: CmsAdditions): void {
     articles: data.articles || [],
     posts: data.posts || [],
     deletedPosts: data.deletedPosts || [],
+    deletedArticles: data.deletedArticles || [],
   }
 }
 
@@ -78,6 +88,54 @@ export function addSubcategory(sub: CmsSubcategory): void {
 
 export function addArticle(art: CmsArticle): void {
   additions.articles.push(art)
+}
+
+export function isCmsArticle(categoryId: string, subcategoryId: string, articleId: string): boolean {
+  return additions.articles.some(
+    (a) => a.categoryId === categoryId && a.subcategoryId === subcategoryId && a.id === articleId
+  )
+}
+
+export function removeArticle(
+  categoryId: string,
+  subcategoryId: string,
+  articleId: string
+): void {
+  const cmsIndex = additions.articles.findIndex(
+    (a) =>
+      a.categoryId === categoryId && a.subcategoryId === subcategoryId && a.id === articleId
+  )
+  if (cmsIndex >= 0) {
+    additions.articles.splice(cmsIndex, 1)
+    additions.posts = additions.posts.filter(
+      (p) =>
+        !(
+          p.categoryId === categoryId &&
+          p.subcategoryId === subcategoryId &&
+          p.articleId === articleId
+        )
+    )
+    return
+  }
+
+  if (!additions.deletedArticles) additions.deletedArticles = []
+  const already = additions.deletedArticles.some(
+    (d) =>
+      d.categoryId === categoryId &&
+      d.subcategoryId === subcategoryId &&
+      d.articleId === articleId
+  )
+  if (!already) {
+    additions.deletedArticles.push({ categoryId, subcategoryId, articleId })
+  }
+  additions.posts = additions.posts.filter(
+    (p) =>
+      !(
+        p.categoryId === categoryId &&
+        p.subcategoryId === subcategoryId &&
+        p.articleId === articleId
+      )
+  )
 }
 
 export function addPost(post: CmsPost): void {

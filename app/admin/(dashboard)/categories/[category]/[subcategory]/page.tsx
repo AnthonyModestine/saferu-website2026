@@ -27,6 +27,11 @@ export default async function SubcategoryDetailPage({ params }: PageProps) {
     notFound()
   }
 
+  const liveArticles = subcategory.articles.filter((a) =>
+    isArticlePublished(categoryId, subcategoryId, a.id)
+  )
+  const draftCount = subcategory.articles.length - liveArticles.length
+
   return (
     <div className="p-8">
       {/* Breadcrumb */}
@@ -66,11 +71,20 @@ export default async function SubcategoryDetailPage({ params }: PageProps) {
         <CardHeader>
           <CardTitle>Articles</CardTitle>
           <CardDescription>
-            {subcategory.articles.length} article{subcategory.articles.length !== 1 ? "s" : ""} in this subcategory
+            {liveArticles.length} live article{liveArticles.length !== 1 ? "s" : ""}
+            {draftCount > 0 && (
+              <>
+                {" "}
+                ·{" "}
+                <Link href="/admin/unpublished" className="text-amber-800 underline hover:text-amber-900">
+                  {draftCount} draft{draftCount !== 1 ? "s" : ""}
+                </Link>
+              </>
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
-          {subcategory.articles.length === 0 ? (
+          {liveArticles.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <FileText className="mb-4 h-12 w-12 text-gray-300" />
               <h3 className="text-lg font-medium text-gray-900">No articles yet</h3>
@@ -86,13 +100,7 @@ export default async function SubcategoryDetailPage({ params }: PageProps) {
             <ArticleListOrder
               categoryId={categoryId}
               subcategoryId={subcategoryId}
-              articles={subcategory.articles}
-              publishedByArticleId={Object.fromEntries(
-                subcategory.articles.map((a) => [
-                  a.id,
-                  isArticlePublished(categoryId, subcategoryId, a.id),
-                ])
-              )}
+              articles={liveArticles}
             />
           )}
         </CardContent>

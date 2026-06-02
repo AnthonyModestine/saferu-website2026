@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
-import { addArticle, generateId, getAdditions } from "@/lib/cms-additions"
+import { addArticle, generateId, getAdditions, removeArticle } from "@/lib/cms-additions"
 import { loadCmsAdditions, persistAdditions } from "@/lib/cms-additions-persist"
+import { setArticlePublished } from "@/lib/content-visibility"
+import { loadVisibility, persistVisibility } from "@/lib/content-visibility-persist"
 import { unauthorizedIfNotAdmin } from "@/lib/require-admin-api"
 
 /** Sanitize custom slug: letters, numbers, hyphens only; preserve case */
@@ -30,7 +32,7 @@ export async function POST(request: NextRequest) {
     const id = slug?.trim()
       ? sanitizeSlug(slug) || generateId("art", title)
       : generateId("art", title)
-    await loadCmsAdditions()
+    await Promise.all([loadCmsAdditions(), loadVisibility()])
     addArticle({
       categoryId,
       subcategoryId,
@@ -38,7 +40,8 @@ export async function POST(request: NextRequest) {
       title: title.trim(),
       description: (description || "").trim(),
     })
-    await persistAdditions()
+    setArticlePublished(categoryId, subcategoryId, id, false)
+    await Promise.all([persistAdditions(), persistVisibility()])
 
     const saved = getAdditions().articles.find(
       (a) => a.id === id && a.categoryId === categoryId && a.subcategoryId === subcategoryId
@@ -55,6 +58,36 @@ export async function POST(request: NextRequest) {
     console.error("[cms/article] ERROR:", err)
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Invalid request" },
+      { status: 500 }
+    )
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  const denied = await unauthorizedIfNotAdmin()
+  if (denied) return denied
+  try {
+    const body = await request.json()
+    const { categoryId, subcategoryId, articleId } = body as {
+      categoryId: string
+      subcategoryId: string
+      articleId: string
+    }
+    if (!categoryId || !subcategoryId || !articleId) {
+      return NextResponse.json(
+        { error: "categoryId, subcategoryId, and articleId required" },
+        { status: 400 }
+      )
+    }
+    await Promise.all([loadCmsAdditions(), loadVisibility()])
+    removeArticle(categoryId, subcategoryId, articleId)
+    setArticlePublished(categoryId, subcategoryId, articleId, true)
+    await Promise.all([persistAdditions(), persistVisibility()])
+    return NextResponse.json({ ok: true })
+  } catch (err) {
+    console.error("[cms/article] DELETE error:", err)
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Failed to delete article" },
       { status: 500 }
     )
   }

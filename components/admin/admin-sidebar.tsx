@@ -27,7 +27,7 @@ const navigation = [
   { name: "Tickets", href: "/admin/tickets", icon: MessageSquare },
   { name: "Categories", href: "/admin/categories", icon: FolderTree },
   { name: "Articles", href: "/admin/articles", icon: FileText },
-  { name: "Unpublished", href: "/admin/unpublished", icon: Archive },
+  { name: "Drafts", href: "/admin/unpublished", icon: Archive },
   { name: "Media Library", href: "/admin/media", icon: ImageIcon },
   { name: "Metrics", href: "/admin/metrics", icon: BarChart3 },
 ]
