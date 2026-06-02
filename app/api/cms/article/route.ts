@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { addArticle, generateId } from "@/lib/cms-additions"
+import { addArticle, generateId, getAdditions } from "@/lib/cms-additions"
 import { loadCmsAdditions, persistAdditions } from "@/lib/cms-additions-persist"
 import { unauthorizedIfNotAdmin } from "@/lib/require-admin-api"
 
@@ -39,8 +39,23 @@ export async function POST(request: NextRequest) {
       description: (description || "").trim(),
     })
     await persistAdditions()
+
+    const saved = getAdditions().articles.find(
+      (a) => a.id === id && a.categoryId === categoryId && a.subcategoryId === subcategoryId
+    )
+    if (!saved) {
+      return NextResponse.json(
+        { error: "Article could not be saved to database. Check Vercel Postgres connection." },
+        { status: 500 }
+      )
+    }
+
     return NextResponse.json({ ok: true, id })
-  } catch {
-    return NextResponse.json({ error: "Invalid request" }, { status: 400 })
+  } catch (err) {
+    console.error("[cms/article] ERROR:", err)
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Invalid request" },
+      { status: 500 }
+    )
   }
 }

@@ -11,40 +11,50 @@ import { isDatabaseConfigured, getSql, ensureSchema } from "@/lib/db"
 const DATA_DIR = path.join(process.cwd(), "data")
 const FILE_PATH = path.join(DATA_DIR, "content-visibility.json")
 
-let loadPromise: Promise<void> | null = null
+let fileLoadPromise: Promise<void> | null = null
 
-// ── Database helpers ─────────────────────────────────────────────────────────
+function parseKeys(raw: unknown): string[] {
+  let value = raw
+  if (typeof value === "string") {
+    try {
+      value = JSON.parse(value)
+    } catch {
+      return []
+    }
+  }
+  return Array.isArray(value) ? value.filter((k): k is string => typeof k === "string") : []
+}
 
-async function dbLoad(): Promise<void> {
+async function dbLoad(): Promise<string[]> {
   await ensureSchema()
   const db = getSql()
   const rows = await db`SELECT unpublished_keys FROM content_visibility WHERE id = 'singleton'`
-  if (rows.length > 0) {
-    const arr = rows[0].unpublished_keys as string[]
-    if (Array.isArray(arr)) setUnpublishedKeys(arr)
-  }
+  if (rows.length === 0) return []
+  return parseKeys(rows[0].unpublished_keys)
 }
 
 async function dbSave(arr: string[]): Promise<void> {
   await ensureSchema()
   const db = getSql()
   await db`
-    INSERT INTO content_visibility (id, unpublished_keys) VALUES ('singleton', ${JSON.stringify(arr)}::jsonb)
+    INSERT INTO content_visibility (id, unpublished_keys) VALUES ('singleton', ${arr})
     ON CONFLICT (id) DO UPDATE SET unpublished_keys = EXCLUDED.unpublished_keys
   `
 }
-
-// ── File helpers ─────────────────────────────────────────────────────────────
 
 function fileLoad(): void {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const raw = require("fs").readFileSync(FILE_PATH, "utf-8")
     const arr = JSON.parse(raw) as string[]
-    if (Array.isArray(arr)) setUnpublishedKeys(arr)
+    if (Array.isArray(arr)) {
+      setUnpublishedKeys(arr)
+      return
+    }
   } catch {
     // No file or invalid: keep default empty
   }
+  setUnpublishedKeys([])
 }
 
 async function fileSave(arr: string[]): Promise<void> {
@@ -53,29 +63,27 @@ async function fileSave(arr: string[]): Promise<void> {
   await writeFile(FILE_PATH, JSON.stringify(arr, null, 2), "utf-8")
 }
 
-// ── Public API ────────────────────────────────────────────────────────────────
-
-/** Load visibility state into memory. Returns the same Promise if a load is already in-flight. */
-export function loadVisibility(): Promise<void> {
-  if (!loadPromise) {
-    loadPromise = (async () => {
-      if (isDatabaseConfigured()) {
-        await dbLoad()
-      } else {
-        fileLoad()
-      }
-    })()
+/** Load visibility state into memory. Postgres: always fresh from DB. */
+export async function loadVisibility(): Promise<void> {
+  if (isDatabaseConfigured()) {
+    setUnpublishedKeys(await dbLoad())
+    return
   }
-  return loadPromise
+
+  if (!fileLoadPromise) {
+    fileLoadPromise = Promise.resolve().then(() => fileLoad())
+  }
+  await fileLoadPromise
 }
 
-/** Persist unpublished keys. Call from API after setArticlePublished. */
+/** Persist unpublished keys. */
 export async function persistVisibility(): Promise<void> {
   const arr = getUnpublishedArticleKeys()
   if (isDatabaseConfigured()) {
     await dbSave(arr)
-  } else {
-    await fileSave(arr)
+    setUnpublishedKeys(await dbLoad())
+    return
   }
-  loadPromise = null
+  await fileSave(arr)
+  fileLoadPromise = null
 }
