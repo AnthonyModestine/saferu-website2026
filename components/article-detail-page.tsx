@@ -180,7 +180,7 @@ export function ArticleDetailPage({
                           alt={post.title}
                           fill
                           className="object-cover"
-                          unoptimized={imageSrc.startsWith("/images/")}
+                          unoptimized={imageSrc.startsWith("/images/") || imageSrc.startsWith("http")}
                           onError={(e) => {
                             const target = e.currentTarget
                             target.style.display = "none"

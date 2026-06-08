@@ -35,9 +35,9 @@ export function PostMessageBlock({
 
   return (
     <>
-      <div className="relative rounded-xl bg-gray-50 p-3 pb-8 mb-2">
+      <div className="relative mb-3 rounded-xl border border-gray-200 bg-white p-4 pb-9 shadow-sm">
         <p
-          className={`text-sm text-gray-700 leading-relaxed whitespace-pre-wrap ${
+          className={`text-[15px] text-gray-900 leading-[1.65] whitespace-pre-wrap ${
             long && !expanded ? "line-clamp-6" : ""
           } ${long && expanded ? "max-h-80 overflow-y-auto pr-1" : ""}`}
         >
