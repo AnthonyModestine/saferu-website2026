@@ -92,7 +92,8 @@ export async function generatePressReleaseWithAI(payload: PressReleasePayload): 
 
     const text = completion.choices?.[0]?.message?.content?.trim()
     return text || null
-  } catch {
+  } catch (err) {
+    console.error("[press-release-ai] OpenAI error:", err)
     return null
   }
 }

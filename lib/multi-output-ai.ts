@@ -229,7 +229,10 @@ export async function generateMultiOutput(
   payload: PressReleasePayload & { requestFootage?: boolean; footageTimeframe?: string; whatToLookFor?: string }
 ): Promise<MultiOutputResult | null> {
   const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) return null
+    if (!apiKey) {
+    console.error("[multi-output-ai] OPENAI_API_KEY is not set")
+    return null
+  }
 
   try {
     const { default: OpenAI } = await import("openai")
@@ -265,7 +268,8 @@ export async function generateMultiOutput(
       talkingPoints: parsed.talkingPoints || "",
       communityRequest: parsed.communityRequest || null,
     }
-  } catch {
+  } catch (err) {
+    console.error("[multi-output-ai] OpenAI error:", err)
     return null
   }
 }

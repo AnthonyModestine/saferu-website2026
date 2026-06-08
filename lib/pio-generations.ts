@@ -2,17 +2,13 @@
  * Tracks AI generation usage per member.
  * Monthly quota resets automatically. Purchased packs carry over.
  *
- * Storage format (data/pio-generations.json):
- * {
- *   "user@agency.gov": {
- *     "2026-05": 12,   // generations used in that month
- *     "packs": 5       // additional purchased generations (carry-over)
- *   }
- * }
+ * Uses Neon Postgres when POSTGRES_URL / DATABASE_URL is set (production),
+ * otherwise falls back to data/pio-generations.json (local dev).
  */
 
 import { readFile, writeFile, mkdir } from "fs/promises"
 import path from "path"
+import { ensureSchema, getSql, isDatabaseConfigured } from "@/lib/db"
 
 const DATA_DIR = path.join(process.cwd(), "data")
 const FILE_PATH = path.join(DATA_DIR, "pio-generations.json")
@@ -20,7 +16,7 @@ const MONTHLY_QUOTA = 30
 
 interface MemberRecord {
   [monthKey: string]: number // "YYYY-MM" → used count
-  packs: number              // purchased extra generations (carry-over)
+  packs: number
 }
 
 interface GenerationsStore {
@@ -32,7 +28,13 @@ function currentMonthKey(): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`
 }
 
-async function readStore(): Promise<GenerationsStore> {
+function ensureRecord(store: GenerationsStore, email: string): MemberRecord {
+  if (!store[email]) store[email] = { packs: 0 }
+  if (typeof store[email].packs !== "number") store[email].packs = 0
+  return store[email]
+}
+
+async function readFileStore(): Promise<GenerationsStore> {
   try {
     const raw = await readFile(FILE_PATH, "utf-8")
     const data = JSON.parse(raw) as GenerationsStore
@@ -42,15 +44,58 @@ async function readStore(): Promise<GenerationsStore> {
   }
 }
 
-async function writeStore(store: GenerationsStore): Promise<void> {
+async function writeFileStore(store: GenerationsStore): Promise<void> {
   await mkdir(DATA_DIR, { recursive: true })
   await writeFile(FILE_PATH, JSON.stringify(store, null, 2), "utf-8")
 }
 
-function ensureRecord(store: GenerationsStore, email: string): MemberRecord {
-  if (!store[email]) store[email] = { packs: 0 }
-  if (typeof store[email].packs !== "number") store[email].packs = 0
-  return store[email]
+async function dbReadRecord(email: string): Promise<MemberRecord> {
+  await ensureSchema()
+  const db = getSql()
+  const rows = await db`SELECT data FROM pio_generations WHERE email = ${email}`
+  if (rows.length === 0) return { packs: 0 }
+  const data = rows[0].data
+  if (typeof data === "string") {
+    try {
+      return { packs: 0, ...JSON.parse(data) }
+    } catch {
+      return { packs: 0 }
+    }
+  }
+  if (data && typeof data === "object") {
+    return { packs: 0, ...(data as MemberRecord) }
+  }
+  return { packs: 0 }
+}
+
+async function dbWriteRecord(email: string, record: MemberRecord): Promise<void> {
+  await ensureSchema()
+  const db = getSql()
+  await db`
+    INSERT INTO pio_generations (email, data)
+    VALUES (${email}, ${JSON.stringify(record)}::jsonb)
+    ON CONFLICT (email) DO UPDATE SET data = EXCLUDED.data
+  `
+}
+
+async function readRecord(email: string): Promise<MemberRecord> {
+  const key = email.trim().toLowerCase()
+  if (isDatabaseConfigured()) {
+    return dbReadRecord(key)
+  }
+  const store = await readFileStore()
+  return ensureRecord(store, key)
+}
+
+async function writeRecord(email: string, record: MemberRecord): Promise<void> {
+  const key = email.trim().toLowerCase()
+  if (isDatabaseConfigured()) {
+    await dbWriteRecord(key, record)
+    return
+  }
+  const store = await readFileStore()
+  store[key] = record
+  await writeFileStore(store)
 }
 
 /** Returns { used, quota, packs, remaining } for the current month. */
@@ -60,9 +105,7 @@ export async function getGenerationStatus(email: string): Promise<{
   packs: number
   remaining: number
 }> {
-  const key = email.trim().toLowerCase()
-  const store = await readStore()
-  const record = ensureRecord(store, key)
+  const record = await readRecord(email)
   const month = currentMonthKey()
   const used = typeof record[month] === "number" ? record[month] : 0
   const packs = record.packs
@@ -75,9 +118,7 @@ export async function getGenerationStatus(email: string): Promise<{
  * Returns true if allowed and decremented, false if no generations left.
  */
 export async function consumeGeneration(email: string): Promise<boolean> {
-  const key = email.trim().toLowerCase()
-  const store = await readStore()
-  const record = ensureRecord(store, key)
+  const record = await readRecord(email)
   const month = currentMonthKey()
   const used = typeof record[month] === "number" ? record[month] : 0
   const monthlyRemaining = MONTHLY_QUOTA - used
@@ -85,13 +126,13 @@ export async function consumeGeneration(email: string): Promise<boolean> {
 
   if (monthlyRemaining > 0) {
     record[month] = used + 1
-    await writeStore(store)
+    await writeRecord(email, record)
     return true
   }
 
   if (packs > 0) {
     record.packs = packs - 1
-    await writeStore(store)
+    await writeRecord(email, record)
     return true
   }
 
@@ -100,9 +141,7 @@ export async function consumeGeneration(email: string): Promise<boolean> {
 
 /** Add purchased generation pack credits to a member's account. */
 export async function addGenerationPack(email: string, count: number): Promise<void> {
-  const key = email.trim().toLowerCase()
-  const store = await readStore()
-  const record = ensureRecord(store, key)
+  const record = await readRecord(email)
   record.packs = (record.packs || 0) + count
-  await writeStore(store)
+  await writeRecord(email, record)
 }

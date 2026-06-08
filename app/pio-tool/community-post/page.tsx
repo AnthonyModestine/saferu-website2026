@@ -57,6 +57,7 @@ export default function CommunityPostPage() {
   const [copied, setCopied] = useState(false)
   const [activeTab, setActiveTab] = useState("incident")
   const [showGenLimitModal, setShowGenLimitModal] = useState(false)
+  const [generateError, setGenerateError] = useState<string | null>(null)
 
   // Incident fields
   const [incidentType, setIncidentType] = useState("")
@@ -92,19 +93,9 @@ export default function CommunityPostPage() {
 
   const handleGenerate = async () => {
     setGenerating(true)
+    setGenerateError(null)
     const displayAgency = agencyName || "Agency Name"
     const displayIncident = incidentType === "other" ? otherIncidentType : incidentType || "incident"
-    const displayAddress = address || "the area"
-    const displayDate = incidentDate
-      ? new Date(incidentDate).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
-      : "a recent date"
-    const footageStr = footageTimeframe || "during the time of the incident"
-    const lookForStr = whatToLookFor || "any activity related to this incident"
-    const contactStr = contactDetails
-      ? `Contact ${contactDetails}`
-      : `Contact the ${displayAgency}`
-    const caseStr = caseNumber ? ` Reference case #${caseNumber}.` : ""
-    const tipStr = tipLine ? ` Anonymous tips can be submitted to ${tipLine}.` : ""
 
     try {
       const res = await fetch("/api/pio/generate-community-request", {
@@ -145,32 +136,16 @@ export default function CommunityPostPage() {
         setShowGenLimitModal(true)
         return
       }
+      setGenerateError(
+        data?.error ||
+          "AI drafting failed. OpenAI did not run — please try again in a few minutes."
+      )
+      setGenerating(false)
+      return
     } catch {
-      // Fall through to template
+      setGenerateError("Could not reach the server. Check your connection and try again.")
+      setGenerating(false)
     }
-
-    // Fallback template when drafting is unavailable or fails
-    const post = `${displayAgency.toUpperCase()} - REQUESTING VIDEO ASSISTANCE
-
-The ${displayAgency} is investigating a ${displayIncident.toLowerCase()} that occurred on ${displayDate} in the area of ${displayAddress}.
-
-${description ? `${description}\n\n` : ""}We are requesting video footage from residents and businesses in the area from ${footageStr}. We are looking for ${lookForStr}.
-
-If you have video footage from a doorbell camera, security camera, or dashcam, please share it with us. ${contactStr}.${caseStr}${tipStr}
-
-Do not approach any suspicious individuals. If you see something, call 911.`
-
-    setGeneratedPost(post)
-    addPioHistoryItem({
-      title: `${displayIncident || "Incident"} - Video Request`,
-      type: displayIncident || "Incident",
-      format: "Video Request",
-      content: post,
-    })
-    setGenerating(false)
-    setGenerated(true)
-    setActiveTab("preview")
-    track("pio_generate", { source: "community_post" })
   }
 
   const handleCopy = async () => {
@@ -437,6 +412,11 @@ Do not approach any suspicious individuals. If you see something, call 911.`
       </Tabs>
 
       {/* Action Buttons */}
+      {generateError && (
+        <p className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm text-amber-900">
+          {generateError}
+        </p>
+      )}
       <div className="flex flex-wrap gap-3 pb-8">
         <Button
           onClick={handleGenerate}

@@ -63,7 +63,8 @@ export async function generateCommunityRequestWithAI(payload: CommunityRequestPa
 
     const text = completion.choices?.[0]?.message?.content?.trim()
     return text || null
-  } catch {
+  } catch (err) {
+    console.error("[community-request-ai] OpenAI error:", err)
     return null
   }
 }

@@ -70,6 +70,13 @@ export async function ensureSchema(): Promise<void> {
     )
   `
 
+  await db`
+    CREATE TABLE IF NOT EXISTS pio_generations (
+      email TEXT PRIMARY KEY,
+      data JSONB NOT NULL DEFAULT '{"packs":0}'
+    )
+  `
+
   await db`CREATE INDEX IF NOT EXISTS idx_free_members_email ON free_members (email)`
   await db`CREATE INDEX IF NOT EXISTS idx_member_sessions_expires ON member_sessions (expires_at)`
 

@@ -73,6 +73,7 @@ export default function NewPressReleasePage() {
   const [generated, setGenerated] = useState(false)
   const [copied, setCopied] = useState(false)
   const [showGenLimitModal, setShowGenLimitModal] = useState(false)
+  const [generateError, setGenerateError] = useState<string | null>(null)
   const [incidentType, setIncidentType] = useState("")
   const [entryType, setEntryType] = useState("none")
   const [arrestsMade, setArrestsMade] = useState(false)
@@ -167,6 +168,7 @@ export default function NewPressReleasePage() {
 
   const handleGenerate = async () => {
     setGenerating(true)
+    setGenerateError(null)
     const displayAgency = agencyName || "Agency Name"
     const displayCity = city || "City Name"
     const displayState = state || "State"
@@ -231,41 +233,16 @@ export default function NewPressReleasePage() {
         setShowGenLimitModal(true)
         return
       }
+      setGenerateError(
+        data?.error ||
+          "AI drafting failed. OpenAI did not run — please try again in a few minutes."
+      )
+      setGenerating(false)
+      return
     } catch {
-      // Fall through to template
+      setGenerateError("Could not reach the server. Check your connection and try again.")
+      setGenerating(false)
     }
-
-    const releaseText = `${displayAgency.toUpperCase()} PRESS RELEASE
-
-${displayCity.toUpperCase()}, ${displayState.toUpperCase()} – ${incidentDate ? new Date(incidentDate).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })} – For Immediate Release
-
-${displayAgency} is investigating a reported ${incidentType || "incident"}${location ? ` that occurred in ${location}` : ""}${incidentDate ? ` on ${new Date(incidentDate).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}` : ""}${incidentTime ? ` at approximately ${incidentTime}` : ""}.
-
-${incidentSummary ? `${incidentSummary.trim()}\n\n` : ""}${investigationOngoing ? "The investigation is ongoing. " : ""}Anyone with information regarding this incident is encouraged to contact ${displayAgency} at ${displayPhone} or submit an anonymous tip through Crime Stoppers.
-
-${agencySettings.boilerplate ? `\n${agencySettings.boilerplate}\n` : ""}
-Media Contact:
-${displayContact}
-${displayAgency}
-Phone: ${displayPhone}${contactPhone2 ? `\nSecondary: ${contactPhone2}` : ""}
-Email: ${displayEmail}`
-
-    setGeneratedRelease(releaseText)
-    setGeneratedFacebook("")
-    setGeneratedTwitter("")
-    setGeneratedTalkingPoints("")
-    setGeneratedCommunityRequest(null)
-    addPioHistoryItem({
-      title: `${incidentType || "Incident"} - Press Release`,
-      type: incidentType || "Incident",
-      format: "Press Release",
-      content: releaseText,
-    })
-    setGenerating(false)
-    setGenerated(true)
-    setPreviewTab("press-release")
-    setActiveTab("preview")
-    track("pio_generate", { source: "press_release" })
   }
 
   const handleCopyField = async (text: string, field: string) => {
@@ -946,6 +923,11 @@ Email: ${displayEmail}`
       </Tabs>
 
       {/* Action Buttons */}
+      {generateError && (
+        <p className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm text-amber-900">
+          {generateError}
+        </p>
+      )}
       <div className="flex flex-wrap gap-3 pb-8">
         <Button
           onClick={handleGenerate}
