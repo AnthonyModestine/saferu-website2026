@@ -106,7 +106,7 @@ export default function AboutPage() {
                   </li>
                   <li className="flex items-center gap-2 text-sm text-muted-foreground">
                     <CheckCircle className="h-4 w-4 text-primary" />
-                    Create community requests for tips or video
+                    Create video requests for tips or footage
                   </li>
                   <li className="flex items-center gap-2 text-sm text-muted-foreground">
                     <CheckCircle className="h-4 w-4 text-primary" />

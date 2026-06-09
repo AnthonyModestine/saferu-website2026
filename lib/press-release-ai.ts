@@ -1,11 +1,16 @@
 /**
  * Generate press release body text using OpenAI from structured form data.
  * Set OPENAI_API_KEY in Vercel (Project → Settings → Environment Variables) or in .env.local.
- * If the key is missing or the request fails, returns null and the caller can fall back to template.
+ * If the key is missing or the request fails, returns null.
  *
  * To use YOUR prompt + user info: edit SYSTEM_PROMPT below (and the user message in generatePressReleaseWithAI).
- * User data is built in buildUserMessage() and sent with the system prompt to OpenAI.
+ * Word-count rules: lib/press-release-length.ts
  */
+
+import {
+  PRESS_RELEASE_LENGTH_RULES,
+  getPressReleaseLengthGuidance,
+} from "./press-release-length"
 
 export interface PressReleasePayload {
   agencyName: string
@@ -62,7 +67,11 @@ function buildUserMessage(p: PressReleasePayload): string {
   return lines.join("\n")
 }
 
-const SYSTEM_PROMPT = `You are a professional public information officer (PIO) writing an official press release for a law enforcement or public safety agency. Use ONLY the facts provided. Do not invent any details, names, addresses, or circumstances. Use neutral, formal language. Avoid speculation, opinions, or emotional language. For minors, never include the name; use "a juvenile" or "a minor" as appropriate. Use "alleged" only for unconfirmed actions. Format the release as plain text with a clear dateline (CITY, STATE – Date – For Immediate Release), body paragraphs, and end with a Media Contact section listing the contact name, agency, phone, and email. Do not use markdown or asterisks for bold.`
+const SYSTEM_PROMPT = `You are a professional public information officer (PIO) writing an official press release for a law enforcement or public safety agency. Use ONLY the facts provided. Do not invent any details, names, addresses, or circumstances. Use neutral, formal language. Avoid speculation, opinions, or emotional language. For minors, never include the name; use "a juvenile" or "a minor" as appropriate. Use "alleged" only for unconfirmed actions. Format the release as plain text with a clear dateline (CITY, STATE – Date – For Immediate Release), body paragraphs, and end with a Media Contact section listing the contact name, agency, phone, and email. Do not use markdown or asterisks for bold.
+
+${PRESS_RELEASE_LENGTH_RULES}
+
+Match the word-count target specified in the user message. Never pad with invented detail to reach word count.`
 
 export async function generatePressReleaseWithAI(payload: PressReleasePayload): Promise<string | null> {
   const apiKey = process.env.OPENAI_API_KEY
@@ -73,6 +82,10 @@ export async function generatePressReleaseWithAI(payload: PressReleasePayload): 
     const openai = new OpenAI({ apiKey })
 
     const userContent = buildUserMessage(payload)
+    const lengthGuidance = getPressReleaseLengthGuidance(
+      payload.incidentType,
+      payload.arrests.length > 0
+    )
     const dateStr = payload.incidentDate
       ? new Date(payload.incidentDate + (payload.incidentTime ? `T${payload.incidentTime}` : "")).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" })
       : new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
@@ -83,10 +96,10 @@ export async function generatePressReleaseWithAI(payload: PressReleasePayload): 
         { role: "system", content: SYSTEM_PROMPT },
         {
           role: "user",
-          content: `Write a press release using only these facts. Release date for the dateline: ${dateStr}. Contact: ${payload.contactName}, ${payload.agencyName}, Phone: ${payload.contactPhone}${payload.contactPhone2 ? `, Secondary: ${payload.contactPhone2}` : ""}, Email: ${payload.contactEmail}. ${payload.boilerplate ? `Include this standard closing paragraph after the body: ${payload.boilerplate}` : ""}\n\nFacts:\n${userContent}`,
+          content: `Write a press release using only these facts.\n\n${lengthGuidance}\n\nRelease date for the dateline: ${dateStr}. Contact: ${payload.contactName}, ${payload.agencyName}, Phone: ${payload.contactPhone}${payload.contactPhone2 ? `, Secondary: ${payload.contactPhone2}` : ""}, Email: ${payload.contactEmail}. ${payload.boilerplate ? `Include this standard closing paragraph after the body: ${payload.boilerplate}` : ""}\n\nFacts:\n${userContent}`,
         },
       ],
-      max_tokens: 1500,
+      max_tokens: 2000,
       temperature: 0.3,
     })
 

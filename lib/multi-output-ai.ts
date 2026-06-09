@@ -1,11 +1,15 @@
 /**
  * Multi-output AI generation: from one set of form data, produce a press release,
- * Facebook post, X/Twitter post, talking points, and optionally a community/footage request.
+ * Facebook post, X/Twitter post, talking points, and optionally a video request.
  *
  * Uses OPENAI_API_KEY. Returns null for the whole bundle if the key is missing or the call fails.
  */
 
 import type { PressReleasePayload } from "./press-release-ai"
+import {
+  PRESS_RELEASE_LENGTH_RULES,
+  getPressReleaseLengthGuidance,
+} from "./press-release-length"
 
 export interface MultiOutputResult {
   pressRelease: string
@@ -104,6 +108,8 @@ Example:
 - what residents should look for
 - who they should contact.
 
+${PRESS_RELEASE_LENGTH_RULES}
+
 OUTPUT FORMAT
 
 Return your response as valid JSON with these exact keys:
@@ -113,7 +119,7 @@ Return your response as valid JSON with these exact keys:
   "facebook": "...",
   "twitter": "...",
   "talkingPoints": "...",
-  "communityRequest": "..." or null
+  "communityRequest": "..." (video request text) or null
 }
 
 Generate each section as follows:
@@ -130,6 +136,8 @@ Format the release as plain text with:
 - End with a Media Contact section listing the contact name, agency, phone, and email
 
 Do not use markdown or asterisks for bold. Plain text only.
+
+Match the word-count target for this release category (routine vs incident-related) specified in the facts.
 
 ---
 
@@ -171,15 +179,15 @@ Include Case # if available.
 
 ---
 
-COMMUNITY REQUEST (communityRequest)
+VIDEO REQUEST (communityRequest)
 
 ONLY generate this if the facts include "FOOTAGE/VIDEO REQUEST: Yes". Otherwise set communityRequest to null.
 
-Write a direct request to residents asking them to check security cameras or provide information related to the incident.
+Write a direct video request to residents asking them to check security cameras or provide footage related to the incident.
 
 Structure:
 
-[emoji] COMMUNITY REQUEST - INCIDENT TYPE
+[emoji] VIDEO REQUEST - INCIDENT TYPE
 
 The [Agency Name] is investigating a [specific incident type] that occurred in the [general location] on [date/time].
 
@@ -216,7 +224,7 @@ Include:
 - Date/time and general location
 - Investigation status (ongoing or resolved)
 - Any suspect information that can be publicly shared
-- Whether the department is requesting community assistance
+- Whether the department is requesting video footage or tips from the public
 - Reminder that the investigation is ongoing if applicable
 
 Talking points must be factual and suitable for a chief or PIO to reference during media inquiries.
@@ -239,6 +247,10 @@ export async function generateMultiOutput(
     const openai = new OpenAI({ apiKey })
 
     const facts = buildFactsBlock(payload)
+    const lengthGuidance = getPressReleaseLengthGuidance(
+      payload.incidentType,
+      payload.arrests.length > 0
+    )
     const dateStr = payload.incidentDate
       ? new Date(payload.incidentDate + (payload.incidentTime ? `T${payload.incidentTime}` : "")).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
       : new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
@@ -249,10 +261,10 @@ export async function generateMultiOutput(
         { role: "system", content: SYSTEM_PROMPT },
         {
           role: "user",
-          content: `Generate all outputs using only these facts.\n\nRelease date for the dateline: ${dateStr}\nContact: ${payload.contactName}, ${payload.agencyName}, Phone: ${payload.contactPhone}${payload.contactPhone2 ? `, Secondary: ${payload.contactPhone2}` : ""}, Email: ${payload.contactEmail}.\n${payload.boilerplate ? `Include this standard closing paragraph in the press release: ${payload.boilerplate}\n` : ""}\nFacts:\n${facts}`,
+          content: `Generate all outputs using only these facts.\n\n${lengthGuidance}\n\nRelease date for the dateline: ${dateStr}\nContact: ${payload.contactName}, ${payload.agencyName}, Phone: ${payload.contactPhone}${payload.contactPhone2 ? `, Secondary: ${payload.contactPhone2}` : ""}, Email: ${payload.contactEmail}.\n${payload.boilerplate ? `Include this standard closing paragraph in the press release: ${payload.boilerplate}\n` : ""}\nFacts:\n${facts}`,
         },
       ],
-      max_tokens: 3000,
+      max_tokens: 4500,
       temperature: 0.3,
       response_format: { type: "json_object" },
     })

@@ -70,7 +70,7 @@ export default function AgencySettingsPage() {
           <div>
             <p className="font-bold text-[#1a365d] text-lg">Get started with Press Center</p>
             <p className="text-sm text-muted-foreground mt-0.5">
-              $30/month. Confident communication for public safety — draft press releases and community requests in minutes without compromising oversight.
+              $30/month. Confident communication for public safety — draft press releases and video requests in minutes without compromising oversight.
             </p>
           </div>
           <Button asChild className="shrink-0 bg-[#f2b233] text-[#1a365d] hover:bg-[#f2b233]/90 font-semibold">
@@ -87,7 +87,7 @@ export default function AgencySettingsPage() {
             Agency Information
           </CardTitle>
           <CardDescription>
-            These details will be used as defaults in your press releases and community requests.
+            These details will be used as defaults in your press releases and video requests.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -129,14 +129,14 @@ export default function AgencySettingsPage() {
             <Label htmlFor="boilerplate">Default Boilerplate Paragraph</Label>
             <Textarea
               id="boilerplate"
-              placeholder="Add a standard paragraph to include at the end of press releases and community requests..."
+              placeholder="Add a standard paragraph to include at the end of press releases and video requests..."
               className="placeholder:text-muted-foreground/60"
               rows={4}
               value={settings.boilerplate}
               onChange={(e) => updateSettings({ boilerplate: e.target.value })}
             />
             <p className="text-xs text-muted-foreground">
-              This paragraph will be automatically added to the end of your press releases and community requests.
+              This paragraph will be automatically added to the end of your press releases and video requests.
             </p>
           </div>
         </CardContent>

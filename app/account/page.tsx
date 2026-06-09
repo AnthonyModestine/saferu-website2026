@@ -154,7 +154,7 @@ export default function AccountPage() {
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Access</p>
                 <p className="mt-0.5 text-foreground">
-                  {member.paid ? "Press Center subscriber (press release & community request access)" : "Free member (What's New content)"}
+                  {member.paid ? "Press Center subscriber (press release & video request access)" : "Free member (What's New content)"}
                 </p>
               </div>
             </CardContent>

@@ -46,7 +46,7 @@ export function PIOTopBar({ onMenuClick }: PIOTopBarProps) {
               <div className="flex flex-col gap-1">
                 <span className="font-medium">New template available</span>
                 <span className="text-xs text-muted-foreground">
-                  New templates for press releases and community requests
+                  New templates for press releases and video requests
                 </span>
               </div>
             </DropdownMenuItem>

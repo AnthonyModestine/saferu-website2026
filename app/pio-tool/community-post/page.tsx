@@ -177,7 +177,7 @@ export default function CommunityPostPage() {
       <div>
         <h1 className="text-2xl font-bold text-foreground">Video Request</h1>
         <p className="text-muted-foreground">
-          Draft a direct message requesting video footage or community assistance. Use on Neighbors by Ring, social media, or your usual channels.
+          Draft a direct message requesting video footage. Use on Neighbors by Ring, social media, or your usual channels.
         </p>
       </div>
 

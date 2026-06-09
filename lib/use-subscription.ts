@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 
 /**
- * Returns the current user's Press Center subscription status (paid = access to press release generator and community request).
+ * Returns the current user's Press Center subscription status (paid = access to press release generator and video request).
  * Uses member session; paid status comes from Stripe (active subscription or successful charge).
  */
 export function useSubscription(): { isSubscribed: boolean; isLoading: boolean } {

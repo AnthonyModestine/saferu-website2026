@@ -302,9 +302,9 @@ export function DashboardCharts({ metrics }: Props) {
           </div>
         </div>
 
-        {/* Community request */}
+        {/* Video request */}
         <div className="space-y-3">
-          <h3 className="text-sm font-medium text-foreground">Community request usage</h3>
+          <h3 className="text-sm font-medium text-foreground">Video request usage</h3>
           <div className="h-[240px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={displayData} margin={{ top: 8, right: 12, left: 0, bottom: 8 }}>
@@ -324,12 +324,12 @@ export function DashboardCharts({ metrics }: Props) {
                 />
                 <Tooltip
                   contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))" }}
-                  formatter={(value: number) => [value, "Community requests"]}
+                  formatter={(value: number) => [value, "Video requests"]}
                 />
                 <Line
                   type="monotone"
                   dataKey="communityPost"
-                  name="Community requests"
+                  name="Video requests"
                   stroke="#7c3aed"
                   strokeWidth={2}
                   dot={{ fill: "#7c3aed", r: 2.5 }}

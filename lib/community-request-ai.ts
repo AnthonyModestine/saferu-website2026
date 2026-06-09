@@ -1,6 +1,6 @@
 /**
- * Generate community request (footage request / community alert) text using OpenAI.
- * Uses OPENAI_API_KEY (same as press release). Falls back to template if key missing or request fails.
+ * Generate video request (footage request) text using OpenAI.
+ * Uses OPENAI_API_KEY (same as press release).
  *
  * To use YOUR prompt + user info: edit SYSTEM_PROMPT below (and the user message in generateCommunityRequestWithAI).
  * User data is built in buildUserMessage() and sent with the system prompt to OpenAI.
@@ -36,7 +36,7 @@ function buildUserMessage(p: CommunityRequestPayload): string {
   return lines.join("\n")
 }
 
-const SYSTEM_PROMPT = `You are a public information officer writing a short community alert / footage request for social media or platforms like Neighbors by Ring. Use ONLY the facts provided. Do not invent any details, names, or exact addresses. Use clear, professional language. Keep it concise (a few short paragraphs). Include: (1) a clear headline that the agency is requesting community assistance, (2) what happened and the general area (never exact address), (3) what footage or information you need and the timeframe, (4) how to submit (contact info, case number if provided, tip line if provided), (5) a brief safety line (e.g. do not approach suspects; call 911 if you see something). Do not use markdown or asterisks. No victim names or private information.`
+const SYSTEM_PROMPT = `You are a public information officer writing a short video request for social media or platforms like Neighbors by Ring. Use ONLY the facts provided. Do not invent any details, names, or exact addresses. Use clear, professional language. Keep it concise (a few short paragraphs). Include: (1) a clear headline that the agency is requesting video footage or tips, (2) what happened and the general area (never exact address), (3) what footage or information you need and the timeframe, (4) how to submit (contact info, case number if provided, tip line if provided), (5) a brief safety line (e.g. do not approach suspects; call 911 if you see something). Do not use markdown or asterisks. No victim names or private information.`
 
 export async function generateCommunityRequestWithAI(payload: CommunityRequestPayload): Promise<string | null> {
   const apiKey = process.env.OPENAI_API_KEY
@@ -54,7 +54,7 @@ export async function generateCommunityRequestWithAI(payload: CommunityRequestPa
         { role: "system", content: SYSTEM_PROMPT },
         {
           role: "user",
-          content: `Write a community request / footage request using only these facts. Keep it suitable for social media and community platforms.\n\nFacts:\n${userContent}`,
+          content: `Write a video request using only these facts. Keep it suitable for social media and platforms like Neighbors by Ring.\n\nFacts:\n${userContent}`,
         },
       ],
       max_tokens: 800,

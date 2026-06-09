@@ -97,7 +97,7 @@ export function Pricing() {
                 "Facebook & X posts written and ready to copy",
                 "Talking points so your spokesperson walks in prepared",
                 "Branded PDF with your logo — send it the moment it's done",
-                "Community footage requests drafted and ready to post",
+                "Video requests drafted and ready to post",
                 "One-click Spanish translation to reach every resident",
               ].map((feature) => (
                 <li key={feature} className="flex items-start gap-3">

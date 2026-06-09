@@ -9,7 +9,7 @@ const SUBSCRIBE_PATH = "/pio-tool/subscribe"
 const SIGN_IN_PATH = "/sign-in"
 
 /**
- * Wraps Press Center content that requires a paid subscription (press release generator, community request).
+ * Wraps Press Center content that requires a paid subscription (press release generator, video request).
  * Requires sign-in first; then redirects to subscribe if not paid.
  */
 export function PIOPaywall({ children }: { children: React.ReactNode }) {

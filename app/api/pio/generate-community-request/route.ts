@@ -68,7 +68,7 @@ export async function POST(request: Request) {
     }
     return NextResponse.json({ content })
   } catch (e) {
-    console.error("Generate community request error:", e)
-    return NextResponse.json({ error: "Failed to generate community request." }, { status: 500 })
+    console.error("Generate video request error:", e)
+    return NextResponse.json({ error: "Failed to generate video request." }, { status: 500 })
   }
 }

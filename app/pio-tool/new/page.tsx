@@ -36,6 +36,11 @@ import { addPioHistoryItem } from "@/lib/pio-history-store"
 import Image from "next/image"
 
 const incidentTypes = [
+  "Road Closure",
+  "Community Event",
+  "Safety Campaign",
+  "Hiring Announcement",
+  "Grant Award",
   "Burglary",
   "Theft",
   "Robbery",
@@ -690,9 +695,9 @@ export default function NewPressReleasePage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Community Video/Footage Request</CardTitle>
+              <CardTitle>Video Request</CardTitle>
               <CardDescription>
-                Check this if you want to ask the community for security camera footage or video
+                Check this if you want to ask residents for security camera or doorbell video footage
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -703,7 +708,7 @@ export default function NewPressReleasePage() {
                   onCheckedChange={(checked) => setRequestFootage(checked as boolean)}
                 />
                 <Label htmlFor="requestFootage" className="font-medium">
-                  Request video footage from the community
+                  Request video footage from residents
                 </Label>
               </div>
               {requestFootage && (
@@ -906,7 +911,7 @@ export default function NewPressReleasePage() {
                         value={generatedCommunityRequest}
                         onChange={(e) => setGeneratedCommunityRequest(e.target.value)}
                         className="w-full min-h-[200px] whitespace-pre-wrap text-sm text-foreground font-sans leading-relaxed bg-transparent border-0 focus:outline-none focus:ring-0 resize-none"
-                        placeholder="Community footage request will appear here..."
+                        placeholder="Video request will appear here..."
                       />
                     </div>
                     <div className="flex flex-wrap gap-2 mt-3">

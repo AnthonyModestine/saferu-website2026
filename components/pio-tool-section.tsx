@@ -10,7 +10,7 @@ const features = [
   },
   {
     title: "Video Requests",
-    description: "Create clear, compliant requests for community assistance, including video and tips, aligned with platform guidelines such as Neighbors by Ring.",
+    description: "Create clear, compliant video requests for footage and tips, aligned with platform guidelines such as Neighbors by Ring.",
     icon: Zap,
   },
   {

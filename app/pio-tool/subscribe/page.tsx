@@ -19,7 +19,7 @@ const features = [
   {
     icon: Zap,
     title: "Video Requests",
-    description: "Create clear, compliant requests for community assistance, including video and tips, aligned with platform guidelines such as Neighbors by Ring.",
+    description: "Create clear, compliant video requests for footage and tips, aligned with platform guidelines such as Neighbors by Ring.",
   },
   {
     icon: Shield,
@@ -146,7 +146,7 @@ export default function SubscribePage() {
               "Facebook & X posts written and ready to copy",
               "Talking points so your spokesperson walks in prepared",
               "Branded PDF with your logo — send it the moment it's done",
-              "Community footage requests drafted and ready to post",
+              "Video requests drafted and ready to post",
               "One-click Spanish translation to reach every resident",
               "Cancel anytime — no contracts",
             ].map((feature) => (
