@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { generateCommunityRequestWithAI } from "@/lib/community-request-ai"
+import { buildCall3UserPayload } from "@/lib/pio-normalized-facts"
 import { getMemberSession } from "@/lib/member-session"
 import { getIsPaidByEmail } from "@/lib/member-access"
 import { isOnActiveTrial } from "@/lib/pio-trial"
@@ -64,21 +65,21 @@ export async function POST(request: Request) {
     const resolvedType =
       rawType === "other" ? cap(body.otherIncidentType, 100) || "other" : rawType
 
-    const payload = {
+    const userPayload = buildCall3UserPayload({
       agencyName: cap(body.agencyName, 100),
       incidentType: resolvedType,
-      otherIncidentType: body.otherIncidentType != null ? cap(body.otherIncidentType, 100) : undefined,
-      address: body.address != null ? cap(body.address, 200) : undefined,
+      location: body.address != null ? cap(body.address, 200) : undefined,
       incidentDate: body.incidentDate != null ? cap(body.incidentDate, 20) : undefined,
-      description: body.description != null ? cap(body.description, 4500) : undefined,
+      incidentSummary: body.description != null ? cap(body.description, 4500) : undefined,
       footageTimeframe: body.footageTimeframe != null ? cap(body.footageTimeframe, 200) : undefined,
       whatToLookFor: body.whatToLookFor != null ? cap(body.whatToLookFor, 500) : undefined,
-      contactDetails: body.contactDetails != null ? cap(body.contactDetails, 200) : undefined,
+      submissionMethods:
+        body.contactDetails != null ? [cap(body.contactDetails, 200)] : undefined,
       caseNumber: body.caseNumber != null ? cap(body.caseNumber, 50) : undefined,
       tipLine: body.tipLine != null ? cap(body.tipLine, 100) : undefined,
-    }
+    })
 
-    const result = await generateCommunityRequestWithAI(payload)
+    const result = await generateCommunityRequestWithAI(userPayload)
     if (!result.ok) {
       console.error("[generate-community-request] AI failed:", result.reason, result.detail ?? "")
       return NextResponse.json(aiErrorPayload(result.reason, result.detail), { status: 503 })

@@ -107,6 +107,7 @@ export default function NewPressReleasePage() {
   const [generatedTwitter, setGeneratedTwitter] = useState("")
   const [generatedTalkingPoints, setGeneratedTalkingPoints] = useState("")
   const [generatedCommunityRequest, setGeneratedCommunityRequest] = useState<string | null>(null)
+  const [includesVideoRequest, setIncludesVideoRequest] = useState(false)
   const [previewTab, setPreviewTab] = useState("press-release")
   const [copiedField, setCopiedField] = useState<string | null>(null)
   const didPrefill = useRef(false)
@@ -217,10 +218,16 @@ export default function NewPressReleasePage() {
           requestFootage: investigationOngoing || requestFootage,
           footageTimeframe: footageTimeframe.trim() || undefined,
           whatToLookFor: whatToLookFor.trim() || undefined,
+          onlineTipsUrl: onlineTipsUrl.trim() || undefined,
         }),
       })
       const data = await res.json()
       if (res.ok && data.pressRelease) {
+        const wantedVideo =
+          investigationOngoing ||
+          requestFootage ||
+          Boolean(footageTimeframe.trim() || whatToLookFor.trim())
+        setIncludesVideoRequest(wantedVideo)
         setGeneratedRelease(data.pressRelease)
         setGeneratedFacebook(data.facebook || "")
         setGeneratedFacebookSpanish("")
@@ -308,6 +315,7 @@ export default function NewPressReleasePage() {
     setGeneratedTwitter("")
     setGeneratedTalkingPoints("")
     setGeneratedCommunityRequest(null)
+    setIncludesVideoRequest(false)
     setPersons([])
     setArrests([])
     setArrestsMade(false)
@@ -324,7 +332,6 @@ export default function NewPressReleasePage() {
     setIncidentDate("")
     setIncidentTime("")
     setLocation("")
-    setPropertyDamage("")
     setTipLine("")
     setDetectiveContact("")
     setResolutionText("")
@@ -892,7 +899,7 @@ export default function NewPressReleasePage() {
                   <TabsTrigger value="facebook" className="text-xs sm:text-sm">Facebook</TabsTrigger>
                   <TabsTrigger value="twitter" className="text-xs sm:text-sm">X / Twitter</TabsTrigger>
                   <TabsTrigger value="talking-points" className="text-xs sm:text-sm">Talking Points</TabsTrigger>
-                  {generatedCommunityRequest && (
+                  {includesVideoRequest && (
                     <TabsTrigger value="community-request" className="text-xs sm:text-sm">Video Request</TabsTrigger>
                   )}
                 </TabsList>
@@ -1045,21 +1052,29 @@ export default function NewPressReleasePage() {
                 </TabsContent>
 
                 {/* Video Request */}
-                {generatedCommunityRequest && (
+                {includesVideoRequest && (
                   <TabsContent value="community-request" className="mt-4">
-                    <div className="rounded-lg border border-border bg-card p-6">
-                      <textarea
-                        value={generatedCommunityRequest}
-                        onChange={(e) => setGeneratedCommunityRequest(e.target.value)}
-                        className="w-full min-h-[200px] whitespace-pre-wrap text-sm text-foreground font-sans leading-relaxed bg-transparent border-0 focus:outline-none focus:ring-0 resize-none"
-                        placeholder="Video request will appear here..."
-                      />
-                    </div>
-                    <div className="flex flex-wrap gap-2 mt-3">
-                      <Button variant="outline" size="sm" onClick={() => handleCopyField(generatedCommunityRequest || "", "community-request")} className="bg-transparent">
-                        {copiedField === "community-request" ? <><Check className="mr-2 h-4 w-4" />Copied!</> : <><Copy className="mr-2 h-4 w-4" />Copy Video Request</>}
-                      </Button>
-                    </div>
+                    {generatedCommunityRequest ? (
+                      <>
+                        <div className="rounded-lg border border-border bg-card p-6">
+                          <textarea
+                            value={generatedCommunityRequest}
+                            onChange={(e) => setGeneratedCommunityRequest(e.target.value)}
+                            className="w-full min-h-[200px] whitespace-pre-wrap text-sm text-foreground font-sans leading-relaxed bg-transparent border-0 focus:outline-none focus:ring-0 resize-none"
+                            placeholder="Video request will appear here..."
+                          />
+                        </div>
+                        <div className="flex flex-wrap gap-2 mt-3">
+                          <Button variant="outline" size="sm" onClick={() => handleCopyField(generatedCommunityRequest || "", "community-request")} className="bg-transparent">
+                            {copiedField === "community-request" ? <><Check className="mr-2 h-4 w-4" />Copied!</> : <><Copy className="mr-2 h-4 w-4" />Copy Video Request</>}
+                          </Button>
+                        </div>
+                      </>
+                    ) : (
+                      <p className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                        Video request could not be generated. Try generating again, or use the standalone Video Request tool.
+                      </p>
+                    )}
                   </TabsContent>
                 )}
               </Tabs>

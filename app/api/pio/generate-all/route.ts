@@ -104,6 +104,7 @@ export async function POST(request: Request) {
       requestFootage: Boolean(body.requestFootage),
       footageTimeframe: body.footageTimeframe != null ? cap(body.footageTimeframe, 200) : undefined,
       whatToLookFor: body.whatToLookFor != null ? cap(body.whatToLookFor, 500) : undefined,
+      onlineTipsUrl: body.onlineTipsUrl != null ? cap(body.onlineTipsUrl, 200) : undefined,
     }
 
     const result = await generateMultiOutput(payload)

@@ -3,16 +3,17 @@
  * Used in OpenAI prompts for Press Center generation.
  */
 
-const INCIDENT_MIN = 400
-const INCIDENT_MAX = 800
+export const INCIDENT_MIN = 400
+export const INCIDENT_MAX = 800
 
-export const PRESS_RELEASE_LENGTH_RULES = `PRESS RELEASE LENGTH (pressRelease body only — exclude dateline and media contact from word count)
+export const PRESS_RELEASE_LENGTH_RULES = `PRESS RELEASE LENGTH (body only — exclude dateline and media contact from word count)
 
-Crime, fire, accident, and public-safety incident releases: 400–800 words
-Examples: burglaries, robberies, assaults, structure fires, vehicle fires, arson, major traffic crashes, hit-and-runs, arrests, missing persons, officer-involved incidents, and similar emergency incidents.
+Preferred range when sufficient facts are provided: 400–800 words for crime, fire, accident, and public-safety incident releases.
 
-Aim for the middle of the range when enough facts are provided; use the lower end only when facts are limited. Never pad with invented detail to reach word count.`
+If facts are sparse, write a shorter release that covers only what is provided. Waive the minimum word count when facts are limited — factual sufficiency and plain language matter more than hitting a length target.
 
-export function getPressReleaseLengthGuidance(): string {
-  return `Target length for pressRelease: ${INCIDENT_MIN}–${INCIDENT_MAX} words (crime, fire, accident, or public-safety incident release).`
+Never pad with invented detail to reach word count. Put the most important information first and remove unnecessary text.`
+
+export function getPressReleaseLengthGuidance(min = 400, max = 800): string {
+  return `Preferred length when enough facts are provided: ${min}–${max} words. If facts are sparse, write shorter and waive the minimum — do not invent detail to reach word count.`
 }

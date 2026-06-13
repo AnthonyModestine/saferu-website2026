@@ -1,18 +1,9 @@
 /**
- * Translate Press Center social copy to American Spanish (US).
- * Uses OPENAI_API_KEY. Does not consume generation quota.
+ * Translate Facebook post to U.S. Spanish. Does not consume generation quota.
  */
 
 import type { AiResult } from "./ai-result"
-
-const SYSTEM_PROMPT = `You translate English public safety social media posts into American Spanish (US Spanish).
-
-Rules:
-- Preserve meaning, urgency, and professional PIO tone.
-- Keep phone numbers, URLs, email addresses, case numbers, and dates exactly as written.
-- Use natural American Spanish appropriate for law enforcement community messaging.
-- Do not add new facts or embellish.
-- Return only the translated text. No explanations, labels, or markdown.`
+import { TRANSLATE_SYSTEM_PROMPT } from "./pio-prompts"
 
 export async function translateToAmericanSpanish(text: string): Promise<AiResult<string>> {
   const trimmed = text.trim()
@@ -32,14 +23,14 @@ export async function translateToAmericanSpanish(text: string): Promise<AiResult
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: SYSTEM_PROMPT },
+        { role: "system", content: TRANSLATE_SYSTEM_PROMPT },
         {
           role: "user",
-          content: `Translate this Facebook post to American Spanish:\n\n${trimmed}`,
+          content: `Translate this Facebook post to U.S. Spanish:\n\n${trimmed}`,
         },
       ],
       max_tokens: 1200,
-      temperature: 0.2,
+      temperature: 0,
     })
 
     const translated = completion.choices?.[0]?.message?.content?.trim()
