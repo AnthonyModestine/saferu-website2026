@@ -36,7 +36,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Search, MoreHorizontal, Download, Copy, FileText, Eye, Trash2 } from "lucide-react"
+import { Search, MoreHorizontal, Download, Copy, FileText, Eye, Trash2, Check } from "lucide-react"
 import Link from "next/link"
 import {
   getPioHistoryItems,
@@ -44,15 +44,44 @@ import {
   type PioHistoryItem,
 } from "@/lib/pio-history-store"
 import { useSubscription } from "@/lib/use-subscription"
+import { useAgency } from "@/lib/agency-context"
+import { copyTextToClipboard } from "@/lib/copy-to-clipboard"
+import { downloadPressReleasePDF } from "@/lib/pdf-export"
+
+function formatHistoryReleaseDate(dateStr: string): string {
+  const parsed = new Date(`${dateStr}T12:00:00`)
+  if (Number.isFinite(parsed.getTime())) {
+    return parsed.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    })
+  }
+  return new Date().toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  })
+}
+
+function extractPressReleaseBody(content: string): string {
+  const withoutContact = content.split(/\n\n(?:\*\*)?Media Contact/i)[0]?.trim() || content
+  const afterHeader = withoutContact.replace(/^[\s\S]*?For Immediate Release\n+/i, "").trim()
+  return afterHeader || withoutContact || content
+}
 
 export default function HistoryPage() {
   const { isSubscribed } = useSubscription()
+  const { settings: agencySettings } = useAgency()
   const [items, setItems] = useState<PioHistoryItem[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedItem, setSelectedItem] = useState<PioHistoryItem | null>(null)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [copyError, setCopyError] = useState<string | null>(null)
+  const [exportingId, setExportingId] = useState<string | null>(null)
 
   useEffect(() => {
     setItems(getPioHistoryItems())
@@ -70,8 +99,40 @@ export default function HistoryPage() {
     setPreviewOpen(true)
   }
 
-  const handleCopy = async (content: string) => {
-    await navigator.clipboard.writeText(content)
+  const handleCopy = async (item: PioHistoryItem) => {
+    setCopyError(null)
+    const ok = await copyTextToClipboard(item.content)
+    if (ok) {
+      setCopiedId(item.id)
+      setTimeout(() => setCopiedId(null), 2000)
+      return
+    }
+    setCopyError("Could not copy to clipboard. Try selecting the text manually.")
+    setTimeout(() => setCopyError(null), 4000)
+  }
+
+  const handleExportPDF = async (item: PioHistoryItem) => {
+    setExportingId(item.id)
+    try {
+      const isPressRelease = item.format === "Press Release"
+      await downloadPressReleasePDF({
+        agencyName: agencySettings.agencyName || "Agency Name",
+        city: agencySettings.city || "City",
+        state: agencySettings.state || "State",
+        releaseDate: formatHistoryReleaseDate(item.date),
+        content: isPressRelease ? extractPressReleaseBody(item.content) : item.content,
+        contactName: agencySettings.contactName || "Contact Name",
+        contactPhone: agencySettings.contactPhone || "Phone Number",
+        contactPhone2: agencySettings.contactPhone2 || undefined,
+        contactEmail: agencySettings.contactEmail || "email@agency.gov",
+        logoUrl: agencySettings.logoUrl || undefined,
+        boilerplate: isPressRelease ? agencySettings.boilerplate || undefined : undefined,
+        documentLabel: isPressRelease ? "PRESS RELEASE" : "VIDEO REQUEST",
+        includeContactSection: isPressRelease,
+      })
+    } finally {
+      setExportingId(null)
+    }
   }
 
   const handleDelete = (id: string) => {
@@ -109,6 +170,9 @@ export default function HistoryPage() {
         <p className="text-muted-foreground">
           View, export, and manage your press releases and video requests from the past 30 days. Items older than 30 days are automatically removed.
         </p>
+        {copyError && (
+          <p className="text-sm text-destructive mt-2">{copyError}</p>
+        )}
       </div>
 
       <Card>
@@ -167,13 +231,17 @@ export default function HistoryPage() {
                               <Eye className="mr-2 h-4 w-4" />
                               View
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleCopy(item.content)}>
-                              <Copy className="mr-2 h-4 w-4" />
-                              Copy
+                            <DropdownMenuItem onSelect={() => handleCopy(item)}>
+                              {copiedId === item.id ? (
+                                <Check className="mr-2 h-4 w-4" />
+                              ) : (
+                                <Copy className="mr-2 h-4 w-4" />
+                              )}
+                              {copiedId === item.id ? "Copied!" : "Copy"}
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => void handleExportPDF(item)}>
                               <Download className="mr-2 h-4 w-4" />
-                              Export PDF
+                              {exportingId === item.id ? "Opening print dialog..." : "Export PDF"}
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
@@ -221,14 +289,27 @@ export default function HistoryPage() {
           <div className="flex gap-2 mt-4">
             <Button
               variant="outline"
-              onClick={() => selectedItem && handleCopy(selectedItem.content)}
+              onClick={() => selectedItem && void handleCopy(selectedItem)}
             >
-              <Copy className="mr-2 h-4 w-4" />
-              Copy
+              {selectedItem && copiedId === selectedItem.id ? (
+                <>
+                  <Check className="mr-2 h-4 w-4" />
+                  Copied!
+                </>
+              ) : (
+                <>
+                  <Copy className="mr-2 h-4 w-4" />
+                  Copy
+                </>
+              )}
             </Button>
-            <Button variant="outline">
+            <Button
+              variant="outline"
+              disabled={!selectedItem || exportingId === selectedItem.id}
+              onClick={() => selectedItem && void handleExportPDF(selectedItem)}
+            >
               <Download className="mr-2 h-4 w-4" />
-              Export PDF
+              {selectedItem && exportingId === selectedItem.id ? "Opening print dialog..." : "Export PDF"}
             </Button>
           </div>
         </DialogContent>

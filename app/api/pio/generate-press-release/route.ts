@@ -6,6 +6,7 @@ import { isOnActiveTrial } from "@/lib/pio-trial"
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
 import { consumeGeneration, getGenerationStatus } from "@/lib/pio-generations"
 import { aiErrorPayload } from "@/lib/ai-result"
+import { validatePressReleaseInput } from "@/lib/pio-generate-validation"
 
 const MAX = 1000
 
@@ -46,11 +47,25 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json()
+
+    const validationError = validatePressReleaseInput({
+      incidentType: body.incidentType,
+      incidentSummary: body.incidentSummary,
+      otherIncidentType: body.otherIncidentType,
+    })
+    if (validationError) {
+      return NextResponse.json({ error: validationError }, { status: 400 })
+    }
+
+    const rawType = cap(body.incidentType, 100)
+    const resolvedType =
+      rawType === "other" ? cap(body.otherIncidentType, 100) || "other" : rawType
+
     const payload = {
-      agencyName: cap(body.agencyName, 100) || "Agency Name",
-      city: cap(body.city, 100) || "City",
-      state: cap(body.state, 50) || "State",
-      incidentType: cap(body.incidentType, 100) || "incident",
+      agencyName: cap(body.agencyName, 100),
+      city: cap(body.city, 100),
+      state: cap(body.state, 50),
+      incidentType: resolvedType,
       incidentSummary: body.incidentSummary != null ? cap(body.incidentSummary, 4500) : undefined,
       incidentDate: body.incidentDate != null ? cap(body.incidentDate, 20) : undefined,
       incidentTime: body.incidentTime != null ? cap(body.incidentTime, 20) : undefined,
@@ -71,10 +86,10 @@ export async function POST(request: Request) {
       detectiveContact: body.detectiveContact != null ? cap(body.detectiveContact, 200) : undefined,
       resolutionText: body.resolutionText != null ? cap(body.resolutionText, 500) : undefined,
       boilerplate: body.boilerplate != null ? cap(body.boilerplate, 1000) : undefined,
-      contactName: cap(body.contactName, 100) || "Contact Name",
-      contactPhone: cap(body.contactPhone, 30) || "Phone Number",
+      contactName: cap(body.contactName, 100),
+      contactPhone: cap(body.contactPhone, 30),
       contactPhone2: body.contactPhone2 != null ? cap(body.contactPhone2, 30) || undefined : undefined,
-      contactEmail: cap(body.contactEmail, 100) || "email@agency.gov",
+      contactEmail: cap(body.contactEmail, 100),
     }
 
     const result = await generatePressReleaseWithAI(payload)

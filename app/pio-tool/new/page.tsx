@@ -26,6 +26,7 @@ import {
   FileText,
   Search,
   CheckCircle,
+  Languages,
 } from "lucide-react"
 import { useAgency } from "@/lib/agency-context"
 import { track } from "@/lib/track"
@@ -36,6 +37,7 @@ import { addPioHistoryItem } from "@/lib/pio-history-store"
 import Image from "next/image"
 
 import { PIO_INCIDENT_TYPES, incidentTypeToValue } from "@/lib/pio-incident-types"
+import { validatePressReleaseInput } from "@/lib/pio-generate-validation"
 
 const incidentTypes = PIO_INCIDENT_TYPES
 
@@ -98,6 +100,10 @@ export default function NewPressReleasePage() {
 
   const [generatedRelease, setGeneratedRelease] = useState("")
   const [generatedFacebook, setGeneratedFacebook] = useState("")
+  const [generatedFacebookSpanish, setGeneratedFacebookSpanish] = useState("")
+  const [facebookLangView, setFacebookLangView] = useState<"en" | "es">("en")
+  const [translatingFacebook, setTranslatingFacebook] = useState(false)
+  const [translateError, setTranslateError] = useState<string | null>(null)
   const [generatedTwitter, setGeneratedTwitter] = useState("")
   const [generatedTalkingPoints, setGeneratedTalkingPoints] = useState("")
   const [generatedCommunityRequest, setGeneratedCommunityRequest] = useState<string | null>(null)
@@ -170,23 +176,29 @@ export default function NewPressReleasePage() {
   const handleGenerate = async () => {
     setGenerating(true)
     setGenerateError(null)
-    const displayAgency = agencyName || "Agency Name"
-    const displayCity = city || "City Name"
-    const displayState = state || "State"
-    const displayContact = contactName || "Contact Name"
-    const displayPhone = contactPhone || "Phone Number"
-    const displayEmail = contactEmail || "Email Address"
+
+    const validationError = validatePressReleaseInput({
+      incidentType,
+      incidentSummary,
+      otherIncidentType,
+    })
+    if (validationError) {
+      setGenerateError(validationError)
+      setGenerating(false)
+      return
+    }
 
     try {
       const res = await fetch("/api/pio/generate-all", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          agencyName: displayAgency,
-          city: displayCity,
-          state: displayState,
-          incidentType: incidentType === "other" ? otherIncidentType.trim() || "incident" : incidentType || "incident",
-          incidentSummary: incidentSummary.trim() || undefined,
+          agencyName: agencyName.trim(),
+          city: city.trim(),
+          state: state.trim(),
+          incidentType: incidentType === "other" ? "other" : incidentType,
+          otherIncidentType: incidentType === "other" ? otherIncidentType.trim() : undefined,
+          incidentSummary: incidentSummary.trim(),
           incidentDate: incidentDate || undefined,
           incidentTime: incidentTime || undefined,
           location: location.trim() || undefined,
@@ -198,10 +210,10 @@ export default function NewPressReleasePage() {
           detectiveContact: detectiveContact.trim() || undefined,
           resolutionText: resolutionText.trim() || undefined,
           boilerplate: agencySettings.boilerplate?.trim() || undefined,
-          contactName: displayContact,
-          contactPhone: displayPhone,
+          contactName: contactName.trim(),
+          contactPhone: contactPhone.trim(),
           contactPhone2: contactPhone2?.trim() || undefined,
-          contactEmail: displayEmail,
+          contactEmail: contactEmail.trim(),
           requestFootage: investigationOngoing || requestFootage,
           footageTimeframe: footageTimeframe.trim() || undefined,
           whatToLookFor: whatToLookFor.trim() || undefined,
@@ -211,6 +223,9 @@ export default function NewPressReleasePage() {
       if (res.ok && data.pressRelease) {
         setGeneratedRelease(data.pressRelease)
         setGeneratedFacebook(data.facebook || "")
+        setGeneratedFacebookSpanish("")
+        setFacebookLangView("en")
+        setTranslateError(null)
         setGeneratedTwitter(data.twitter || "")
         setGeneratedTalkingPoints(data.talkingPoints || "")
         setGeneratedCommunityRequest(data.communityRequest || null)
@@ -251,6 +266,32 @@ export default function NewPressReleasePage() {
     setTimeout(() => setCopiedField(null), 2000)
   }
 
+  const handleTranslateFacebook = async () => {
+    const source = generatedFacebook.trim()
+    if (!source) return
+
+    setTranslatingFacebook(true)
+    setTranslateError(null)
+    try {
+      const res = await fetch("/api/pio/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: source }),
+      })
+      const data = await res.json()
+      if (res.ok && data.translation) {
+        setGeneratedFacebookSpanish(data.translation)
+        setFacebookLangView("es")
+        return
+      }
+      setTranslateError(data?.error || "Translation failed. Please try again.")
+    } catch {
+      setTranslateError("Could not reach the server. Check your connection and try again.")
+    } finally {
+      setTranslatingFacebook(false)
+    }
+  }
+
   const handleCopy = async () => {
     await navigator.clipboard.writeText(generatedRelease)
     setCopied(true)
@@ -261,6 +302,9 @@ export default function NewPressReleasePage() {
     setGenerated(false)
     setGeneratedRelease("")
     setGeneratedFacebook("")
+    setGeneratedFacebookSpanish("")
+    setFacebookLangView("en")
+    setTranslateError(null)
     setGeneratedTwitter("")
     setGeneratedTalkingPoints("")
     setGeneratedCommunityRequest(null)
@@ -638,7 +682,7 @@ export default function NewPressReleasePage() {
                   }}
                   className={`cursor-pointer rounded-xl border-2 p-5 transition-all ${
                     !investigationOngoing
-                      ? "border-green-600 bg-green-50 ring-2 ring-green-600/20"
+                      ? "border-green-600 bg-green-50/80 ring-2 ring-green-600/20"
                       : "border-border hover:border-muted-foreground/50"
                   }`}
                 >
@@ -724,7 +768,7 @@ export default function NewPressReleasePage() {
 
               {/* Resolved Details */}
               {!investigationOngoing && (
-                <div className="space-y-4 rounded-xl border border-green-600/30 bg-green-50 p-5">
+                <div className="space-y-4 rounded-xl border border-border bg-card p-5 shadow-sm">
                   <p className="font-medium text-foreground">How was this case resolved?</p>
                   <Textarea
                     placeholder="Describe the resolution (e.g. arrest made, suspect in custody, property recovered, charges filed, etc.)"
@@ -744,7 +788,7 @@ export default function NewPressReleasePage() {
                     </Label>
                   </div>
                   {requestFootage && (
-                    <div className="space-y-4 rounded-xl border border-blue-500/30 bg-blue-50 p-5">
+                    <div className="space-y-4 rounded-xl border border-blue-500/40 bg-blue-50/80 p-5">
                       <div className="space-y-2">
                         <Label>Timeframe for footage</Label>
                         <Input
@@ -888,16 +932,79 @@ export default function NewPressReleasePage() {
                 {/* Facebook */}
                 <TabsContent value="facebook" className="mt-4">
                   <div className="rounded-lg border border-border bg-card p-6">
+                    {generatedFacebookSpanish && (
+                      <div className="flex gap-2 mb-3">
+                        <Button
+                          type="button"
+                          variant={facebookLangView === "en" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setFacebookLangView("en")}
+                        >
+                          English
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={facebookLangView === "es" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setFacebookLangView("es")}
+                        >
+                          Español
+                        </Button>
+                      </div>
+                    )}
                     <textarea
-                      value={generatedFacebook}
-                      onChange={(e) => setGeneratedFacebook(e.target.value)}
+                      value={facebookLangView === "es" && generatedFacebookSpanish ? generatedFacebookSpanish : generatedFacebook}
+                      onChange={(e) => {
+                        if (facebookLangView === "es" && generatedFacebookSpanish) {
+                          setGeneratedFacebookSpanish(e.target.value)
+                        } else {
+                          setGeneratedFacebook(e.target.value)
+                          setGeneratedFacebookSpanish("")
+                        }
+                      }}
                       className="w-full min-h-[200px] whitespace-pre-wrap text-sm text-foreground font-sans leading-relaxed bg-transparent border-0 focus:outline-none focus:ring-0 resize-none"
                       placeholder="Facebook post will appear here..."
                     />
                   </div>
+                  {translateError && (
+                    <p className="text-sm text-destructive mt-2">{translateError}</p>
+                  )}
                   <div className="flex flex-wrap gap-2 mt-3">
-                    <Button variant="outline" size="sm" onClick={() => handleCopyField(generatedFacebook, "facebook")} className="bg-transparent">
-                      {copiedField === "facebook" ? <><Check className="mr-2 h-4 w-4" />Copied!</> : <><Copy className="mr-2 h-4 w-4" />Copy Facebook Post</>}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        handleCopyField(
+                          facebookLangView === "es" && generatedFacebookSpanish
+                            ? generatedFacebookSpanish
+                            : generatedFacebook,
+                          facebookLangView === "es" ? "facebook-es" : "facebook"
+                        )
+                      }
+                      className="bg-transparent"
+                    >
+                      {(copiedField === "facebook" && facebookLangView === "en") ||
+                      (copiedField === "facebook-es" && facebookLangView === "es") ? (
+                        <><Check className="mr-2 h-4 w-4" />Copied!</>
+                      ) : (
+                        <><Copy className="mr-2 h-4 w-4" />Copy Facebook Post</>
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void handleTranslateFacebook()}
+                      disabled={!generatedFacebook.trim() || translatingFacebook}
+                      className="bg-transparent"
+                    >
+                      {translatingFacebook ? (
+                        <>Translating...</>
+                      ) : (
+                        <>
+                          <Languages className="mr-2 h-4 w-4" />
+                          Translate to Spanish
+                        </>
+                      )}
                     </Button>
                   </div>
                 </TabsContent>

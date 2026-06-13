@@ -34,7 +34,14 @@ function buildUserMessage(p: CommunityRequestPayload): string {
   return lines.join("\n")
 }
 
-const SYSTEM_PROMPT = `You are a public information officer writing a short video request for an active investigation. Use ONLY the facts provided. Do not invent any details, names, or exact addresses. Use clear, professional language. Keep it concise (a few short paragraphs). Include: (1) a clear headline that the agency is requesting video footage related to the incident, (2) what happened and the general area (never exact address), (3) what footage or information you need and the timeframe, (4) how to submit (contact info, case number if provided, tip line if provided), (5) a brief safety line (e.g. do not approach suspects; call 911 if you see something). Do not use markdown or asterisks. No victim names or private information.`
+const SYSTEM_PROMPT = `You are a public information officer writing a short video request for an active investigation.
+
+CRITICAL — FACTS ONLY:
+- Use ONLY the facts provided. Do NOT invent any details, names, exact addresses, suspects, vehicles, or circumstances.
+- If facts are limited, write a shorter request that states only what is provided.
+- Never fill gaps with plausible-sounding fiction.
+
+Use clear, professional language. Keep it concise (a few short paragraphs). Include: (1) a clear headline that the agency is requesting video footage related to the incident, (2) what happened and the general area (never exact address), (3) what footage or information you need and the timeframe, (4) how to submit (contact info, case number if provided, tip line if provided), (5) a brief safety line (e.g. do not approach suspects; call 911 if you see something). Do not use markdown or asterisks. No victim names or private information.`
 
 export async function generateCommunityRequestWithAI(payload: CommunityRequestPayload): Promise<AiResult<string>> {
   const apiKey = process.env.OPENAI_API_KEY?.trim()

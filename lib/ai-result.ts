@@ -3,6 +3,7 @@ export type AiFailureReason =
   | "openai_error"
   | "empty_response"
   | "invalid_json"
+  | "empty_input"
 
 export type AiResult<T> =
   | { ok: true; data: T }
@@ -14,6 +15,9 @@ export function aiErrorMessage(reason: AiFailureReason): string {
   }
   if (reason === "openai_error") {
     return "OpenAI returned an error. Check your API key, billing, and rate limits in the OpenAI dashboard, then try again."
+  }
+  if (reason === "empty_input") {
+    return "Nothing to translate."
   }
   if (reason === "invalid_json" || reason === "empty_response") {
     return "Drafting returned an incomplete response. Please try again."

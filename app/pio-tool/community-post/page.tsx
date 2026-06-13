@@ -26,6 +26,7 @@ import { addPioHistoryItem } from "@/lib/pio-history-store"
 import { PIOPreviewGate } from "@/components/pio-preview-gate"
 import { GenerationLimitModal } from "@/components/generation-limit-modal"
 import { track } from "@/lib/track"
+import { validateVideoRequestInput } from "@/lib/pio-generate-validation"
 
 const incidentTypes = [
   "Burglary",
@@ -100,17 +101,31 @@ export default function CommunityPostPage() {
   const handleGenerate = async () => {
     setGenerating(true)
     setGenerateError(null)
-    const displayAgency = agencyName || "Agency Name"
-    const displayIncident = incidentType === "other" ? otherIncidentType : incidentType || "incident"
+
+    const validationError = validateVideoRequestInput({
+      incidentType,
+      otherIncidentType,
+      description,
+      whatToLookFor,
+      footageTimeframe,
+      address,
+    })
+    if (validationError) {
+      setGenerateError(validationError)
+      setGenerating(false)
+      return
+    }
+
+    const displayIncident = incidentType === "other" ? otherIncidentType : incidentType
 
     try {
       const res = await fetch("/api/pio/generate-community-request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          agencyName: displayAgency,
-          incidentType: incidentType || "incident",
-          otherIncidentType: otherIncidentType?.trim() || undefined,
+          agencyName: agencyName.trim(),
+          incidentType: incidentType === "other" ? "other" : incidentType,
+          otherIncidentType: incidentType === "other" ? otherIncidentType.trim() : undefined,
           address: address?.trim() || undefined,
           incidentDate: incidentDate || undefined,
           description: description?.trim() || undefined,

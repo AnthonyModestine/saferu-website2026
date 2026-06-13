@@ -13,6 +13,8 @@ interface PressReleaseData {
   contactEmail: string
   logoUrl?: string
   boilerplate?: string
+  documentLabel?: string
+  includeContactSection?: boolean
 }
 
 export async function generatePressReleasePDF(data: PressReleaseData): Promise<void> {
@@ -32,7 +34,7 @@ export async function generatePressReleasePDF(data: PressReleaseData): Promise<v
   const headerRight = data.logoUrl ? `<div class="header-logo">${logoHtml}</div>` : '<div class="header-logo"></div>'
   const headerCenter = `
     <h1 class="agency-name">${data.agencyName}</h1>
-    <div class="release-type">PRESS RELEASE</div>
+    <div class="release-type">${data.documentLabel || "PRESS RELEASE"}</div>
     <div class="release-info">
       ${data.caseNumber ? `Case #: ${data.caseNumber}<br>` : ''}
       FOR IMMEDIATE RELEASE
@@ -194,6 +196,7 @@ export async function generatePressReleasePDF(data: PressReleaseData): Promise<v
     ${data.content.split('\n').filter(p => p.trim()).map(p => `<p>${p}</p>`).join('')}
   </div>
   
+  ${data.includeContactSection !== false ? `
   <div class="contact-section">
     <div class="contact-title">Media Contact:</div>
     <div class="contact-info">
@@ -203,6 +206,7 @@ export async function generatePressReleasePDF(data: PressReleaseData): Promise<v
       Email: ${data.contactEmail}
     </div>
   </div>
+  ` : ""}
   
   <div class="end-marker">###</div>
   

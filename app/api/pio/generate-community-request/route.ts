@@ -6,6 +6,7 @@ import { isOnActiveTrial } from "@/lib/pio-trial"
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
 import { consumeGeneration, getGenerationStatus } from "@/lib/pio-generations"
 import { aiErrorPayload } from "@/lib/ai-result"
+import { validateVideoRequestInput } from "@/lib/pio-generate-validation"
 
 const MAX = 1000
 
@@ -46,9 +47,26 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json()
+
+    const validationError = validateVideoRequestInput({
+      incidentType: body.incidentType,
+      otherIncidentType: body.otherIncidentType,
+      description: body.description,
+      whatToLookFor: body.whatToLookFor,
+      footageTimeframe: body.footageTimeframe,
+      address: body.address,
+    })
+    if (validationError) {
+      return NextResponse.json({ error: validationError }, { status: 400 })
+    }
+
+    const rawType = cap(body.incidentType, 100)
+    const resolvedType =
+      rawType === "other" ? cap(body.otherIncidentType, 100) || "other" : rawType
+
     const payload = {
-      agencyName: cap(body.agencyName, 100) || "Agency Name",
-      incidentType: cap(body.incidentType, 100) || "incident",
+      agencyName: cap(body.agencyName, 100),
+      incidentType: resolvedType,
       otherIncidentType: body.otherIncidentType != null ? cap(body.otherIncidentType, 100) : undefined,
       address: body.address != null ? cap(body.address, 200) : undefined,
       incidentDate: body.incidentDate != null ? cap(body.incidentDate, 20) : undefined,

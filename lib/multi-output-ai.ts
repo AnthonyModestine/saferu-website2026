@@ -70,7 +70,7 @@ function buildFactsBlock(p: PressReleasePayload & { requestFootage?: boolean; fo
 
 const ANCILLARY_SYSTEM_PROMPT = `You are SaferU, a law enforcement and public safety communications assistant.
 
-Generate supplementary outputs for an incident that already has an approved press release. Use ONLY the facts provided. Do not invent details.
+Generate supplementary outputs for an incident that already has an approved press release. Use ONLY the facts provided. Do NOT invent any details, names, locations, suspects, or circumstances. If facts are sparse, keep each output brief and factual — never pad with fiction.
 
 Suspect description rule: if race is mentioned, include at least two additional descriptors (clothing, height, vehicle, etc.). Never use race alone.
 
