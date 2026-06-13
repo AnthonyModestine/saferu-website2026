@@ -11,6 +11,7 @@ import {
   PRESS_RELEASE_LENGTH_RULES,
   getPressReleaseLengthGuidance,
 } from "./press-release-length"
+import type { AiResult } from "./ai-result"
 
 export interface PressReleasePayload {
   agencyName: string
@@ -67,27 +68,27 @@ function buildUserMessage(p: PressReleasePayload): string {
   return lines.join("\n")
 }
 
-const SYSTEM_PROMPT = `You are a professional public information officer (PIO) writing an official press release for a law enforcement or public safety agency. Use ONLY the facts provided. Do not invent any details, names, addresses, or circumstances. Use neutral, formal language. Avoid speculation, opinions, or emotional language. For minors, never include the name; use "a juvenile" or "a minor" as appropriate. Use "alleged" only for unconfirmed actions. Format the release as plain text with a clear dateline (CITY, STATE – Date – For Immediate Release), body paragraphs, and end with a Media Contact section listing the contact name, agency, phone, and email. Do not use markdown or asterisks for bold.
+const SYSTEM_PROMPT = `You are a professional public information officer (PIO) writing an official press release about a crime, fire, traffic accident, or other public-safety emergency for a law enforcement or public safety agency. Use ONLY the facts provided. Do not invent any details, names, addresses, or circumstances. Use neutral, formal language. Avoid speculation, opinions, or emotional language. For minors, never include the name; use "a juvenile" or "a minor" as appropriate. Use "alleged" only for unconfirmed actions. Format the release as plain text with a clear dateline (CITY, STATE – Date – For Immediate Release), body paragraphs, and end with a Media Contact section listing the contact name, agency, phone, and email. Do not use markdown or asterisks for bold.
 
 ${PRESS_RELEASE_LENGTH_RULES}
 
 Match the word-count target specified in the user message. Never pad with invented detail to reach word count.`
 
-export async function generatePressReleaseWithAI(payload: PressReleasePayload): Promise<string | null> {
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) return null
+export async function generatePressReleaseWithAI(payload: PressReleasePayload): Promise<AiResult<string>> {
+  const apiKey = process.env.OPENAI_API_KEY?.trim()
+  if (!apiKey) {
+    console.error("[press-release-ai] OPENAI_API_KEY is not set")
+    return { ok: false, reason: "missing_api_key" }
+  }
 
   try {
     const { default: OpenAI } = await import("openai")
     const openai = new OpenAI({ apiKey })
 
     const userContent = buildUserMessage(payload)
-    const lengthGuidance = getPressReleaseLengthGuidance(
-      payload.incidentType,
-      payload.arrests.length > 0
-    )
+    const lengthGuidance = getPressReleaseLengthGuidance()
     const dateStr = payload.incidentDate
-      ? new Date(payload.incidentDate + (payload.incidentTime ? `T${payload.incidentTime}` : "")).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" })
+      ? new Date(payload.incidentDate + (payload.incidentTime ? `T${payload.incidentTime}` : "")).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
       : new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
 
     const completion = await openai.chat.completions.create({
@@ -99,14 +100,18 @@ export async function generatePressReleaseWithAI(payload: PressReleasePayload): 
           content: `Write a press release using only these facts.\n\n${lengthGuidance}\n\nRelease date for the dateline: ${dateStr}. Contact: ${payload.contactName}, ${payload.agencyName}, Phone: ${payload.contactPhone}${payload.contactPhone2 ? `, Secondary: ${payload.contactPhone2}` : ""}, Email: ${payload.contactEmail}. ${payload.boilerplate ? `Include this standard closing paragraph after the body: ${payload.boilerplate}` : ""}\n\nFacts:\n${userContent}`,
         },
       ],
-      max_tokens: 2000,
+      max_tokens: 3500,
       temperature: 0.3,
     })
 
     const text = completion.choices?.[0]?.message?.content?.trim()
-    return text || null
+    if (!text) {
+      return { ok: false, reason: "empty_response" }
+    }
+    return { ok: true, data: text }
   } catch (err) {
-    console.error("[press-release-ai] OpenAI error:", err)
-    return null
+    const detail = err instanceof Error ? err.message : String(err)
+    console.error("[press-release-ai] OpenAI error:", detail)
+    return { ok: false, reason: "openai_error", detail }
   }
 }

@@ -4,7 +4,8 @@ import { getMemberSession } from "@/lib/member-session"
 import { getIsPaidByEmail } from "@/lib/member-access"
 import { isOnActiveTrial } from "@/lib/pio-trial"
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
-import { consumeGeneration } from "@/lib/pio-generations"
+import { consumeGeneration, getGenerationStatus } from "@/lib/pio-generations"
+import { aiErrorPayload } from "@/lib/ai-result"
 
 const MAX = 1000
 
@@ -35,8 +36,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Too many requests." }, { status: 429 })
   }
 
-  const allowed = await consumeGeneration(session.email)
-  if (!allowed) {
+  const status = await getGenerationStatus(session.email)
+  if (status.remaining === 0) {
     return NextResponse.json(
       { error: "You have used all your generations for this month. Purchase a generation pack to continue." },
       { status: 403 }
@@ -76,14 +77,21 @@ export async function POST(request: Request) {
       contactEmail: cap(body.contactEmail, 100) || "email@agency.gov",
     }
 
-    const content = await generatePressReleaseWithAI(payload)
-    if (!content) {
+    const result = await generatePressReleaseWithAI(payload)
+    if (!result.ok) {
+      console.error("[generate-press-release] AI failed:", result.reason, result.detail ?? "")
+      return NextResponse.json(aiErrorPayload(result.reason, result.detail), { status: 503 })
+    }
+
+    const consumed = await consumeGeneration(session.email)
+    if (!consumed) {
       return NextResponse.json(
-        { error: "Drafting is temporarily unavailable. Please try again in a few minutes." },
-        { status: 503 }
+        { error: "You have used all your generations for this month. Purchase a generation pack to continue." },
+        { status: 403 }
       )
     }
-    return NextResponse.json({ content })
+
+    return NextResponse.json({ content: result.data })
   } catch (e) {
     console.error("Generate press release error:", e)
     return NextResponse.json({ error: "Failed to generate press release." }, { status: 500 })

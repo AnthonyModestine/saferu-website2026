@@ -72,8 +72,8 @@ export default function PIODashboardPage() {
             </p>
             <p className="text-sm text-muted-foreground mt-0.5">
               {member
-                ? "You're signed in with a free account. Subscribe to unlock press release and video request drafting."
-                : "$30/month. Confident communication for public safety — draft press releases and video requests in minutes without compromising oversight."}
+                ? "You're signed in with a free account. Subscribe to unlock press release and video request drafting for crimes, fires, and accidents."
+                : "$30/month. Draft press releases and video requests for crimes, fires, accidents, and public-safety incidents — without compromising oversight."}
             </p>
           </div>
           <Button asChild className="shrink-0 bg-[#f2b233] text-[#1a365d] hover:bg-[#f2b233]/90 font-semibold">
@@ -88,7 +88,7 @@ export default function PIODashboardPage() {
       <div>
         <h1 className="text-2xl font-bold text-[#1a365d]">Press Center</h1>
         <p className="text-muted-foreground mt-1">
-          Confident communication for public safety. Draft press releases and video requests with guided drafting.
+          Draft messaging for crimes, fires, traffic accidents, and public-safety incidents — press releases, social posts, and video requests.
         </p>
       </div>
 
@@ -186,7 +186,7 @@ export default function PIODashboardPage() {
               </div>
               <div className="flex-1">
                 <p className="font-semibold text-foreground">New Video Request</p>
-                <p className="text-sm text-muted-foreground">Alerts and footage requests for social media and community platforms</p>
+                <p className="text-sm text-muted-foreground">Footage requests for active investigations</p>
               </div>
               <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-[#4a9d6b] transition-colors" />
             </Link>
@@ -215,7 +215,7 @@ export default function PIODashboardPage() {
               </div>
               <h2 className="font-semibold text-foreground">Video Request</h2>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Clear social posts requesting community video or tips—built to follow Neighbors by Ring Community Guidelines when you publish on that platform.
+                Request security camera or doorbell footage that may help investigators — formatted for social media, Neighbors by Ring, and your usual channels.
               </p>
             </CardContent>
           </Card>
@@ -232,7 +232,7 @@ export default function PIODashboardPage() {
             </div>
             <h3 className="font-semibold text-[#1a365d]">1. Pick Your Format</h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Choose a formal press release for media or a video request for social media and community platforms.
+              Choose a formal press release for media or a video request to solicit footage for an active investigation.
             </p>
           </div>
           <div className="space-y-3">

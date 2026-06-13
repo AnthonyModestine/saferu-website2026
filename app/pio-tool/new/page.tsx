@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -35,28 +35,9 @@ import { downloadPressReleasePDF } from "@/lib/pdf-export"
 import { addPioHistoryItem } from "@/lib/pio-history-store"
 import Image from "next/image"
 
-const incidentTypes = [
-  "Road Closure",
-  "Community Event",
-  "Safety Campaign",
-  "Hiring Announcement",
-  "Grant Award",
-  "Burglary",
-  "Theft",
-  "Robbery",
-  "Assault",
-  "Fire",
-  "Structure Fire",
-  "Traffic Incident",
-  "Vehicle Accident",
-  "Officer-Involved Shooting",
-  "Drug Seizure",
-  "Missing Person",
-  "Vandalism",
-  "Domestic Dispute",
-  "Suspicious Activity",
-  "Other",
-]
+import { PIO_INCIDENT_TYPES, incidentTypeToValue } from "@/lib/pio-incident-types"
+
+const incidentTypes = PIO_INCIDENT_TYPES
 
 interface PersonEntry {
   id: string
@@ -94,6 +75,11 @@ export default function NewPressReleasePage() {
   const [contactPhone, setContactPhone] = useState("")
   const [contactPhone2, setContactPhone2] = useState("")
   const [contactEmail, setContactEmail] = useState("")
+  const [releaseDate, setReleaseDate] = useState("")
+  const [caseNumber, setCaseNumber] = useState("")
+  const [otherIncidentType, setOtherIncidentType] = useState("")
+  const [mutualAid, setMutualAid] = useState("")
+  const [onlineTipsUrl, setOnlineTipsUrl] = useState("")
   
   const [persons, setPersons] = useState<PersonEntry[]>([])
   const [arrests, setArrests] = useState<ArrestEntry[]>([])
@@ -102,7 +88,6 @@ export default function NewPressReleasePage() {
   const [incidentDate, setIncidentDate] = useState("")
   const [incidentTime, setIncidentTime] = useState("")
   const [location, setLocation] = useState("")
-  const [propertyDamage, setPropertyDamage] = useState("")
   const [tipLine, setTipLine] = useState("")
   const [detectiveContact, setDetectiveContact] = useState("")
   const [resolutionText, setResolutionText] = useState("")
@@ -118,16 +103,27 @@ export default function NewPressReleasePage() {
   const [generatedCommunityRequest, setGeneratedCommunityRequest] = useState<string | null>(null)
   const [previewTab, setPreviewTab] = useState("press-release")
   const [copiedField, setCopiedField] = useState<string | null>(null)
+  const didPrefill = useRef(false)
 
-  // Pre-fill from agency settings
+  // Pre-fill empty fields once from agency settings (never overwrite user input).
   useEffect(() => {
-    if (agencySettings.agencyName && !agencyName) setAgencyName(agencySettings.agencyName)
-    if (agencySettings.city && !city) setCity(agencySettings.city)
-    if (agencySettings.state && !state) setState(agencySettings.state)
-    if (agencySettings.contactName && !contactName) setContactName(agencySettings.contactName)
-    if (agencySettings.contactPhone && !contactPhone) setContactPhone(agencySettings.contactPhone)
-    if (agencySettings.contactPhone2 && !contactPhone2) setContactPhone2(agencySettings.contactPhone2)
-    if (agencySettings.contactEmail && !contactEmail) setContactEmail(agencySettings.contactEmail)
+    if (didPrefill.current) return
+    const hasStored =
+      agencySettings.agencyName ||
+      agencySettings.city ||
+      agencySettings.state ||
+      agencySettings.contactName ||
+      agencySettings.contactPhone ||
+      agencySettings.contactEmail
+    if (!hasStored) return
+    didPrefill.current = true
+    setAgencyName((prev) => prev || agencySettings.agencyName)
+    setCity((prev) => prev || agencySettings.city)
+    setState((prev) => prev || agencySettings.state)
+    setContactName((prev) => prev || agencySettings.contactName)
+    setContactPhone((prev) => prev || agencySettings.contactPhone)
+    setContactPhone2((prev) => prev || agencySettings.contactPhone2)
+    setContactEmail((prev) => prev || agencySettings.contactEmail)
   }, [agencySettings])
 
   const handleEntryTypeChange = (value: string) => {
@@ -189,7 +185,7 @@ export default function NewPressReleasePage() {
           agencyName: displayAgency,
           city: displayCity,
           state: displayState,
-          incidentType: incidentType || "incident",
+          incidentType: incidentType === "other" ? otherIncidentType.trim() || "incident" : incidentType || "incident",
           incidentSummary: incidentSummary.trim() || undefined,
           incidentDate: incidentDate || undefined,
           incidentTime: incidentTime || undefined,
@@ -198,7 +194,6 @@ export default function NewPressReleasePage() {
           persons: persons.map((p) => ({ name: p.name, isMinor: p.isMinor, description: p.description })),
           entryType,
           arrests: arrests.map((a) => ({ name: a.name, details: a.details })),
-          propertyDamage: propertyDamage.trim() || undefined,
           tipLine: tipLine.trim() || undefined,
           detectiveContact: detectiveContact.trim() || undefined,
           resolutionText: resolutionText.trim() || undefined,
@@ -207,7 +202,7 @@ export default function NewPressReleasePage() {
           contactPhone: displayPhone,
           contactPhone2: contactPhone2?.trim() || undefined,
           contactEmail: displayEmail,
-          requestFootage,
+          requestFootage: investigationOngoing || requestFootage,
           footageTimeframe: footageTimeframe.trim() || undefined,
           whatToLookFor: whatToLookFor.trim() || undefined,
         }),
@@ -275,6 +270,11 @@ export default function NewPressReleasePage() {
     setRequestAssistance(false)
     setInvestigationOngoing(false)
     setIncidentType("")
+    setOtherIncidentType("")
+    setReleaseDate("")
+    setCaseNumber("")
+    setMutualAid("")
+    setOnlineTipsUrl("")
     setEntryType("none")
     setIncidentSummary("")
     setIncidentDate("")
@@ -341,7 +341,7 @@ export default function NewPressReleasePage() {
         </TabsList>
 
         {/* Header Fields */}
-        <TabsContent value="header" className="space-y-4 mt-4">
+        <TabsContent value="header" forceMount className="space-y-4 mt-4 data-[state=inactive]:hidden">
           <Card>
             <CardHeader>
               <CardTitle>Header Information</CardTitle>
@@ -385,11 +385,22 @@ export default function NewPressReleasePage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="releaseDate">Release Date</Label>
-                  <Input id="releaseDate" type="date" />
+                  <Input
+                    id="releaseDate"
+                    type="date"
+                    value={releaseDate}
+                    onChange={(e) => setReleaseDate(e.target.value)}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="caseNumber">Case Number</Label>
-                  <Input id="caseNumber" placeholder="Case Number" className="placeholder:text-muted-foreground/60" />
+                  <Input
+                    id="caseNumber"
+                    placeholder="Case Number"
+                    className="placeholder:text-muted-foreground/60"
+                    value={caseNumber}
+                    onChange={(e) => setCaseNumber(e.target.value)}
+                  />
                 </div>
               </div>
             </CardContent>
@@ -397,7 +408,7 @@ export default function NewPressReleasePage() {
         </TabsContent>
 
         {/* Incident Basics */}
-        <TabsContent value="incident" className="space-y-4 mt-4">
+        <TabsContent value="incident" forceMount className="space-y-4 mt-4 data-[state=inactive]:hidden">
           <Card>
             <CardHeader>
               <CardTitle>Incident Basics</CardTitle>
@@ -414,7 +425,7 @@ export default function NewPressReleasePage() {
                   </SelectTrigger>
                   <SelectContent>
                     {incidentTypes.map((type) => (
-                      <SelectItem key={type} value={type.toLowerCase()}>
+                      <SelectItem key={type} value={incidentTypeToValue(type)}>
                         {type}
                       </SelectItem>
                     ))}
@@ -424,7 +435,13 @@ export default function NewPressReleasePage() {
               {incidentType === "other" && (
                 <div className="space-y-2">
                   <Label htmlFor="otherType">Specify Incident Type</Label>
-                  <Input id="otherType" placeholder="Describe the incident type" className="placeholder:text-muted-foreground/60" />
+                  <Input
+                    id="otherType"
+                    placeholder="Describe the incident type"
+                    className="placeholder:text-muted-foreground/60"
+                    value={otherIncidentType}
+                    onChange={(e) => setOtherIncidentType(e.target.value)}
+                  />
                 </div>
               )}
               <div className="grid gap-4 sm:grid-cols-2">
@@ -479,7 +496,7 @@ export default function NewPressReleasePage() {
         </TabsContent>
 
         {/* Details Section */}
-        <TabsContent value="details" className="space-y-4 mt-4">
+        <TabsContent value="details" forceMount className="space-y-4 mt-4 data-[state=inactive]:hidden">
           <Card>
             <CardHeader>
               <CardTitle>People Involved</CardTitle>
@@ -572,35 +589,28 @@ export default function NewPressReleasePage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Property & Damage</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Textarea
-                placeholder="Describe stolen items, damage, injuries, or other facts..."
-                rows={3}
-                className="placeholder:text-muted-foreground/60"
-                value={propertyDamage}
-                onChange={(e) => setPropertyDamage(e.target.value)}
-              />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
               <CardTitle>Response & Status</CardTitle>
               <CardDescription>Select the current case status</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-2">
                 <Label>Mutual Aid / Additional Agencies (optional)</Label>
-                <Input placeholder="List any assisting agencies..." className="placeholder:text-muted-foreground/60" />
+                <Input
+                  placeholder="List any assisting agencies..."
+                  className="placeholder:text-muted-foreground/60"
+                  value={mutualAid}
+                  onChange={(e) => setMutualAid(e.target.value)}
+                />
               </div>
 
               {/* Status Cards */}
               <div className="grid gap-4 sm:grid-cols-2">
                 {/* Ongoing Card */}
                 <div
-                  onClick={() => setInvestigationOngoing(true)}
+                  onClick={() => {
+                    setInvestigationOngoing(true)
+                    setRequestFootage(true)
+                  }}
                   className={`cursor-pointer rounded-xl border-2 p-5 transition-all ${
                     investigationOngoing
                       ? "border-primary bg-primary/5 ring-2 ring-primary/20"
@@ -622,7 +632,10 @@ export default function NewPressReleasePage() {
 
                 {/* Resolved Card */}
                 <div
-                  onClick={() => setInvestigationOngoing(false)}
+                  onClick={() => {
+                    setInvestigationOngoing(false)
+                    setRequestFootage(false)
+                  }}
                   className={`cursor-pointer rounded-xl border-2 p-5 transition-all ${
                     !investigationOngoing
                       ? "border-green-600 bg-green-50 ring-2 ring-green-600/20"
@@ -672,6 +685,38 @@ export default function NewPressReleasePage() {
                     <Input
                       placeholder="e.g. www.agency.gov/tips"
                       className="placeholder:text-muted-foreground/60 bg-background"
+                      value={onlineTipsUrl}
+                      onChange={(e) => setOnlineTipsUrl(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {investigationOngoing && (
+                <div className="space-y-4 rounded-xl border border-blue-500/30 bg-blue-50 p-5">
+                  <div>
+                    <p className="font-medium text-foreground">Video Request</p>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      Ongoing investigations often need doorbell or security camera footage. Add details below.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Timeframe for footage</Label>
+                    <Input
+                      placeholder="e.g. Between 10pm Jan 5 and 2am Jan 6"
+                      className="placeholder:text-muted-foreground/60 bg-background"
+                      value={footageTimeframe}
+                      onChange={(e) => setFootageTimeframe(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>What to look for</Label>
+                    <Textarea
+                      placeholder="e.g. Suspect description, vehicle, suspicious activity near driveways..."
+                      rows={2}
+                      className="placeholder:text-muted-foreground/60 bg-background"
+                      value={whatToLookFor}
+                      onChange={(e) => setWhatToLookFor(e.target.value)}
                     />
                   </div>
                 </div>
@@ -688,50 +733,39 @@ export default function NewPressReleasePage() {
                     value={resolutionText}
                     onChange={(e) => setResolutionText(e.target.value)}
                   />
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Video Request</CardTitle>
-              <CardDescription>
-                Check this if you want to ask residents for security camera or doorbell video footage
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="requestFootage"
-                  checked={requestFootage}
-                  onCheckedChange={(checked) => setRequestFootage(checked as boolean)}
-                />
-                <Label htmlFor="requestFootage" className="font-medium">
-                  Request video footage from residents
-                </Label>
-              </div>
-              {requestFootage && (
-                <div className="space-y-4 rounded-xl border border-blue-500/30 bg-blue-50 p-5">
-                  <div className="space-y-2">
-                    <Label>Timeframe for footage</Label>
-                    <Input
-                      placeholder="e.g. Between 10pm Jan 5 and 2am Jan 6"
-                      className="placeholder:text-muted-foreground/60 bg-background"
-                      value={footageTimeframe}
-                      onChange={(e) => setFootageTimeframe(e.target.value)}
+                  <div className="flex items-center space-x-2 pt-1">
+                    <Checkbox
+                      id="needVideoResolved"
+                      checked={requestFootage}
+                      onCheckedChange={(checked) => setRequestFootage(checked as boolean)}
                     />
+                    <Label htmlFor="needVideoResolved" className="font-medium">
+                      Still need video from residents?
+                    </Label>
                   </div>
-                  <div className="space-y-2">
-                    <Label>What to look for</Label>
-                    <Textarea
-                      placeholder="e.g. A dark-colored sedan, suspicious activity near driveways..."
-                      rows={2}
-                      className="placeholder:text-muted-foreground/60 bg-background"
-                      value={whatToLookFor}
-                      onChange={(e) => setWhatToLookFor(e.target.value)}
-                    />
-                  </div>
+                  {requestFootage && (
+                    <div className="space-y-4 rounded-xl border border-blue-500/30 bg-blue-50 p-5">
+                      <div className="space-y-2">
+                        <Label>Timeframe for footage</Label>
+                        <Input
+                          placeholder="e.g. Between 10pm Jan 5 and 2am Jan 6"
+                          className="placeholder:text-muted-foreground/60 bg-background"
+                          value={footageTimeframe}
+                          onChange={(e) => setFootageTimeframe(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>What to look for</Label>
+                        <Textarea
+                          placeholder="e.g. Suspect description, vehicle, suspicious activity near driveways..."
+                          rows={2}
+                          className="placeholder:text-muted-foreground/60 bg-background"
+                          value={whatToLookFor}
+                          onChange={(e) => setWhatToLookFor(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>
@@ -739,7 +773,7 @@ export default function NewPressReleasePage() {
         </TabsContent>
 
         {/* Contact Tab */}
-        <TabsContent value="contact" className="space-y-4 mt-4">
+        <TabsContent value="contact" forceMount className="space-y-4 mt-4 data-[state=inactive]:hidden">
           <Card>
             <CardHeader>
               <CardTitle>Media Contact</CardTitle>

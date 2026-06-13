@@ -10,7 +10,7 @@ const features = [
   },
   {
     title: "Video Requests",
-    description: "Create clear, compliant video requests for footage and tips, aligned with platform guidelines such as Neighbors by Ring.",
+    description: "Create clear video requests for active investigations — footage and tips formatted for social media and platforms like Neighbors by Ring.",
     icon: Zap,
   },
   {
@@ -20,7 +20,7 @@ const features = [
   },
   {
     title: "Ready to Share",
-    description: "Download a branded document or copy content directly into your existing workflow. Messaging can also be translated into Spanish to better reach your entire community.",
+    description: "Download a branded document or copy content directly into your existing workflow. Spanish translation is available when you need it.",
     icon: Download,
   },
 ]
@@ -43,10 +43,10 @@ export function PIOToolSection() {
               Press Center
             </p>
             <p className="mt-6 text-lg text-[#c5d8eb] leading-relaxed">
-              Press Center helps agencies draft clear, structured public messaging in minutes — without compromising oversight or professionalism.
+              Press Center helps agencies draft clear, structured messaging for crimes, fires, accidents, and public-safety emergencies — without compromising oversight or professionalism.
             </p>
             <p className="mt-4 text-lg text-[#c5d8eb] leading-relaxed">
-              Whether preparing a press release or a video request, Press Center provides guided drafting with consistent tone and structured language designed for public safety communication.
+              From press releases to investigation video requests, Press Center provides guided drafting with consistent tone and structured language for law enforcement and fire department communication.
             </p>
             
             <div className="mt-8 flex flex-col gap-4 sm:flex-row">

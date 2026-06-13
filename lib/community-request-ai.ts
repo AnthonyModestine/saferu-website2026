@@ -1,11 +1,9 @@
 /**
  * Generate video request (footage request) text using OpenAI.
  * Uses OPENAI_API_KEY (same as press release).
- *
- * To use YOUR prompt + user info: edit SYSTEM_PROMPT below (and the user message in generateCommunityRequestWithAI).
- * User data is built in buildUserMessage() and sent with the system prompt to OpenAI.
  */
 
+import type { AiResult } from "./ai-result"
 export interface CommunityRequestPayload {
   agencyName: string
   incidentType: string
@@ -36,11 +34,14 @@ function buildUserMessage(p: CommunityRequestPayload): string {
   return lines.join("\n")
 }
 
-const SYSTEM_PROMPT = `You are a public information officer writing a short video request for social media or platforms like Neighbors by Ring. Use ONLY the facts provided. Do not invent any details, names, or exact addresses. Use clear, professional language. Keep it concise (a few short paragraphs). Include: (1) a clear headline that the agency is requesting video footage or tips, (2) what happened and the general area (never exact address), (3) what footage or information you need and the timeframe, (4) how to submit (contact info, case number if provided, tip line if provided), (5) a brief safety line (e.g. do not approach suspects; call 911 if you see something). Do not use markdown or asterisks. No victim names or private information.`
+const SYSTEM_PROMPT = `You are a public information officer writing a short video request for an active investigation. Use ONLY the facts provided. Do not invent any details, names, or exact addresses. Use clear, professional language. Keep it concise (a few short paragraphs). Include: (1) a clear headline that the agency is requesting video footage related to the incident, (2) what happened and the general area (never exact address), (3) what footage or information you need and the timeframe, (4) how to submit (contact info, case number if provided, tip line if provided), (5) a brief safety line (e.g. do not approach suspects; call 911 if you see something). Do not use markdown or asterisks. No victim names or private information.`
 
-export async function generateCommunityRequestWithAI(payload: CommunityRequestPayload): Promise<string | null> {
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) return null
+export async function generateCommunityRequestWithAI(payload: CommunityRequestPayload): Promise<AiResult<string>> {
+  const apiKey = process.env.OPENAI_API_KEY?.trim()
+  if (!apiKey) {
+    console.error("[community-request-ai] OPENAI_API_KEY is not set")
+    return { ok: false, reason: "missing_api_key" }
+  }
 
   try {
     const { default: OpenAI } = await import("openai")
@@ -54,7 +55,7 @@ export async function generateCommunityRequestWithAI(payload: CommunityRequestPa
         { role: "system", content: SYSTEM_PROMPT },
         {
           role: "user",
-          content: `Write a video request using only these facts. Keep it suitable for social media and platforms like Neighbors by Ring.\n\nFacts:\n${userContent}`,
+          content: `Write a video request for an active investigation using only these facts. Keep it suitable for social media and platforms like Neighbors by Ring.\n\nFacts:\n${userContent}`,
         },
       ],
       max_tokens: 800,
@@ -62,9 +63,13 @@ export async function generateCommunityRequestWithAI(payload: CommunityRequestPa
     })
 
     const text = completion.choices?.[0]?.message?.content?.trim()
-    return text || null
+    if (!text) {
+      return { ok: false, reason: "empty_response" }
+    }
+    return { ok: true, data: text }
   } catch (err) {
-    console.error("[community-request-ai] OpenAI error:", err)
-    return null
+    const detail = err instanceof Error ? err.message : String(err)
+    console.error("[community-request-ai] OpenAI error:", detail)
+    return { ok: false, reason: "openai_error", detail }
   }
 }

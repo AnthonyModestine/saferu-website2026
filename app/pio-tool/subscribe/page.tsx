@@ -19,7 +19,7 @@ const features = [
   {
     icon: Zap,
     title: "Video Requests",
-    description: "Create clear, compliant video requests for footage and tips, aligned with platform guidelines such as Neighbors by Ring.",
+    description: "Create clear video requests for active investigations — footage and tips formatted for social media and platforms like Neighbors by Ring.",
   },
   {
     icon: Shield,
@@ -29,7 +29,7 @@ const features = [
   {
     icon: Download,
     title: "Ready to Share",
-    description: "Download a branded document or copy content directly into your existing workflow. Messaging can also be translated into Spanish to better reach your entire community.",
+    description: "Download a branded document or copy content directly into your existing workflow. Spanish translation is available when you need it.",
   },
 ]
 
@@ -127,7 +127,7 @@ export default function SubscribePage() {
       <Card className="border-[#1470AF]/20">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Press Center</CardTitle>
-          <CardDescription>Everything you need to communicate with confidence during any incident.</CardDescription>
+          <CardDescription>Crimes, fires, accidents, and public-safety incidents — press releases, social posts, and video requests.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="text-center">
@@ -147,7 +147,7 @@ export default function SubscribePage() {
               "Talking points so your spokesperson walks in prepared",
               "Branded PDF with your logo — send it the moment it's done",
               "Video requests drafted and ready to post",
-              "One-click Spanish translation to reach every resident",
+              "One-click Spanish translation for incident messaging",
               "Cancel anytime — no contracts",
             ].map((feature) => (
               <li key={feature} className="flex items-start gap-2 text-sm">

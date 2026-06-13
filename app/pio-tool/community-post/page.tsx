@@ -29,21 +29,27 @@ import { track } from "@/lib/track"
 
 const incidentTypes = [
   "Burglary",
-  "Robbery",
   "Theft",
+  "Robbery",
+  "Assault",
+  "Shooting",
+  "Officer-Involved Shooting",
   "Vehicle Break-In",
   "Carjacking",
   "Hit and Run",
-  "Assault",
-  "Shooting",
-  "Suspicious Activity",
+  "Package Theft",
+  "Drug Seizure",
   "Missing Person",
   "Vandalism",
-  "Package Theft",
   "Arson",
+  "Fire",
   "Structure Fire",
   "Vehicle Fire",
   "Fire Investigation",
+  "Traffic Incident",
+  "Vehicle Accident",
+  "Domestic Dispute",
+  "Suspicious Activity",
   "Other",
 ]
 
@@ -177,7 +183,7 @@ export default function CommunityPostPage() {
       <div>
         <h1 className="text-2xl font-bold text-foreground">Video Request</h1>
         <p className="text-muted-foreground">
-          Draft a direct message requesting video footage. Use on Neighbors by Ring, social media, or your usual channels.
+          Draft a direct message requesting security camera or doorbell footage for an active investigation. Use on Neighbors by Ring, social media, or your usual channels.
         </p>
       </div>
 

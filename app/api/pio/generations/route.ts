@@ -20,5 +20,8 @@ export async function GET() {
   }
 
   const status = await getGenerationStatus(session.email)
-  return NextResponse.json(status)
+  return NextResponse.json({
+    ...status,
+    draftingConfigured: Boolean(process.env.OPENAI_API_KEY?.trim()),
+  })
 }
