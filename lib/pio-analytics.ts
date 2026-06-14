@@ -111,6 +111,20 @@ export interface PressCenterDashboard {
   }[]
   incidentTypes: { type: string; count: number }[]
   departmentSignups: { type: string; count: number }[]
+  signupsOverTime: { period: string; count: number }[]
+  agencyTypeBreakdown: {
+    type: string
+    signups: number
+    agencies: number
+    activeAgencies: number
+    totalSessions: number
+    downloads: number
+    copies: number
+    positiveFeedback: number
+    negativeFeedback: number
+  }[]
+  planBreakdown: { plan: string; count: number }[]
+  feedbackByReason: { reason: string; count: number }[]
   agencyActivity: {
     agencyName: string
     agencyType: string
@@ -511,6 +525,19 @@ function formatPlan(plan: MemberPlan): string {
   return "Free"
 }
 
+function emptyTypeBreakdown() {
+  return {
+    signups: 0,
+    agencies: 0,
+    activeAgencies: 0,
+    totalSessions: 0,
+    downloads: 0,
+    copies: 0,
+    positiveFeedback: 0,
+    negativeFeedback: 0,
+  }
+}
+
 function formatIncidentLabel(type: string): string {
   return type
     .replace(/_/g, " ")
@@ -591,6 +618,16 @@ export async function getPressCenterDashboard(
 
   const periodFn =
     groupBy === "week" ? toWeekKey : groupBy === "month" ? toMonthKey : toDayKey
+
+  const signupsMap = new Map<string, number>()
+  for (const m of membersInRange) {
+    const key = periodFn(m.createdAt * 1000)
+    signupsMap.set(key, (signupsMap.get(key) ?? 0) + 1)
+  }
+  const signupsOverTime = Array.from(signupsMap.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([period, count]) => ({ period, count }))
+
   const usageMap = new Map<string, { pr: number; vr: number }>()
   for (const s of sessionsInRange) {
     const key = periodFn(s.createdAt)
@@ -709,6 +746,55 @@ export async function getPressCenterDashboard(
     }))
     .sort((a, b) => b.lastActive - a.lastActive)
 
+  const typeBreakdownMap = new Map<
+    string,
+    {
+      signups: number
+      agencies: number
+      activeAgencies: number
+      totalSessions: number
+      downloads: number
+      copies: number
+      positiveFeedback: number
+      negativeFeedback: number
+    }
+  >()
+
+  for (const { type, count } of departmentSignups) {
+    const cur = typeBreakdownMap.get(type) ?? emptyTypeBreakdown()
+    cur.signups = count
+    typeBreakdownMap.set(type, cur)
+  }
+
+  for (const a of agencyActivity) {
+    const cur = typeBreakdownMap.get(a.agencyType) ?? emptyTypeBreakdown()
+    cur.agencies += 1
+    if (a.totalSessions > 0) cur.activeAgencies += 1
+    cur.totalSessions += a.totalSessions
+    cur.downloads += a.downloads
+    cur.copies += a.copies
+    typeBreakdownMap.set(a.agencyType, cur)
+  }
+
+  for (const f of feedback) {
+    const session = sessionById.get(f.generationSessionId)
+    if (!session) continue
+    const typeLabel = formatAgencyType(session.agencyType, session.departmentOther)
+    const cur = typeBreakdownMap.get(typeLabel) ?? emptyTypeBreakdown()
+    if (f.rating === "positive") cur.positiveFeedback += 1
+    else cur.negativeFeedback += 1
+    typeBreakdownMap.set(typeLabel, cur)
+  }
+
+  const agencyTypeBreakdown = Array.from(typeBreakdownMap.entries())
+    .map(([type, stats]) => ({ type, ...stats }))
+    .sort((a, b) => b.totalSessions + b.signups - (a.totalSessions + a.signups))
+
+  const planBreakdown = [
+    { plan: "Paid", count: paidAgencies },
+    { plan: "Free", count: freeAgencies },
+  ]
+
   const assetUtilization = {
     pressReleaseSessions: pressSessions.length,
     pressReleaseCopies: actionCounts("press_release_copied"),
@@ -738,6 +824,10 @@ export async function getPressCenterDashboard(
     complaintMap.size > 0
       ? Array.from(complaintMap.entries()).sort((a, b) => b[1] - a[1])[0][0]
       : null
+
+  const feedbackByReason = Array.from(complaintMap.entries())
+    .map(([reason, count]) => ({ reason, count }))
+    .sort((a, b) => b.count - a.count)
 
   const recentFeedback = feedback
     .sort((a, b) => b.createdAt - a.createdAt)
@@ -774,6 +864,10 @@ export async function getPressCenterDashboard(
     usageOverTime,
     incidentTypes,
     departmentSignups,
+    signupsOverTime,
+    agencyTypeBreakdown,
+    planBreakdown,
+    feedbackByReason,
     agencyActivity,
     assetUtilization,
     feedback: {
