@@ -37,7 +37,7 @@ export const METRIC_HELP = {
   curatedCopies: "Times a user copied text from a curated article page.",
   curatedDownloads: "Image or asset downloads from curated article pages.",
   unusedArticles:
-    "Sample of published articles with zero views in this period (may indicate low discovery).",
+    "Articles with no views in this period (only shown once article views exist in the range).",
 
   generationSessionsChart:
     "Press release and video request generations over time, grouped by day, week, or month.",

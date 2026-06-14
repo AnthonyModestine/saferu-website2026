@@ -52,6 +52,7 @@ export default async function AdminDashboardPage() {
   const ms = metricsSnapshot.pressCenter.summary
   const fb = metricsSnapshot.pressCenter.feedback
   const contentTotals = metricsSnapshot.content.totals
+  const metricsStorage = metricsSnapshot.meta?.storage ?? "postgres"
 
   const stats = [
     { name: "Categories", value: totalCategories, icon: FolderTree, color: "bg-blue-500" },
@@ -144,7 +145,12 @@ export default async function AdminDashboardPage() {
             <div>
               <CardTitle className="text-lg">Metrics (last 30 days)</CardTitle>
               <CardDescription className="mt-0.5">
-                Signups, generation usage, feedback, and curated content — open Metrics for bar charts and full breakdowns.
+                Live counts from the last 30 days — open Metrics for charts and breakdowns.
+                {metricsStorage === "file" && (
+                  <span className="block mt-1 text-amber-700">
+                    Database not configured; set POSTGRES_URL on Vercel for persistent analytics.
+                  </span>
+                )}
               </CardDescription>
             </div>
             <Button asChild className="bg-[#1470AF] text-white hover:bg-[#1470AF]/90 shrink-0">

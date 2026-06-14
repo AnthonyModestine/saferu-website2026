@@ -36,8 +36,25 @@ type SortKey = "lastActive" | "totalSessions" | "downloads" | "feedbackScore"
 type SectionTab = "overview" | "agencies" | "feedback" | "content"
 
 interface DashboardData {
+  meta?: { storage: "postgres" | "file" }
   pressCenter: PressCenterDashboard
   content: ContentAnalyticsDashboard
+}
+
+function hasTrackedActivity(
+  pc: PressCenterDashboard,
+  content?: ContentAnalyticsDashboard
+): boolean {
+  return (
+    pc.summary.totalSessions > 0 ||
+    pc.summary.newSignups > 0 ||
+    pc.summary.totalCopyActions > 0 ||
+    pc.feedback.positiveCount + pc.feedback.negativeCount > 0 ||
+    (content?.totals.views ?? 0) +
+      (content?.totals.copies ?? 0) +
+      (content?.totals.downloads ?? 0) >
+      0
+  )
 }
 
 const EMPTY_CONTENT: ContentAnalyticsDashboard = {
@@ -54,6 +71,7 @@ function normalizeDashboard(raw: Partial<DashboardData> | null | undefined): Das
   const content = raw.content ?? EMPTY_CONTENT
 
   return {
+    meta: raw.meta,
     pressCenter: {
       ...pc,
       usageOverTime: pc.usageOverTime ?? [],
@@ -321,6 +339,8 @@ export function MetricsDashboardView() {
 
   const pc = data?.pressCenter
   const content = data?.content
+  const storage = data?.meta?.storage ?? "postgres"
+  const showStorageWarning = storage === "file"
 
   const usageChart = useMemo(() => {
     if (!pc) return []
@@ -472,18 +492,34 @@ export function MetricsDashboardView() {
     { name: "Negative", count: pc.feedback.negativeCount },
   ]
 
+  const periodHasData = hasTrackedActivity(pc, content ?? undefined)
+
   return (
     <TooltipProvider delayDuration={200}>
     <div className="space-y-4 p-4 sm:space-y-6 sm:p-6 lg:p-8">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">Metrics</h1>
         <p className="mt-1 text-sm text-gray-500 sm:text-base">
-          Signups, usage, agency activity, feedback, and curated content.
+          Live data from signups, Press Center usage, feedback, and curated content in the selected date range.
           <span className="hidden sm:inline">
             {" "}Tap the <CircleHelp className="inline h-3.5 w-3.5 align-text-bottom text-gray-400" /> icon on any metric for details.
           </span>
         </p>
       </div>
+
+      {showStorageWarning && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Analytics database is not configured. Metrics may reset on deploy and will not match production activity.
+          Set <code className="text-xs">POSTGRES_URL</code> on Vercel for persistent, accurate data.
+        </div>
+      )}
+
+      {!periodHasData && (
+        <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
+          No tracked activity in this date range yet. Numbers below are real counts — mostly zero until users sign up,
+          generate content, leave feedback, or view curated articles.
+        </div>
+      )}
 
       <Card>
         <CardHeader className="pb-3">
@@ -925,7 +961,7 @@ export function MetricsDashboardView() {
                   { label: "Article Views", value: content.totals.views, help: METRIC_HELP.curatedViews },
                   { label: "Copies", value: content.totals.copies, help: METRIC_HELP.curatedCopies },
                   { label: "Downloads", value: content.totals.downloads, help: METRIC_HELP.curatedDownloads },
-                  { label: "Unused Articles (sample)", value: content.unusedArticles.length, help: METRIC_HELP.unusedArticles },
+                  { label: "Articles not viewed", value: content.unusedArticles.length, help: METRIC_HELP.unusedArticles },
                 ]}
               />
 
@@ -987,10 +1023,12 @@ export function MetricsDashboardView() {
                     </ul>
                   </div>
                   <div>
-                    <h3 className="text-sm font-medium mb-2">Not viewed (sample)</h3>
+                    <h3 className="text-sm font-medium mb-2">Not viewed this period</h3>
                     <ul className="space-y-1 text-sm text-gray-600 max-h-64 overflow-y-auto">
-                      {content.unusedArticles.length === 0 ? (
-                        <li>All tracked articles had at least one view.</li>
+                      {content.totals.views === 0 ? (
+                        <li>No article views recorded in this period.</li>
+                      ) : content.unusedArticles.length === 0 ? (
+                        <li>All tracked articles had at least one view in this period.</li>
                       ) : (
                         content.unusedArticles.map((a) => (
                           <li key={a.path}>{a.category}: {a.title}</li>

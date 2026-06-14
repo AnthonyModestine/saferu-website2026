@@ -598,6 +598,7 @@ export async function getPressCenterDashboard(
   const membersInRange = registeredMembers.filter(
     (m) => m.createdAt * 1000 >= range.startMs && m.createdAt * 1000 <= range.endMs
   )
+  const membersInRangeIds = new Set(membersInRange.map((m) => m.id))
   const departmentSignupMap = new Map<string, number>()
   for (const m of membersInRange) {
     const label = formatDepartmentLabel(m.departmentType, m.departmentOther)
@@ -609,8 +610,8 @@ export async function getPressCenterDashboard(
 
   const incidentMap = new Map<string, number>()
   for (const s of sessionsInRange) {
-    const key = s.incidentType || "unknown"
-    incidentMap.set(key, (incidentMap.get(key) ?? 0) + 1)
+    if (!s.incidentType) continue
+    incidentMap.set(s.incidentType, (incidentMap.get(s.incidentType) ?? 0) + 1)
   }
   const incidentTypes = Array.from(incidentMap.entries())
     .map(([type, count]) => ({ type: formatIncidentLabel(type), count }))
@@ -647,6 +648,7 @@ export async function getPressCenterDashboard(
   const agencyMap = new Map<
     string,
     {
+      agencyId: string
       agencyName: string
       agencyType: string
       plan: MemberPlan
@@ -661,11 +663,12 @@ export async function getPressCenterDashboard(
     }
   >()
 
-  for (const m of registeredMembers) {
+  for (const m of membersInRange) {
     const key = m.id
     const createdMs = m.createdAt * 1000
     const plan = sessionPlanByAgency.get(key) ?? "free"
     agencyMap.set(key, {
+      agencyId: key,
       agencyName: m.agency || m.name || m.email,
       agencyType: formatDepartmentLabel(m.departmentType, m.departmentOther),
       plan,
@@ -683,6 +686,7 @@ export async function getPressCenterDashboard(
   for (const s of sessionsInRange) {
     const key = s.agencyId
     const cur = agencyMap.get(key) ?? {
+      agencyId: key,
       agencyName: s.agencyName || s.memberEmail,
       agencyType: formatAgencyType(s.agencyType, s.departmentOther),
       plan: s.memberPlan,
@@ -728,6 +732,11 @@ export async function getPressCenterDashboard(
   }
 
   const agencyActivity = Array.from(agencyMap.values())
+    .filter((a) => {
+      const hasUsage =
+        a.pr + a.vr + a.downloads + a.copies + a.spanish + a.positive + a.negative > 0
+      return hasUsage || membersInRangeIds.has(a.agencyId)
+    })
     .map((a) => ({
       agencyName: a.agencyName,
       agencyType: a.agencyType,
@@ -766,14 +775,38 @@ export async function getPressCenterDashboard(
     typeBreakdownMap.set(type, cur)
   }
 
-  for (const a of agencyActivity) {
-    const cur = typeBreakdownMap.get(a.agencyType) ?? emptyTypeBreakdown()
+  for (const m of registeredMembers) {
+    const label = formatDepartmentLabel(m.departmentType, m.departmentOther)
+    const cur = typeBreakdownMap.get(label) ?? emptyTypeBreakdown()
     cur.agencies += 1
-    if (a.totalSessions > 0) cur.activeAgencies += 1
-    cur.totalSessions += a.totalSessions
-    cur.downloads += a.downloads
-    cur.copies += a.copies
-    typeBreakdownMap.set(a.agencyType, cur)
+    typeBreakdownMap.set(label, cur)
+  }
+
+  const activeIdsByType = new Map<string, Set<string>>()
+  for (const s of sessionsInRange) {
+    const typeLabel = formatAgencyType(s.agencyType, s.departmentOther)
+    const cur = typeBreakdownMap.get(typeLabel) ?? emptyTypeBreakdown()
+    cur.totalSessions += 1
+    typeBreakdownMap.set(typeLabel, cur)
+    const ids = activeIdsByType.get(typeLabel) ?? new Set<string>()
+    ids.add(s.agencyId)
+    activeIdsByType.set(typeLabel, ids)
+  }
+
+  for (const a of actions) {
+    const session = sessionById.get(a.generationSessionId)
+    if (!session) continue
+    const typeLabel = formatAgencyType(session.agencyType, session.departmentOther)
+    const cur = typeBreakdownMap.get(typeLabel) ?? emptyTypeBreakdown()
+    if (DOWNLOAD_ACTIONS.includes(a.actionType)) cur.downloads += 1
+    if (COPY_ACTIONS.includes(a.actionType)) cur.copies += 1
+    typeBreakdownMap.set(typeLabel, cur)
+  }
+
+  for (const [typeLabel, ids] of activeIdsByType) {
+    const cur = typeBreakdownMap.get(typeLabel) ?? emptyTypeBreakdown()
+    cur.activeAgencies = ids.size
+    typeBreakdownMap.set(typeLabel, cur)
   }
 
   for (const f of feedback) {

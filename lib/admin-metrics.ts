@@ -1,5 +1,6 @@
 import { getContentAnalytics } from "@/lib/content-analytics"
 import { getAllArticlePaths } from "@/lib/content-paths"
+import { isDatabaseConfigured } from "@/lib/db"
 import { getPressCenterDashboard, type DateRange } from "@/lib/pio-analytics"
 
 export async function getAdminMetricsDashboard(
@@ -11,5 +12,11 @@ export async function getAdminMetricsDashboard(
     getContentAnalytics(range, getAllArticlePaths()),
   ])
 
-  return { pressCenter, content }
+  return {
+    meta: {
+      storage: isDatabaseConfigured() ? ("postgres" as const) : ("file" as const),
+    },
+    pressCenter,
+    content,
+  }
 }

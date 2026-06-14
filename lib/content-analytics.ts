@@ -220,9 +220,10 @@ export async function getContentAnalytics(
     events.filter((e) => e.eventType === "page_view").map((e) => e.path).filter(Boolean)
   )
 
-  const unusedArticles = allArticlePaths
-    .filter((a) => !viewedPaths.has(a.path))
-    .slice(0, 25)
+  const unusedArticles =
+    totalViews > 0
+      ? allArticlePaths.filter((a) => !viewedPaths.has(a.path)).slice(0, 25)
+      : []
 
   return {
     topArticles: Array.from(articleStats.values())
