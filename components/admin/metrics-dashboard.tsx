@@ -23,7 +23,7 @@ import type { ContentAnalyticsDashboard } from "@/lib/content-analytics"
 
 type Preset = "7d" | "30d" | "90d" | "year" | "custom"
 type SortKey = "lastActive" | "totalSessions" | "downloads" | "feedbackScore"
-type SectionTab = "overview" | "signups" | "press-center" | "agencies" | "feedback" | "content"
+type SectionTab = "overview" | "agencies" | "feedback" | "content"
 
 interface DashboardData {
   pressCenter: PressCenterDashboard
@@ -140,7 +140,7 @@ function VerticalBarChart({
   )
 }
 
-export function PressCenterDashboardView() {
+export function MetricsDashboardView() {
   const [preset, setPreset] = useState<Preset>("30d")
   const [customStart, setCustomStart] = useState("")
   const [customEnd, setCustomEnd] = useState("")
@@ -326,7 +326,6 @@ export function PressCenterDashboardView() {
     )
   }
 
-  const util = pc.assetUtilization
   const feedbackSummaryChart = [
     { name: "Positive", count: pc.feedback.positiveCount },
     { name: "Negative", count: pc.feedback.negativeCount },
@@ -337,7 +336,7 @@ export function PressCenterDashboardView() {
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Metrics</h1>
         <p className="mt-1 text-gray-500">
-          Signups, Press Center usage, agency engagement, feedback, and curated content — organized by tab for easier review.
+          All site analytics in one place — signups by department, usage, agency activity, feedback, and curated content.
         </p>
       </div>
 
@@ -370,9 +369,7 @@ export function PressCenterDashboardView() {
       <Tabs value={section} onValueChange={(v) => setSection(v as SectionTab)}>
         <TabsList className="flex h-auto flex-wrap gap-1">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="signups">Signups &amp; Types</TabsTrigger>
-          <TabsTrigger value="press-center">Press Center</TabsTrigger>
-          <TabsTrigger value="agencies">Agencies</TabsTrigger>
+          <TabsTrigger value="agencies">Agencies &amp; Signups</TabsTrigger>
           <TabsTrigger value="feedback">Feedback</TabsTrigger>
           <TabsTrigger value="content">Curated Content</TabsTrigger>
         </TabsList>
@@ -381,9 +378,11 @@ export function PressCenterDashboardView() {
           <SummaryCards
             items={[
               { label: "Total Agencies", value: pc.summary.totalAgencies },
-              { label: "Active (30d)", value: pc.summary.activeAgencies },
               { label: "New Signups", value: pc.summary.newSignups },
-              { label: "Total Sessions", value: pc.summary.totalSessions },
+              { label: "Press Release Sessions", value: pc.summary.newPressReleaseSessions },
+              { label: "Video Request Sessions", value: pc.summary.videoRequestSessions },
+              { label: "Downloads", value: pc.summary.pressReleaseDownloads + pc.summary.talkingPointDownloads },
+              { label: "Copies", value: pc.summary.totalCopyActions },
               { label: "Positive Feedback", value: `${pc.feedback.positivePercent}%` },
               { label: "Curated Views", value: content?.totals.views ?? 0 },
             ]}
@@ -393,14 +392,14 @@ export function PressCenterDashboardView() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between gap-2">
                 <div>
-                  <CardTitle className="text-lg">Press Center sessions</CardTitle>
-                  <CardDescription>Press releases vs video requests</CardDescription>
+                  <CardTitle className="text-lg">Generation sessions</CardTitle>
+                  <CardDescription>Press releases vs video requests over time</CardDescription>
                 </div>
                 {groupByTabs}
               </CardHeader>
               <CardContent className="h-[280px]">
                 {usageChart.length === 0 ? (
-                  <ChartEmpty message="No Press Center sessions in this period." />
+                  <ChartEmpty message="No generation sessions in this period." />
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={usageChart}>
@@ -455,21 +454,26 @@ export function PressCenterDashboardView() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Sessions by department type</CardTitle>
+                <CardTitle className="text-lg">Incident types generated</CardTitle>
               </CardHeader>
               <CardContent>
-                <HorizontalBarChart
-                  data={agencyTypeChart.map((r) => ({ type: r.type, sessions: r.sessions }))}
-                  dataKey="sessions"
-                  categoryKey="type"
-                  color="#1470AF"
-                />
+                <HorizontalBarChart data={pc.incidentTypes.slice(0, 12)} dataKey="count" categoryKey="type" />
               </CardContent>
             </Card>
           </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Output utilization (%)</CardTitle>
+              <CardDescription>How often generated assets are copied or downloaded</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <HorizontalBarChart data={assetUtilChart} dataKey="rate" categoryKey="name" color="#7c3aed" height={300} />
+            </CardContent>
+          </Card>
         </TabsContent>
 
-        <TabsContent value="signups" className="mt-6 space-y-6">
+        <TabsContent value="agencies" className="mt-6 space-y-6">
           <SummaryCards
             items={[
               { label: "New Signups", value: pc.summary.newSignups },
@@ -574,98 +578,7 @@ export function PressCenterDashboardView() {
               />
             </CardContent>
           </Card>
-        </TabsContent>
 
-        <TabsContent value="press-center" className="mt-6 space-y-6">
-          <SummaryCards
-            items={[
-              { label: "Press Release Sessions", value: pc.summary.newPressReleaseSessions },
-              { label: "Video Request Sessions", value: pc.summary.videoRequestSessions },
-              { label: "PR Downloads", value: pc.summary.pressReleaseDownloads },
-              { label: "Talking Point Downloads", value: pc.summary.talkingPointDownloads },
-              { label: "Spanish Translations", value: pc.summary.spanishTranslationsGenerated },
-              { label: "Total Copies", value: pc.summary.totalCopyActions },
-            ]}
-          />
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-2">
-              <div>
-                <CardTitle className="text-lg">Usage over time</CardTitle>
-              </div>
-              {groupByTabs}
-            </CardHeader>
-            <CardContent className="h-[280px]">
-              {usageChart.length === 0 ? (
-                <ChartEmpty message="No sessions in this period." />
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={usageChart}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                    <YAxis allowDecimals={false} width={32} />
-                    <Tooltip />
-                    <Legend />
-                    <Line type="monotone" dataKey="newPressReleaseSessions" name="Press Release" stroke="#1470AF" strokeWidth={2} dot={false} />
-                    <Line type="monotone" dataKey="videoRequestSessions" name="Video Request" stroke="#7c3aed" strokeWidth={2} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              )}
-            </CardContent>
-          </Card>
-
-          <div className="grid gap-6 lg:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Incident types</CardTitle>
-                <CardDescription>What agencies are generating content about</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <HorizontalBarChart data={pc.incidentTypes.slice(0, 15)} dataKey="count" categoryKey="type" />
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Asset utilization rate (%)</CardTitle>
-                <CardDescription>How often generated outputs get used</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <HorizontalBarChart data={assetUtilChart} dataKey="rate" categoryKey="name" color="#7c3aed" height={300} />
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Asset utilization detail</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {[
-                { label: "Press Releases Copied", used: util.pressReleaseCopies, total: util.pressReleaseSessions },
-                { label: "Press Release PDFs", used: util.pressReleaseDownloads, total: util.pressReleaseSessions },
-                { label: "Facebook Posts Copied", used: util.facebookCopies, total: util.pressReleaseSessions },
-                { label: "Spanish Generated", used: util.spanishGenerated, total: util.pressReleaseSessions },
-                { label: "Spanish Copies", used: util.spanishCopies, total: util.spanishGenerated || util.pressReleaseSessions },
-                { label: "X Posts Copied", used: util.xCopies, total: util.pressReleaseSessions },
-                { label: "Talking Points", used: util.talkingPointDownloads, total: util.pressReleaseSessions },
-                { label: "Video Requests Copied", used: util.videoRequestCopies, total: util.videoRequestSessions },
-                { label: "Video Request Downloads", used: util.videoRequestDownloads, total: util.videoRequestSessions },
-              ].map((item) => (
-                <div key={item.label} className="rounded-lg border p-3">
-                  <p className="text-xs text-gray-500">{item.label}</p>
-                  <p className="text-lg font-semibold text-gray-900">
-                    {item.used}
-                    <span className="text-sm font-normal text-gray-500"> / {item.total}</span>
-                  </p>
-                  <p className="text-sm text-[#1470AF]">{pct(item.used, item.total)}% utilization</p>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="agencies" className="mt-6 space-y-6">
           <div className="grid gap-6 lg:grid-cols-2">
             <Card>
               <CardHeader>

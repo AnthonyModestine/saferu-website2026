@@ -1,5 +1,5 @@
-import { PressCenterDashboardView } from "@/components/admin/press-center-dashboard"
+import { MetricsDashboardView } from "@/components/admin/metrics-dashboard"
 
 export default function AdminMetricsPage() {
-  return <PressCenterDashboardView />
+  return <MetricsDashboardView />
 }

@@ -10,7 +10,7 @@ import {
   ShieldCheck,
   Flame,
   Star,
-  TrendingUp,
+  BarChart3,
   Users,
   DollarSign,
   CreditCard,
@@ -18,8 +18,8 @@ import {
 } from "lucide-react"
 import { getAllCategories } from "@/lib/content-merged"
 import { getMembersCounts, getRevenueSummary } from "@/lib/admin-members"
-import { getAggregatedMetrics } from "@/lib/metrics"
-import { DashboardCharts } from "@/components/admin/dashboard-charts"
+import { getAdminMetricsDashboard } from "@/lib/admin-metrics"
+import { parseDateRange } from "@/lib/pio-analytics"
 
 export default async function AdminDashboardPage() {
   const categories = getAllCategories({ includeUnpublished: true })
@@ -40,14 +40,18 @@ export default async function AdminDashboardPage() {
     ), 0
   )
 
-  const [membersResult, revenueResult, metrics] = await Promise.all([
+  const [membersResult, revenueResult, metricsSnapshot] = await Promise.all([
     getMembersCounts(),
     getRevenueSummary(),
-    getAggregatedMetrics(),
+    getAdminMetricsDashboard(parseDateRange("30d"), "day"),
   ])
   const membersTotal = membersResult.error ? 0 : membersResult.total
   const payingMembers = membersResult.error ? 0 : membersResult.paying
   const revenueAvailable = revenueResult.error ? 0 : revenueResult.availableCents / 100
+
+  const ms = metricsSnapshot.pressCenter.summary
+  const fb = metricsSnapshot.pressCenter.feedback
+  const contentTotals = metricsSnapshot.content.totals
 
   const stats = [
     { name: "Categories", value: totalCategories, icon: FolderTree, color: "bg-blue-500" },
@@ -133,21 +137,43 @@ export default async function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* Activity line graphs */}
+      {/* Metrics snapshot — full charts live under Metrics */}
       <section className="mb-6">
-      <DashboardCharts
-        metrics={{
-          trendsByDay: metrics.trendsByDay,
-          trendsByWeek: metrics.trendsByWeek,
-          trendsByMonth: metrics.trendsByMonth,
-          uniqueVisitorsByDay: metrics.uniqueVisitorsByDay,
-          uniqueVisitorsByWeek: metrics.uniqueVisitorsByWeek,
-          uniqueVisitorsByMonth: metrics.uniqueVisitorsByMonth,
-          pioGenerateByDayBySource: metrics.pioGenerateByDayBySource,
-          pioGenerateByWeekBySource: metrics.pioGenerateByWeekBySource,
-          pioGenerateByMonthBySource: metrics.pioGenerateByMonthBySource,
-        }}
-      />
+        <Card className="overflow-hidden">
+          <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4 border-b bg-muted/30 px-6 py-4">
+            <div>
+              <CardTitle className="text-lg">Metrics (last 30 days)</CardTitle>
+              <CardDescription className="mt-0.5">
+                Signups, generation usage, feedback, and curated content — open Metrics for bar charts and full breakdowns.
+              </CardDescription>
+            </div>
+            <Button asChild className="bg-[#1470AF] text-white hover:bg-[#1470AF]/90 shrink-0">
+              <Link href="/admin/metrics">
+                <BarChart3 className="mr-2 h-4 w-4" />
+                Open Metrics
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent className="p-6">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
+              {[
+                { label: "Agencies", value: ms.totalAgencies },
+                { label: "New signups", value: ms.newSignups },
+                { label: "PR sessions", value: ms.newPressReleaseSessions },
+                { label: "Video sessions", value: ms.videoRequestSessions },
+                { label: "Copies", value: ms.totalCopyActions },
+                { label: "Feedback +", value: `${fb.positivePercent}%` },
+                { label: "Article views", value: contentTotals.views },
+                { label: "Active (30d)", value: ms.activeAgencies },
+              ].map((item) => (
+                <div key={item.label} className="rounded-lg border border-gray-200 bg-white p-3">
+                  <p className="text-xs font-medium text-gray-500">{item.label}</p>
+                  <p className="mt-1 text-xl font-bold text-gray-900">{item.value}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </section>
 
       {/* Categories + Quick Actions in a uniform grid */}
@@ -224,8 +250,14 @@ export default async function AdminDashboardPage() {
               </Link>
             </Button>
             <Button asChild variant="outline" className="justify-start gap-3 bg-transparent">
+              <Link href="/admin/metrics">
+                <BarChart3 className="h-4 w-4" />
+                <span>View Metrics</span>
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="justify-start gap-3 bg-transparent">
               <Link href="/" target="_blank">
-                <TrendingUp className="h-4 w-4" />
+                <ExternalLink className="h-4 w-4" />
                 <span>View Live Site</span>
               </Link>
             </Button>
