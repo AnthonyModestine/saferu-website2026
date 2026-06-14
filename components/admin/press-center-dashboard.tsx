@@ -65,20 +65,27 @@ export function PressCenterDashboardView() {
   const [sortAsc, setSortAsc] = useState(false)
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
+    setError(null)
     const params = new URLSearchParams({ preset, groupBy })
     if (preset === "custom") {
       if (customStart) params.set("start", customStart)
       if (customEnd) params.set("end", customEnd)
     }
     try {
-      const res = await fetch(`/api/admin/press-center?${params}`)
-      if (res.ok) setData(await res.json())
-      else setData(null)
+      const res = await fetch(`/api/metrics?${params}`)
+      if (res.ok) {
+        setData(await res.json())
+      } else {
+        setData(null)
+        setError(`Could not load metrics (${res.status})`)
+      }
     } catch {
       setData(null)
+      setError("Could not reach the server.")
     } finally {
       setLoading(false)
     }
@@ -141,13 +148,18 @@ export function PressCenterDashboardView() {
   }
 
   if (!pc) {
-    return <div className="p-8 text-gray-500">Failed to load analytics.</div>
+    return (
+      <div className="p-8">
+        <p className="text-gray-500">{error || "Failed to load metrics."}</p>
+      </div>
+    )
   }
 
   const util = pc.assetUtilization
   const summaryCards = [
     { label: "Total Agencies", value: pc.summary.totalAgencies },
     { label: "Active (30d)", value: pc.summary.activeAgencies },
+    { label: "New Signups", value: pc.summary.newSignups },
     { label: "Press Release Sessions", value: pc.summary.newPressReleaseSessions },
     { label: "Video Request Sessions", value: pc.summary.videoRequestSessions },
     { label: "Total Sessions", value: pc.summary.totalSessions },
@@ -162,9 +174,9 @@ export function PressCenterDashboardView() {
   return (
     <div className="p-8 space-y-8">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Press Center Analytics</h1>
+        <h1 className="text-3xl font-bold text-gray-900">Metrics</h1>
         <p className="mt-1 text-gray-500">
-          Adoption, usage, output value, and agency engagement across SaferU Press Center.
+          Press Center usage, agency engagement, curated content, signups, and feedback. Data is stored in the database and persists across deploys.
         </p>
       </div>
 
@@ -238,29 +250,53 @@ export function PressCenterDashboardView() {
       </Card>
 
       {/* Incident types */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Incident type breakdown</CardTitle>
-          <CardDescription>What agencies generate most often</CardDescription>
-        </CardHeader>
-        <CardContent className="h-[280px]">
-          {pc.incidentTypes.length === 0 ? (
-            <p className="text-sm text-gray-500">No sessions in this period.</p>
-          ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={pc.incidentTypes.slice(0, 12)} layout="vertical" margin={{ left: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
-                <YAxis type="category" dataKey="type" width={120} tick={{ fontSize: 10 }} />
-                <Tooltip />
-                <Bar dataKey="count" fill="#1470AF" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </CardContent>
-      </Card>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Incident type breakdown</CardTitle>
+            <CardDescription>Press Center generations in this period</CardDescription>
+          </CardHeader>
+          <CardContent className="h-[280px]">
+            {pc.incidentTypes.length === 0 ? (
+              <p className="text-sm text-gray-500">No Press Center sessions in this period yet.</p>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={pc.incidentTypes.slice(0, 12)} layout="vertical" margin={{ left: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
+                  <YAxis type="category" dataKey="type" width={120} tick={{ fontSize: 10 }} />
+                  <Tooltip />
+                  <Bar dataKey="count" fill="#1470AF" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
 
-      {/* Agency activity table */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Signups by department</CardTitle>
+            <CardDescription>New member registrations in this period</CardDescription>
+          </CardHeader>
+          <CardContent className="h-[280px]">
+            {pc.departmentSignups.length === 0 ? (
+              <p className="text-sm text-gray-500">No signups in this period yet.</p>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={pc.departmentSignups.slice(0, 12)} layout="vertical" margin={{ left: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
+                  <YAxis type="category" dataKey="type" width={120} tick={{ fontSize: 10 }} />
+                  <Tooltip />
+                  <Bar dataKey="count" fill="#059669" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Agency activity table - removed duplicate incident chart below */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Agency activity</CardTitle>

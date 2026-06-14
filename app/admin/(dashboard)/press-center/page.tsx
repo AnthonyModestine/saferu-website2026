@@ -1,5 +1,5 @@
-import { PressCenterDashboardView } from "@/components/admin/press-center-dashboard"
+import { redirect } from "next/navigation"
 
 export default function AdminPressCenterPage() {
-  return <PressCenterDashboardView />
+  redirect("/admin/metrics")
 }

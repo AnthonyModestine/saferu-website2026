@@ -16,8 +16,7 @@ import {
   Users,
   ExternalLink,
   CreditCard,
-  MessageSquare,
-  Sparkles
+  MessageSquare
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { logoutAdmin } from "@/lib/admin-auth"
@@ -33,7 +32,6 @@ const navigation = [
   { name: "Drafts", href: "/admin/unpublished", icon: Archive },
   { name: "Media Library", href: "/admin/media", icon: ImageIcon },
   { name: "Metrics", href: "/admin/metrics", icon: BarChart3 },
-  { name: "Press Center", href: "/admin/press-center", icon: Sparkles },
 ]
 
 export function AdminSidebar() {

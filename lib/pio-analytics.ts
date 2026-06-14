@@ -7,6 +7,7 @@ import { readFile, writeFile, mkdir } from "fs/promises"
 import path from "path"
 import { ensureSchema, getSql, isDatabaseConfigured } from "@/lib/db"
 import { formatDepartmentLabel } from "@/lib/department-types"
+import { getFreeMembers } from "@/lib/members-store"
 
 const DATA_DIR = path.join(process.cwd(), "data")
 const STORE_PATH = path.join(DATA_DIR, "pio-analytics.json")
@@ -92,6 +93,7 @@ export interface PressCenterDashboard {
   summary: {
     totalAgencies: number
     activeAgencies: number
+    newSignups: number
     newPressReleaseSessions: number
     videoRequestSessions: number
     totalSessions: number
@@ -108,6 +110,7 @@ export interface PressCenterDashboard {
     videoRequestSessions: number
   }[]
   incidentTypes: { type: string; count: number }[]
+  departmentSignups: { type: string; count: number }[]
   agencyActivity: {
     agencyName: string
     agencyType: string
@@ -529,6 +532,7 @@ export async function getPressCenterDashboard(
 ): Promise<PressCenterDashboard> {
   const sessionsInRange = await loadSessionsInRange(range)
   const allSessions = await loadAllSessions()
+  const registeredMembers = await getFreeMembers()
   const sessionById = new Map(sessionsInRange.map((s) => [s.id, s]))
   const actions = await loadActionsInRange(range)
   const feedback = await loadFeedbackInRange(range)
@@ -545,14 +549,36 @@ export async function getPressCenterDashboard(
   const activeAgencyIds = new Set(
     allSessions.filter((s) => s.createdAt >= thirtyDaysAgo).map((s) => s.agencyId)
   )
-  const allAgencyIds = new Set(allSessions.map((s) => s.agencyId))
+  const sessionAgencyIds = new Set(allSessions.map((s) => s.agencyId))
+  const registeredAgencyIds = new Set(registeredMembers.map((m) => m.id))
 
-  const paidAgencies = new Set(
-    allSessions.filter((s) => s.memberPlan === "paid" || s.memberPlan === "trial").map((s) => s.agencyId)
+  const sessionPlanByAgency = new Map<string, MemberPlan>()
+  for (const s of allSessions) {
+    const cur = sessionPlanByAgency.get(s.agencyId)
+    if (!cur || s.memberPlan === "paid" || (s.memberPlan === "trial" && cur === "free")) {
+      sessionPlanByAgency.set(s.agencyId, s.memberPlan)
+    }
+  }
+
+  let paidAgencies = 0
+  let freeAgencies = 0
+  for (const id of registeredAgencyIds) {
+    const plan = sessionPlanByAgency.get(id) ?? "free"
+    if (plan === "paid" || plan === "trial") paidAgencies += 1
+    else freeAgencies += 1
+  }
+
+  const membersInRange = registeredMembers.filter(
+    (m) => m.createdAt * 1000 >= range.startMs && m.createdAt * 1000 <= range.endMs
   )
-  const freeAgencies = new Set(
-    allSessions.filter((s) => s.memberPlan === "free").map((s) => s.agencyId)
-  )
+  const departmentSignupMap = new Map<string, number>()
+  for (const m of membersInRange) {
+    const label = formatDepartmentLabel(m.departmentType, m.departmentOther)
+    departmentSignupMap.set(label, (departmentSignupMap.get(label) ?? 0) + 1)
+  }
+  const departmentSignups = Array.from(departmentSignupMap.entries())
+    .map(([type, count]) => ({ type, count }))
+    .sort((a, b) => b.count - a.count)
 
   const incidentMap = new Map<string, number>()
   for (const s of sessionsInRange) {
@@ -597,6 +623,25 @@ export async function getPressCenterDashboard(
       negative: number
     }
   >()
+
+  for (const m of registeredMembers) {
+    const key = m.id
+    const createdMs = m.createdAt * 1000
+    const plan = sessionPlanByAgency.get(key) ?? "free"
+    agencyMap.set(key, {
+      agencyName: m.agency || m.name || m.email,
+      agencyType: formatDepartmentLabel(m.departmentType, m.departmentOther),
+      plan,
+      lastActive: createdMs,
+      pr: 0,
+      vr: 0,
+      downloads: 0,
+      copies: 0,
+      spanish: 0,
+      positive: 0,
+      negative: 0,
+    })
+  }
 
   for (const s of sessionsInRange) {
     const key = s.agencyId
@@ -713,8 +758,9 @@ export async function getPressCenterDashboard(
   return {
     range,
     summary: {
-      totalAgencies: allAgencyIds.size,
+      totalAgencies: registeredAgencyIds.size || sessionAgencyIds.size,
       activeAgencies: activeAgencyIds.size,
+      newSignups: membersInRange.length,
       newPressReleaseSessions: pressSessions.length,
       videoRequestSessions: videoSessions.length,
       totalSessions: sessionsInRange.length,
@@ -722,11 +768,12 @@ export async function getPressCenterDashboard(
       talkingPointDownloads: actionCounts("talking_points_downloaded"),
       spanishTranslationsGenerated: actionCounts("spanish_generated"),
       totalCopyActions,
-      paidAgencies: paidAgencies.size,
-      freeAgencies: freeAgencies.size,
+      paidAgencies,
+      freeAgencies,
     },
     usageOverTime,
     incidentTypes,
+    departmentSignups,
     agencyActivity,
     assetUtilization,
     feedback: {

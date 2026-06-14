@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { checkAdminSession } from "@/lib/admin-auth"
-import { getPressCenterDashboard, parseDateRange } from "@/lib/pio-analytics"
-import { getContentAnalytics } from "@/lib/content-analytics"
-import { getAllArticlePaths } from "@/lib/content-paths"
+import { getAdminMetricsDashboard } from "@/lib/admin-metrics"
+import { parseDateRange } from "@/lib/pio-analytics"
 
+/** @deprecated Use /api/metrics — kept for backward compatibility */
 export async function GET(request: NextRequest) {
   const ok = await checkAdminSession()
   if (!ok) {
@@ -17,10 +17,6 @@ export async function GET(request: NextRequest) {
   const groupBy = (searchParams.get("groupBy") ?? "day") as "day" | "week" | "month"
 
   const range = parseDateRange(preset, start, end)
-  const [pressCenter, content] = await Promise.all([
-    getPressCenterDashboard(range, groupBy),
-    getContentAnalytics(range, getAllArticlePaths()),
-  ])
-
-  return NextResponse.json({ pressCenter, content })
+  const data = await getAdminMetricsDashboard(range, groupBy)
+  return NextResponse.json(data)
 }
