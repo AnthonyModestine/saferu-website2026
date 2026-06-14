@@ -15,6 +15,7 @@ import {
   type SignupFieldErrors,
 } from "@/lib/signup-validation"
 import { cn } from "@/lib/utils"
+import { DepartmentTypeFields } from "@/components/department-type-fields"
 import {
   Dialog,
   DialogContent,
@@ -30,6 +31,8 @@ export function SignUpModal() {
   const [success, setSuccess] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<SignupFieldErrors>({})
   const [loading, setLoading] = useState(false)
+  const [departmentType, setDepartmentType] = useState("")
+  const [departmentOther, setDepartmentOther] = useState("")
 
   const clearFieldError = (field: keyof SignupFieldErrors) => {
     setFieldErrors((prev) => {
@@ -50,7 +53,12 @@ export function SignUpModal() {
     const agency = (form.querySelector("#modal-agency") as HTMLInputElement)?.value?.trim()
     const password = (form.querySelector("#modal-password") as HTMLInputElement)?.value ?? ""
 
-    const validationErrors = validateSignupFields({ email, password })
+    const validationErrors = validateSignupFields({
+      email,
+      password,
+      departmentType,
+      departmentOther,
+    })
     if (hasSignupErrors(validationErrors)) {
       setFieldErrors(validationErrors)
       return
@@ -61,7 +69,15 @@ export function SignUpModal() {
       const res = await fetch("/api/members/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, firstName, lastName, agency, password }),
+        body: JSON.stringify({
+          email,
+          firstName,
+          lastName,
+          agency,
+          departmentType,
+          departmentOther: departmentType === "other" ? departmentOther : undefined,
+          password,
+        }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -132,6 +148,17 @@ export function SignUpModal() {
                 <Label htmlFor="modal-agency">Agency Name</Label>
                 <Input id="modal-agency" placeholder="Agency Name" />
               </div>
+              <DepartmentTypeFields
+                idPrefix="modal-"
+                departmentType={departmentType}
+                departmentOther={departmentOther}
+                onDepartmentTypeChange={setDepartmentType}
+                onDepartmentOtherChange={setDepartmentOther}
+                departmentTypeError={fieldErrors.departmentType}
+                departmentOtherError={fieldErrors.departmentOther}
+                onClearDepartmentTypeError={() => clearFieldError("departmentType")}
+                onClearDepartmentOtherError={() => clearFieldError("departmentOther")}
+              />
               <div className="space-y-1.5">
                 <Label htmlFor="modal-email">Email</Label>
                 <Input

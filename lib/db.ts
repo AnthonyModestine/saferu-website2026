@@ -39,6 +39,9 @@ export async function ensureSchema(): Promise<void> {
     )
   `
 
+  await db`ALTER TABLE free_members ADD COLUMN IF NOT EXISTS department_type TEXT`
+  await db`ALTER TABLE free_members ADD COLUMN IF NOT EXISTS department_other TEXT`
+
   await db`
     CREATE TABLE IF NOT EXISTS member_sessions (
       id TEXT PRIMARY KEY,
@@ -77,8 +80,71 @@ export async function ensureSchema(): Promise<void> {
     )
   `
 
+  await db`
+    CREATE TABLE IF NOT EXISTS generation_sessions (
+      id TEXT PRIMARY KEY,
+      agency_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      member_email TEXT NOT NULL,
+      agency_name TEXT,
+      agency_type TEXT,
+      member_plan TEXT NOT NULL DEFAULT 'free',
+      generation_type TEXT NOT NULL,
+      incident_type TEXT,
+      investigation_status TEXT,
+      created_at BIGINT NOT NULL
+    )
+  `
+
+  await db`ALTER TABLE generation_sessions ADD COLUMN IF NOT EXISTS department_other TEXT`
+
+  await db`
+    CREATE TABLE IF NOT EXISTS generation_actions (
+      id TEXT PRIMARY KEY,
+      generation_session_id TEXT NOT NULL REFERENCES generation_sessions(id) ON DELETE CASCADE,
+      action_type TEXT NOT NULL,
+      created_at BIGINT NOT NULL
+    )
+  `
+
+  await db`
+    CREATE TABLE IF NOT EXISTS generation_feedback (
+      id TEXT PRIMARY KEY,
+      generation_session_id TEXT NOT NULL REFERENCES generation_sessions(id) ON DELETE CASCADE,
+      rating TEXT NOT NULL,
+      reason TEXT,
+      comment TEXT,
+      created_at BIGINT NOT NULL
+    )
+  `
+
+  await db`
+    CREATE TABLE IF NOT EXISTS content_events (
+      id TEXT PRIMARY KEY,
+      event_type TEXT NOT NULL,
+      category_id TEXT,
+      subcategory_id TEXT,
+      article_id TEXT,
+      article_title TEXT,
+      post_id TEXT,
+      post_title TEXT,
+      path TEXT,
+      member_email TEXT,
+      ip TEXT,
+      created_at BIGINT NOT NULL
+    )
+  `
+
   await db`CREATE INDEX IF NOT EXISTS idx_free_members_email ON free_members (email)`
   await db`CREATE INDEX IF NOT EXISTS idx_member_sessions_expires ON member_sessions (expires_at)`
+  await db`CREATE INDEX IF NOT EXISTS idx_gen_sessions_created ON generation_sessions (created_at)`
+  await db`CREATE INDEX IF NOT EXISTS idx_gen_sessions_agency ON generation_sessions (agency_id)`
+  await db`CREATE INDEX IF NOT EXISTS idx_gen_sessions_email ON generation_sessions (member_email)`
+  await db`CREATE INDEX IF NOT EXISTS idx_gen_actions_session ON generation_actions (generation_session_id)`
+  await db`CREATE INDEX IF NOT EXISTS idx_gen_actions_created ON generation_actions (created_at)`
+  await db`CREATE INDEX IF NOT EXISTS idx_gen_feedback_session ON generation_feedback (generation_session_id)`
+  await db`CREATE INDEX IF NOT EXISTS idx_content_events_created ON content_events (created_at)`
+  await db`CREATE INDEX IF NOT EXISTS idx_content_events_path ON content_events (path)`
 
   schemaReady = true
 }

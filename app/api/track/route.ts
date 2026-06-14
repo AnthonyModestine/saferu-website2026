@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { recordEvent } from "@/lib/metrics"
 import type { TrackEvent } from "@/lib/metrics"
+import { recordContentEvent, parseContentPath } from "@/lib/content-analytics"
 
 function getClientIp(request: NextRequest): string | undefined {
   const forwarded = request.headers.get("x-forwarded-for")
@@ -44,6 +45,23 @@ export async function POST(request: NextRequest) {
       userAgent,
       ...rest,
     })
+
+    if (event === "page_view" || event === "copy" || event === "download") {
+      const parsed = path ? parseContentPath(path) : {}
+      if (parsed.articleId) {
+        await recordContentEvent({
+          eventType: event,
+          path,
+          postId,
+          postTitle,
+          categoryId: parsed.categoryId,
+          subcategoryId: parsed.subcategoryId,
+          articleId: parsed.articleId,
+          ip,
+        })
+      }
+    }
+
     return NextResponse.json({ ok: true })
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 })

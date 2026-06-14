@@ -30,6 +30,9 @@ import {
 } from "lucide-react"
 import { useAgency } from "@/lib/agency-context"
 import { track } from "@/lib/track"
+import { trackPioAction } from "@/lib/pio-analytics-client"
+import type { GenerationActionType } from "@/lib/pio-analytics"
+import { GenerationFeedback } from "@/components/pio/generation-feedback"
 import { PIOPreviewGate } from "@/components/pio-preview-gate"
 import { GenerationLimitModal } from "@/components/generation-limit-modal"
 import { downloadPressReleasePDF } from "@/lib/pdf-export"
@@ -108,6 +111,9 @@ export default function NewPressReleasePage() {
   const [generatedTalkingPoints, setGeneratedTalkingPoints] = useState("")
   const [generatedCommunityRequest, setGeneratedCommunityRequest] = useState<string | null>(null)
   const [includesVideoRequest, setIncludesVideoRequest] = useState(false)
+  const [pressReleaseSessionId, setPressReleaseSessionId] = useState<string | null>(null)
+  const [videoRequestSessionId, setVideoRequestSessionId] = useState<string | null>(null)
+  const [showFeedback, setShowFeedback] = useState(false)
   const [previewTab, setPreviewTab] = useState("press-release")
   const [copiedField, setCopiedField] = useState<string | null>(null)
   const didPrefill = useRef(false)
@@ -219,6 +225,12 @@ export default function NewPressReleasePage() {
           footageTimeframe: footageTimeframe.trim() || undefined,
           whatToLookFor: whatToLookFor.trim() || undefined,
           onlineTipsUrl: onlineTipsUrl.trim() || undefined,
+          agencyType: agencySettings.agencyType,
+          departmentType: agencySettings.agencyType,
+          departmentOther:
+            agencySettings.agencyType === "other"
+              ? agencySettings.agencyTypeOther.trim() || undefined
+              : undefined,
         }),
       })
       const data = await res.json()
@@ -236,6 +248,9 @@ export default function NewPressReleasePage() {
         setGeneratedTwitter(data.twitter || "")
         setGeneratedTalkingPoints(data.talkingPoints || "")
         setGeneratedCommunityRequest(data.communityRequest || null)
+        setPressReleaseSessionId(data.sessionIds?.pressReleaseSessionId ?? null)
+        setVideoRequestSessionId(data.sessionIds?.videoRequestSessionId ?? null)
+        setShowFeedback(true)
         addPioHistoryItem({
           title: `${incidentType || "Incident"} - Press Release`,
           type: incidentType || "Incident",
@@ -267,8 +282,22 @@ export default function NewPressReleasePage() {
     }
   }
 
+  const trackFieldAction = (field: string) => {
+    const map: Record<string, { sessionId: string | null; action: GenerationActionType }> = {
+      "press-release": { sessionId: pressReleaseSessionId, action: "press_release_copied" },
+      facebook: { sessionId: pressReleaseSessionId, action: "facebook_copied" },
+      "facebook-es": { sessionId: pressReleaseSessionId, action: "spanish_copied" },
+      twitter: { sessionId: pressReleaseSessionId, action: "x_copied" },
+      "talking-points": { sessionId: pressReleaseSessionId, action: "talking_points_downloaded" },
+      "community-request": { sessionId: videoRequestSessionId, action: "video_request_copied" },
+    }
+    const entry = map[field]
+    if (entry?.sessionId) trackPioAction(entry.sessionId, entry.action)
+  }
+
   const handleCopyField = async (text: string, field: string) => {
     await navigator.clipboard.writeText(text)
+    trackFieldAction(field)
     setCopiedField(field)
     setTimeout(() => setCopiedField(null), 2000)
   }
@@ -283,7 +312,10 @@ export default function NewPressReleasePage() {
       const res = await fetch("/api/pio/translate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: source }),
+        body: JSON.stringify({
+          text: source,
+          generationSessionId: pressReleaseSessionId,
+        }),
       })
       const data = await res.json()
       if (res.ok && data.translation) {
@@ -301,6 +333,7 @@ export default function NewPressReleasePage() {
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(generatedRelease)
+    trackPioAction(pressReleaseSessionId, "press_release_copied")
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
@@ -316,6 +349,9 @@ export default function NewPressReleasePage() {
     setGeneratedTalkingPoints("")
     setGeneratedCommunityRequest(null)
     setIncludesVideoRequest(false)
+    setPressReleaseSessionId(null)
+    setVideoRequestSessionId(null)
+    setShowFeedback(false)
     setPersons([])
     setArrests([])
     setArrestsMade(false)
@@ -366,6 +402,7 @@ export default function NewPressReleasePage() {
       logoUrl: agencySettings.logoUrl || undefined,
       boilerplate: agencySettings.boilerplate || undefined,
     })
+    trackPioAction(pressReleaseSessionId, "press_release_downloaded")
   }
 
   return (
@@ -893,6 +930,12 @@ export default function NewPressReleasePage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {showFeedback && pressReleaseSessionId && (
+                <GenerationFeedback
+                  generationSessionId={pressReleaseSessionId}
+                  onDone={() => setShowFeedback(false)}
+                />
+              )}
               <Tabs value={previewTab} onValueChange={setPreviewTab}>
                 <TabsList className="flex flex-wrap gap-1 h-auto">
                   <TabsTrigger value="press-release" className="text-xs sm:text-sm">Press Release</TabsTrigger>

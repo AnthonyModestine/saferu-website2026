@@ -236,6 +236,8 @@ export async function addMemberAdmin(params: {
   email: string
   name?: string
   agency?: string
+  departmentType?: import("@/lib/department-types").DepartmentType
+  departmentOther?: string
   password?: string
 }): Promise<{ success: boolean; error?: string }> {
   await ensureAdmin()
@@ -245,6 +247,8 @@ export async function addMemberAdmin(params: {
     email,
     name: params.name?.trim() || email,
     agency: params.agency?.trim(),
+    departmentType: params.departmentType ?? "other",
+    departmentOther: params.departmentOther?.trim() || "Not specified",
     password: params.password?.trim(),
   })
   if ("error" in result) return { success: false, error: result.error }

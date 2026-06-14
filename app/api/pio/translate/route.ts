@@ -5,6 +5,7 @@ import { getIsPaidByEmail } from "@/lib/member-access"
 import { isOnActiveTrial } from "@/lib/pio-trial"
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
 import { aiErrorPayload } from "@/lib/ai-result"
+import { recordGenerationAction, generationSessionBelongsToMember } from "@/lib/pio-analytics"
 
 const MAX_TEXT = 5000
 
@@ -49,6 +50,20 @@ export async function POST(request: Request) {
     if (!result.ok) {
       console.error("[translate] AI failed:", result.reason, result.detail ?? "")
       return NextResponse.json(aiErrorPayload(result.reason, result.detail), { status: 503 })
+    }
+
+    const generationSessionId = body.generationSessionId
+      ? String(body.generationSessionId).trim()
+      : ""
+    if (generationSessionId) {
+      const owned = await generationSessionBelongsToMember(
+        generationSessionId,
+        session.memberId,
+        session.email
+      )
+      if (owned) {
+        await recordGenerationAction(generationSessionId, "spanish_generated")
+      }
     }
 
     return NextResponse.json({ translation: result.data })

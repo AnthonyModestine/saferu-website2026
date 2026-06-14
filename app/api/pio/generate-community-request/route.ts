@@ -8,6 +8,8 @@ import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
 import { consumeGeneration, getGenerationStatus } from "@/lib/pio-generations"
 import { aiErrorPayload } from "@/lib/ai-result"
 import { validateVideoRequestInput } from "@/lib/pio-generate-validation"
+import { logVideoRequestSession } from "@/lib/pio-session-helper"
+import { resolveMemberDepartment } from "@/lib/member-profile"
 
 const MAX = 1000
 
@@ -93,7 +95,22 @@ export async function POST(request: Request) {
       )
     }
 
-    return NextResponse.json({ content: result.data })
+    const { departmentType, departmentOther } = await resolveMemberDepartment(session.email, {
+      departmentType: typeof body.departmentType === "string" ? body.departmentType : body.agencyType,
+      departmentOther: body.departmentOther,
+    })
+
+    const sessionId = await logVideoRequestSession({
+      memberSession: session,
+      stripePaid,
+      trialActive,
+      agencyName: cap(body.agencyName, 100) || undefined,
+      departmentType,
+      departmentOther,
+      incidentType: resolvedType,
+    })
+
+    return NextResponse.json({ content: result.data, sessionId })
   } catch (e) {
     console.error("Generate video request error:", e)
     return NextResponse.json({ error: "Failed to generate video request." }, { status: 500 })

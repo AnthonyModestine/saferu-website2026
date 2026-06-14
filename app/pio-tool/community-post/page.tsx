@@ -26,6 +26,8 @@ import { addPioHistoryItem } from "@/lib/pio-history-store"
 import { PIOPreviewGate } from "@/components/pio-preview-gate"
 import { GenerationLimitModal } from "@/components/generation-limit-modal"
 import { track } from "@/lib/track"
+import { trackPioAction } from "@/lib/pio-analytics-client"
+import { GenerationFeedback } from "@/components/pio/generation-feedback"
 import { validateVideoRequestInput } from "@/lib/pio-generate-validation"
 
 const incidentTypes = [
@@ -85,6 +87,8 @@ export default function CommunityPostPage() {
 
   // Generated post
   const [generatedPost, setGeneratedPost] = useState("")
+  const [videoSessionId, setVideoSessionId] = useState<string | null>(null)
+  const [showFeedback, setShowFeedback] = useState(false)
 
   // Pre-fill from agency settings
   useEffect(() => {
@@ -134,11 +138,19 @@ export default function CommunityPostPage() {
           contactDetails: contactDetails?.trim() || undefined,
           caseNumber: caseNumber?.trim() || undefined,
           tipLine: tipLine?.trim() || undefined,
+          agencyType: agencySettings.agencyType,
+          departmentType: agencySettings.agencyType,
+          departmentOther:
+            agencySettings.agencyType === "other"
+              ? agencySettings.agencyTypeOther.trim() || undefined
+              : undefined,
         }),
       })
       const data = await res.json()
       if (res.ok && data.content) {
         setGeneratedPost(data.content)
+        setVideoSessionId(data.sessionId ?? null)
+        setShowFeedback(true)
         addPioHistoryItem({
           title: `${displayIncident || "Incident"} - Video Request`,
           type: displayIncident || "Incident",
@@ -171,6 +183,7 @@ export default function CommunityPostPage() {
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(generatedPost)
+    trackPioAction(videoSessionId, "video_request_copied")
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
@@ -178,6 +191,8 @@ export default function CommunityPostPage() {
   const handleClear = () => {
     setGenerated(false)
     setGeneratedPost("")
+    setVideoSessionId(null)
+    setShowFeedback(false)
     setIncidentType("")
     setOtherIncidentType("")
     setAddress("")
@@ -395,6 +410,12 @@ export default function CommunityPostPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {showFeedback && videoSessionId && (
+                <GenerationFeedback
+                  generationSessionId={videoSessionId}
+                  onDone={() => setShowFeedback(false)}
+                />
+              )}
               <div className="rounded-lg border border-border bg-card p-6">
                 <textarea
                   value={generatedPost}

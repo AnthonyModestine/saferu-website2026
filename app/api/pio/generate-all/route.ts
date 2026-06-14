@@ -7,6 +7,8 @@ import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
 import { consumeGeneration, getGenerationStatus } from "@/lib/pio-generations"
 import { aiErrorPayload } from "@/lib/ai-result"
 import { validatePressReleaseInput } from "@/lib/pio-generate-validation"
+import { logPressReleaseSessions } from "@/lib/pio-session-helper"
+import { resolveMemberDepartment } from "@/lib/member-profile"
 
 const MAX = 1000 // max chars for free-text fields
 
@@ -121,7 +123,29 @@ export async function POST(request: Request) {
       )
     }
 
-    return NextResponse.json(result.data)
+    const includeVideoRequest =
+      payload.investigationOngoing ||
+      payload.requestFootage ||
+      Boolean(payload.footageTimeframe?.trim() || payload.whatToLookFor?.trim())
+
+    const { departmentType, departmentOther } = await resolveMemberDepartment(session.email, {
+      departmentType: typeof body.departmentType === "string" ? body.departmentType : body.agencyType,
+      departmentOther: body.departmentOther,
+    })
+
+    const sessionIds = await logPressReleaseSessions({
+      memberSession: session,
+      stripePaid,
+      trialActive,
+      agencyName: payload.agencyName || undefined,
+      departmentType,
+      departmentOther,
+      incidentType: resolvedType,
+      investigationOngoing: payload.investigationOngoing,
+      includeVideoRequest,
+    })
+
+    return NextResponse.json({ ...result.data, sessionIds })
   } catch (e) {
     console.error("Generate all outputs error:", e)
     return NextResponse.json({ error: "Failed to generate outputs." }, { status: 500 })

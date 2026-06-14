@@ -22,11 +22,14 @@ import {
 } from "@/lib/signup-validation"
 import { cn } from "@/lib/utils"
 import { CheckCircle, ArrowRight } from "lucide-react"
+import { DepartmentTypeFields } from "@/components/department-type-fields"
 
 export default function MemberSitePage() {
   const [signUpSuccess, setSignUpSuccess] = useState(false)
   const [signUpFieldErrors, setSignUpFieldErrors] = useState<SignupFieldErrors>({})
   const [signUpLoading, setSignUpLoading] = useState(false)
+  const [departmentType, setDepartmentType] = useState("")
+  const [departmentOther, setDepartmentOther] = useState("")
   const [signInError, setSignInError] = useState<string | null>(null)
   const [signInLoading, setSignInLoading] = useState(false)
 
@@ -93,6 +96,8 @@ export default function MemberSitePage() {
       firstName,
       lastName,
       agency,
+      departmentType,
+      departmentOther,
       requireNames: true,
       requireAgency: true,
     })
@@ -106,7 +111,15 @@ export default function MemberSitePage() {
       const res = await fetch("/api/members/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, firstName, lastName, agency, password }),
+        body: JSON.stringify({
+          email,
+          firstName,
+          lastName,
+          agency,
+          departmentType,
+          departmentOther: departmentType === "other" ? departmentOther : undefined,
+          password,
+        }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -250,6 +263,16 @@ export default function MemberSitePage() {
                               />
                               <FieldError message={signUpFieldErrors.agency} />
                             </div>
+                            <DepartmentTypeFields
+                              departmentType={departmentType}
+                              departmentOther={departmentOther}
+                              onDepartmentTypeChange={setDepartmentType}
+                              onDepartmentOtherChange={setDepartmentOther}
+                              departmentTypeError={signUpFieldErrors.departmentType}
+                              departmentOtherError={signUpFieldErrors.departmentOther}
+                              onClearDepartmentTypeError={() => clearSignUpFieldError("departmentType")}
+                              onClearDepartmentOtherError={() => clearSignUpFieldError("departmentOther")}
+                            />
                             <div className="space-y-2">
                               <Label htmlFor="signupPassword">Password (min 8 characters)</Label>
                               <PasswordInput

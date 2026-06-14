@@ -1,11 +1,14 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
+import type { DepartmentType } from "@/lib/department-types"
 
 const STORAGE_KEY = "pio_agency_settings"
 
 interface AgencySettings {
   agencyName: string
+  agencyType: DepartmentType
+  agencyTypeOther: string
   city: string
   state: string
   boilerplate: string
@@ -23,6 +26,8 @@ interface AgencyContextType {
 
 const defaultSettings: AgencySettings = {
   agencyName: "",
+  agencyType: "other",
+  agencyTypeOther: "",
   city: "",
   state: "",
   boilerplate: "",
@@ -64,6 +69,8 @@ function loadStored(): AgencySettings {
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<AgencySettings>
       const merged = { ...defaultSettings, ...parsed }
+      if (!merged.agencyType) merged.agencyType = "other"
+      if (typeof merged.agencyTypeOther !== "string") merged.agencyTypeOther = ""
       const sanitized = sanitizeSettings(merged)
       // Persist the sanitized version so it's clean going forward
       localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized))
@@ -90,7 +97,30 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<AgencySettings>(defaultSettings)
 
   useEffect(() => {
-    setSettings(loadStored())
+    const hadStored =
+      typeof window !== "undefined" && Boolean(localStorage.getItem(STORAGE_KEY))
+    const stored = loadStored()
+    setSettings(stored)
+
+    if (hadStored) return
+
+    fetch("/api/auth/session")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        const member = data?.member
+        if (!member) return
+        setSettings((prev) => {
+          const next: AgencySettings = {
+            ...prev,
+            agencyName: member.agency || prev.agencyName,
+            agencyType: member.departmentType || prev.agencyType,
+            agencyTypeOther: member.departmentOther || prev.agencyTypeOther,
+          }
+          saveStored(next)
+          return next
+        })
+      })
+      .catch(() => {})
   }, [])
 
   const updateSettings = (newSettings: Partial<AgencySettings>) => {

@@ -8,6 +8,7 @@ import { readFile, writeFile, mkdir } from "fs/promises"
 import path from "path"
 import { hashPassword } from "@/lib/password"
 import { ensureSchema, getSql, isDatabaseConfigured } from "@/lib/db"
+import type { DepartmentType } from "@/lib/department-types"
 
 const DATA_DIR = path.join(process.cwd(), "data")
 const FILE_PATH = path.join(DATA_DIR, "free-members.json")
@@ -17,6 +18,8 @@ export interface FreeMember {
   email: string
   name: string
   agency?: string
+  departmentType?: DepartmentType
+  departmentOther?: string
   createdAt: number // Unix seconds
   /** Hashed password; never send to client or include in exports */
   passwordHash?: string
@@ -31,6 +34,8 @@ interface MemberRow {
   email: string
   name: string
   agency: string | null
+  department_type: string | null
+  department_other: string | null
   password_hash: string | null
   created_at: string | number
 }
@@ -41,6 +46,8 @@ function rowToMember(row: MemberRow): FreeMember {
     email: row.email,
     name: row.name,
     agency: row.agency ?? undefined,
+    departmentType: row.department_type ? (row.department_type as DepartmentType) : undefined,
+    departmentOther: row.department_other ?? undefined,
     passwordHash: row.password_hash ?? undefined,
     createdAt: Number(row.created_at),
   }
@@ -65,7 +72,7 @@ export async function getFreeMembers(): Promise<FreeMember[]> {
   if (isDatabaseConfigured()) {
     await ensureSchema()
     const rows = await getSql()`
-      SELECT id, email, name, agency, password_hash, created_at
+      SELECT id, email, name, agency, department_type, department_other, password_hash, created_at
       FROM free_members
       ORDER BY created_at DESC
     `
@@ -83,7 +90,7 @@ export async function getFreeMemberByEmail(email: string): Promise<FreeMember | 
   if (isDatabaseConfigured()) {
     await ensureSchema()
     const rows = await getSql()`
-      SELECT id, email, name, agency, password_hash, created_at
+      SELECT id, email, name, agency, department_type, department_other, password_hash, created_at
       FROM free_members
       WHERE email = ${normalized}
       LIMIT 1
@@ -100,6 +107,8 @@ export async function addFreeMember(params: {
   email: string
   name: string
   agency?: string
+  departmentType: DepartmentType
+  departmentOther?: string
   password?: string
 }): Promise<{ id: string } | { error: string }> {
   const email = params.email.trim().toLowerCase()
@@ -108,6 +117,8 @@ export async function addFreeMember(params: {
   const id = crypto.randomUUID()
   const name = params.name.trim() || email
   const agency = params.agency?.trim() || null
+  const departmentOther =
+    params.departmentType === "other" ? params.departmentOther?.trim() || null : null
   const createdAt = Math.floor(Date.now() / 1000)
   let passwordHash: string | null = null
   if (params.password?.trim()) {
@@ -118,8 +129,13 @@ export async function addFreeMember(params: {
     try {
       await ensureSchema()
       await getSql()`
-        INSERT INTO free_members (id, email, name, agency, password_hash, created_at)
-        VALUES (${id}, ${email}, ${name}, ${agency}, ${passwordHash}, ${createdAt})
+        INSERT INTO free_members (
+          id, email, name, agency, department_type, department_other, password_hash, created_at
+        )
+        VALUES (
+          ${id}, ${email}, ${name}, ${agency}, ${params.departmentType}, ${departmentOther},
+          ${passwordHash}, ${createdAt}
+        )
       `
       return { id }
     } catch (err) {
@@ -141,6 +157,8 @@ export async function addFreeMember(params: {
     email,
     name,
     agency: agency ?? undefined,
+    departmentType: params.departmentType,
+    departmentOther: departmentOther ?? undefined,
     createdAt,
     ...(passwordHash && { passwordHash }),
   }

@@ -1,9 +1,13 @@
+import { isDepartmentType } from "@/lib/department-types"
+
 export interface SignupFieldErrors {
   email?: string
   password?: string
   firstName?: string
   lastName?: string
   agency?: string
+  departmentType?: string
+  departmentOther?: string
   form?: string
 }
 
@@ -15,8 +19,11 @@ export function validateSignupFields(values: {
   firstName?: string
   lastName?: string
   agency?: string
+  departmentType?: string
+  departmentOther?: string
   requireNames?: boolean
   requireAgency?: boolean
+  requireDepartment?: boolean
 }): SignupFieldErrors {
   const errors: SignupFieldErrors = {}
   const email = values.email.trim()
@@ -36,6 +43,18 @@ export function validateSignupFields(values: {
 
   if (values.requireAgency && !values.agency?.trim()) {
     errors.agency = "Agency name is required"
+  }
+
+  const requireDepartment = values.requireDepartment !== false
+  if (requireDepartment) {
+    const departmentType = values.departmentType?.trim() ?? ""
+    if (!departmentType) {
+      errors.departmentType = "Department type is required"
+    } else if (!isDepartmentType(departmentType)) {
+      errors.departmentType = "Select a valid department type"
+    } else if (departmentType === "other" && !values.departmentOther?.trim()) {
+      errors.departmentOther = "Please describe your department"
+    }
   }
 
   return errors
@@ -60,6 +79,12 @@ export function mapSignupApiError(message: string): SignupFieldErrors {
   }
   if (lower.includes("email") && lower.includes("required")) {
     return { email: "Email is required" }
+  }
+  if (lower.includes("department") && lower.includes("required")) {
+    return { departmentType: "Department type is required" }
+  }
+  if (lower.includes("describe your department")) {
+    return { departmentOther: "Please describe your department" }
   }
   if (lower.includes("too many")) {
     return { form: message }

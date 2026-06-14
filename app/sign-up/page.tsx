@@ -18,6 +18,7 @@ import {
 } from "@/lib/signup-validation"
 import { cn } from "@/lib/utils"
 import { Check } from "lucide-react"
+import { DepartmentTypeFields } from "@/components/department-type-fields"
 
 const benefits = [
   "Access to What's New — updated every week",
@@ -31,6 +32,8 @@ export default function SignUpPage() {
   const [success, setSuccess] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<SignupFieldErrors>({})
   const [loading, setLoading] = useState(false)
+  const [departmentType, setDepartmentType] = useState("")
+  const [departmentOther, setDepartmentOther] = useState("")
 
   const clearFieldError = (field: keyof SignupFieldErrors) => {
     setFieldErrors((prev) => {
@@ -51,7 +54,12 @@ export default function SignUpPage() {
     const agency = (form.querySelector("#agency") as HTMLInputElement)?.value?.trim()
     const password = (form.querySelector("#password") as HTMLInputElement)?.value ?? ""
 
-    const validationErrors = validateSignupFields({ email, password })
+    const validationErrors = validateSignupFields({
+      email,
+      password,
+      departmentType,
+      departmentOther,
+    })
     if (hasSignupErrors(validationErrors)) {
       setFieldErrors(validationErrors)
       return
@@ -62,7 +70,15 @@ export default function SignUpPage() {
       const res = await fetch("/api/members/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, firstName, lastName, agency, password }),
+        body: JSON.stringify({
+          email,
+          firstName,
+          lastName,
+          agency,
+          departmentType,
+          departmentOther: departmentType === "other" ? departmentOther : undefined,
+          password,
+        }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -163,6 +179,16 @@ export default function SignUpPage() {
                 className="placeholder:text-muted-foreground/60"
               />
             </div>
+            <DepartmentTypeFields
+              departmentType={departmentType}
+              departmentOther={departmentOther}
+              onDepartmentTypeChange={setDepartmentType}
+              onDepartmentOtherChange={setDepartmentOther}
+              departmentTypeError={fieldErrors.departmentType}
+              departmentOtherError={fieldErrors.departmentOther}
+              onClearDepartmentTypeError={() => clearFieldError("departmentType")}
+              onClearDepartmentOtherError={() => clearFieldError("departmentOther")}
+            />
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input

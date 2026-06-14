@@ -8,8 +8,16 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Save, Upload, Building2, X, CreditCard, ExternalLink } from "lucide-react"
 import { useAgency } from "@/lib/agency-context"
+import { DEPARTMENT_TYPES } from "@/lib/department-types"
 import { useSubscription } from "@/lib/use-subscription"
 import { useMemberSession } from "@/lib/use-member-session"
 import Image from "next/image"
@@ -101,6 +109,37 @@ export default function AgencySettingsPage() {
               onChange={(e) => updateSettings({ agencyName: e.target.value })}
             />
           </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="agencyType">Department Type</Label>
+            <Select
+              value={settings.agencyType}
+              onValueChange={(v) => updateSettings({ agencyType: v as typeof settings.agencyType })}
+            >
+              <SelectTrigger id="agencyType">
+                <SelectValue placeholder="Select department type" />
+              </SelectTrigger>
+              <SelectContent>
+                {DEPARTMENT_TYPES.map((d) => (
+                  <SelectItem key={d.value} value={d.value}>
+                    {d.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {settings.agencyType === "other" && (
+            <div className="space-y-2">
+              <Label htmlFor="agencyTypeOther">Describe your department</Label>
+              <Input
+                id="agencyTypeOther"
+                placeholder="e.g. Campus Security, Tribal Police"
+                value={settings.agencyTypeOther}
+                onChange={(e) => updateSettings({ agencyTypeOther: e.target.value })}
+              />
+            </div>
+          )}
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
