@@ -27,6 +27,7 @@ import {
 import { CircleHelp } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { METRIC_HELP } from "@/lib/metrics-help"
+import { useIsMobile } from "@/hooks/use-mobile"
 import type { PressCenterDashboard } from "@/lib/pio-analytics"
 import type { ContentAnalyticsDashboard } from "@/lib/content-analytics"
 
@@ -122,21 +123,26 @@ function pct(used: number, total: number): number {
 }
 
 function MetricHelp({ text, className }: { text: string; className?: string }) {
+  const isMobile = useIsMobile()
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <button
           type="button"
           className={cn(
-            "inline-flex shrink-0 rounded-full text-gray-400 transition-colors hover:text-[#1470AF] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1470AF]/40",
+            "inline-flex shrink-0 rounded-full p-0.5 text-gray-400 transition-colors hover:text-[#1470AF] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1470AF]/40",
             className
           )}
           aria-label="What does this metric mean?"
         >
-          <CircleHelp className="h-3.5 w-3.5" />
+          <CircleHelp className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
         </button>
       </TooltipTrigger>
-      <TooltipContent side="top" sideOffset={6} className="max-w-[280px] text-left leading-relaxed">
+      <TooltipContent
+        side={isMobile ? "bottom" : "top"}
+        sideOffset={6}
+        className="max-w-[min(280px,calc(100vw-2rem))] text-left leading-relaxed"
+      >
         {text}
       </TooltipContent>
     </Tooltip>
@@ -156,7 +162,7 @@ function ChartTitle({
 }) {
   return (
     <>
-      <CardTitle className={cn("flex items-center gap-1.5 text-lg", className)}>
+      <CardTitle className={cn("flex items-center gap-1.5 text-base sm:text-lg", className)}>
         {title}
         <MetricHelp text={help} />
       </CardTitle>
@@ -171,15 +177,15 @@ function SummaryCards({
   items: { label: string; value: number | string; help?: string }[]
 }) {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
       {items.map((c) => (
         <Card key={c.label}>
-          <CardContent className="p-4">
-            <p className="inline-flex items-center gap-1 text-xs font-medium text-gray-500">
+          <CardContent className="p-3 sm:p-4">
+            <p className="inline-flex items-start gap-1 text-[11px] font-medium leading-snug text-gray-500 sm:text-xs">
               {c.label}
-              {c.help ? <MetricHelp text={c.help} /> : null}
+              {c.help ? <MetricHelp text={c.help} className="mt-0.5" /> : null}
             </p>
-            <p className="text-2xl font-bold text-gray-900">{c.value}</p>
+            <p className="mt-1 text-xl font-bold text-gray-900 sm:text-2xl">{c.value}</p>
           </CardContent>
         </Card>
       ))}
@@ -208,14 +214,22 @@ function HorizontalBarChart({
   color?: string
   height?: number
 }) {
+  const isMobile = useIsMobile()
+  const chartHeight = isMobile ? Math.max(height, 240) : height
+
   if (data.length === 0) return <ChartEmpty message="No data in this period yet." />
   return (
-    <div style={{ height }}>
+    <div style={{ height: chartHeight }}>
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} layout="vertical" margin={{ left: 4, right: 16 }}>
+        <BarChart data={data} layout="vertical" margin={{ left: 0, right: 8, top: 4, bottom: 4 }}>
           <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-          <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
-          <YAxis type="category" dataKey={categoryKey} width={130} tick={{ fontSize: 10 }} />
+          <XAxis type="number" allowDecimals={false} tick={{ fontSize: isMobile ? 10 : 11 }} />
+          <YAxis
+            type="category"
+            dataKey={categoryKey}
+            width={isMobile ? 96 : 130}
+            tick={{ fontSize: isMobile ? 9 : 10 }}
+          />
           <RechartsTooltip />
           <Bar dataKey={dataKey} fill={color} radius={[0, 4, 4, 0]} />
         </BarChart>
@@ -235,16 +249,26 @@ function VerticalBarChart({
   categoryKey: string
   height?: number
 }) {
+  const isMobile = useIsMobile()
+  const chartHeight = isMobile ? Math.max(height, 260) : height
+
   if (data.length === 0) return <ChartEmpty message="No data in this period yet." />
   return (
-    <div style={{ height }}>
+    <div style={{ height: chartHeight }}>
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ bottom: 4 }}>
+        <BarChart data={data} margin={{ bottom: isMobile ? 48 : 4, left: 0, right: 8 }}>
           <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey={categoryKey} tick={{ fontSize: 10 }} interval={0} angle={-25} textAnchor="end" height={60} />
-          <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={36} />
+          <XAxis
+            dataKey={categoryKey}
+            tick={{ fontSize: isMobile ? 9 : 10 }}
+            interval={0}
+            angle={isMobile ? -40 : -25}
+            textAnchor="end"
+            height={isMobile ? 72 : 60}
+          />
+          <YAxis allowDecimals={false} tick={{ fontSize: isMobile ? 10 : 11 }} width={isMobile ? 28 : 36} />
           <RechartsTooltip />
-          <Legend />
+          <Legend wrapperStyle={{ fontSize: isMobile ? 11 : 12 }} />
           {bars.map((b) => (
             <Bar key={b.dataKey} dataKey={b.dataKey} name={b.name} fill={b.color} radius={[4, 4, 0, 0]} />
           ))}
@@ -420,22 +444,24 @@ export function MetricsDashboardView() {
   }
 
   const groupByTabs = (
-    <Tabs value={groupBy} onValueChange={(v) => setGroupBy(v as typeof groupBy)}>
-      <TabsList>
-        <TabsTrigger value="day">Day</TabsTrigger>
-        <TabsTrigger value="week">Week</TabsTrigger>
-        <TabsTrigger value="month">Month</TabsTrigger>
-      </TabsList>
-    </Tabs>
+    <div className="w-full overflow-x-auto sm:w-auto">
+      <Tabs value={groupBy} onValueChange={(v) => setGroupBy(v as typeof groupBy)}>
+        <TabsList className="inline-flex w-max min-w-full sm:min-w-0">
+          <TabsTrigger value="day" className="px-2.5 sm:px-3">Day</TabsTrigger>
+          <TabsTrigger value="week" className="px-2.5 sm:px-3">Week</TabsTrigger>
+          <TabsTrigger value="month" className="px-2.5 sm:px-3">Month</TabsTrigger>
+        </TabsList>
+      </Tabs>
+    </div>
   )
 
   if (loading && !data) {
-    return <div className="p-8 text-gray-500">Loading metrics…</div>
+    return <div className="p-4 text-gray-500 sm:p-8">Loading metrics…</div>
   }
 
   if (!pc) {
     return (
-      <div className="p-8">
+      <div className="p-4 sm:p-8">
         <p className="text-gray-500">{error || "Failed to load metrics."}</p>
       </div>
     )
@@ -448,12 +474,14 @@ export function MetricsDashboardView() {
 
   return (
     <TooltipProvider delayDuration={200}>
-    <div className="p-8 space-y-6">
+    <div className="space-y-4 p-4 sm:space-y-6 sm:p-6 lg:p-8">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Metrics</h1>
-        <p className="mt-1 text-gray-500">
-          All site analytics in one place — signups by department, usage, agency activity, feedback, and curated content.
-          Hover the <CircleHelp className="inline h-3.5 w-3.5 align-text-bottom text-gray-400" /> icon on any metric for a plain-language explanation.
+        <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">Metrics</h1>
+        <p className="mt-1 text-sm text-gray-500 sm:text-base">
+          Signups, usage, agency activity, feedback, and curated content.
+          <span className="hidden sm:inline">
+            {" "}Tap the <CircleHelp className="inline h-3.5 w-3.5 align-text-bottom text-gray-400" /> icon on any metric for details.
+          </span>
         </p>
       </div>
 
@@ -464,35 +492,45 @@ export function MetricsDashboardView() {
             <MetricHelp text={METRIC_HELP.dateRange} />
           </CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-wrap items-end gap-3">
-          <Tabs value={preset} onValueChange={(v) => setPreset(v as Preset)}>
-            <TabsList>
-              <TabsTrigger value="7d">Last 7 Days</TabsTrigger>
-              <TabsTrigger value="30d">Last 30 Days</TabsTrigger>
-              <TabsTrigger value="90d">Last 90 Days</TabsTrigger>
-              <TabsTrigger value="year">This Year</TabsTrigger>
-              <TabsTrigger value="custom">Custom</TabsTrigger>
-            </TabsList>
-          </Tabs>
+        <CardContent className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+          <div className="w-full overflow-x-auto sm:w-auto">
+            <Tabs value={preset} onValueChange={(v) => setPreset(v as Preset)}>
+              <TabsList className="inline-flex h-auto w-max min-w-full flex-nowrap sm:min-w-0">
+                <TabsTrigger value="7d" className="px-2.5 text-xs sm:px-3 sm:text-sm">7 Days</TabsTrigger>
+                <TabsTrigger value="30d" className="px-2.5 text-xs sm:px-3 sm:text-sm">30 Days</TabsTrigger>
+                <TabsTrigger value="90d" className="px-2.5 text-xs sm:px-3 sm:text-sm">90 Days</TabsTrigger>
+                <TabsTrigger value="year" className="px-2.5 text-xs sm:px-3 sm:text-sm">Year</TabsTrigger>
+                <TabsTrigger value="custom" className="px-2.5 text-xs sm:px-3 sm:text-sm">Custom</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
           {preset === "custom" && (
             <>
-              <Input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className="w-auto" />
-              <Input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} className="w-auto" />
+              <Input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className="w-full sm:w-auto" />
+              <Input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} className="w-full sm:w-auto" />
             </>
           )}
-          <Button onClick={() => void load()} disabled={loading}>
+          <Button onClick={() => void load()} disabled={loading} className="w-full sm:w-auto">
             {loading ? "Loading…" : "Apply"}
           </Button>
         </CardContent>
       </Card>
 
       <Tabs value={section} onValueChange={(v) => setSection(v as SectionTab)}>
-        <TabsList className="flex h-auto flex-wrap gap-1">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="agencies">Agencies &amp; Signups</TabsTrigger>
-          <TabsTrigger value="feedback">Feedback</TabsTrigger>
-          <TabsTrigger value="content">Curated Content</TabsTrigger>
-        </TabsList>
+        <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+          <TabsList className="inline-flex h-auto w-max min-w-full flex-nowrap gap-1 sm:min-w-0">
+            <TabsTrigger value="overview" className="px-2.5 text-xs sm:px-3 sm:text-sm">Overview</TabsTrigger>
+            <TabsTrigger value="agencies" className="px-2.5 text-xs sm:px-3 sm:text-sm">
+              <span className="sm:hidden">Agencies</span>
+              <span className="hidden sm:inline">Agencies &amp; Signups</span>
+            </TabsTrigger>
+            <TabsTrigger value="feedback" className="px-2.5 text-xs sm:px-3 sm:text-sm">Feedback</TabsTrigger>
+            <TabsTrigger value="content" className="px-2.5 text-xs sm:px-3 sm:text-sm">
+              <span className="sm:hidden">Content</span>
+              <span className="hidden sm:inline">Curated Content</span>
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="overview" className="mt-6 space-y-6">
           <SummaryCards
@@ -510,7 +548,7 @@ export function MetricsDashboardView() {
 
           <div className="grid gap-6 lg:grid-cols-2">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between gap-2">
+              <CardHeader className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <ChartTitle
                     title="Generation sessions"
@@ -520,7 +558,7 @@ export function MetricsDashboardView() {
                 </div>
                 {groupByTabs}
               </CardHeader>
-              <CardContent className="h-[280px]">
+              <CardContent className="h-[220px] sm:h-[280px]">
                 {usageChart.length === 0 ? (
                   <ChartEmpty message="No generation sessions in this period." />
                 ) : (
@@ -540,7 +578,7 @@ export function MetricsDashboardView() {
             </Card>
 
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between gap-2">
+              <CardHeader className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <ChartTitle
                     title="New signups"
@@ -550,7 +588,7 @@ export function MetricsDashboardView() {
                 </div>
                 {groupByTabs}
               </CardHeader>
-              <CardContent className="h-[280px]">
+              <CardContent className="h-[220px] sm:h-[280px]">
                 {signupsChart.length === 0 ? (
                   <ChartEmpty message="No signups in this period." />
                 ) : (
@@ -614,13 +652,13 @@ export function MetricsDashboardView() {
 
           <div className="grid gap-6 lg:grid-cols-2">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between gap-2">
+              <CardHeader className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <ChartTitle title="Signups over time" help={METRIC_HELP.signupsChart} />
                 </div>
                 {groupByTabs}
               </CardHeader>
-              <CardContent className="h-[300px]">
+              <CardContent className="h-[240px] sm:h-[300px]">
                 {signupsChart.length === 0 ? (
                   <ChartEmpty message="No signups in this period." />
                 ) : (
@@ -659,8 +697,8 @@ export function MetricsDashboardView() {
                 description="Signups, registered agencies, and generation activity by type"
               />
             </CardHeader>
-            <CardContent className="overflow-x-auto">
-              <table className="w-full text-sm">
+            <CardContent className="overflow-x-auto -mx-1 px-1 sm:mx-0 sm:px-0">
+              <table className="min-w-[720px] w-full text-sm">
                 <thead>
                   <tr className="border-b text-left text-gray-500">
                     <th className="py-2 pr-4 font-medium">Department Type</th>
@@ -748,8 +786,8 @@ export function MetricsDashboardView() {
                 description="Click column headers to sort"
               />
             </CardHeader>
-            <CardContent className="overflow-x-auto">
-              <table className="w-full text-sm">
+            <CardContent className="overflow-x-auto -mx-1 px-1 sm:mx-0 sm:px-0">
+              <table className="min-w-[720px] w-full text-sm">
                 <thead>
                   <tr className="border-b text-left text-gray-500">
                     <th className="py-2 pr-4 font-medium">Agency</th>
@@ -806,7 +844,7 @@ export function MetricsDashboardView() {
               <CardHeader>
                 <ChartTitle title="Helpful vs not helpful" help={METRIC_HELP.feedbackSummary} />
               </CardHeader>
-              <CardContent className="h-[260px]">
+              <CardContent className="h-[220px] sm:h-[260px]">
                 {feedbackSummaryChart.every((d) => d.count === 0) ? (
                   <ChartEmpty message="No feedback yet." />
                 ) : (
