@@ -9,7 +9,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   ResponsiveContainer,
   Legend,
   Cell,
@@ -18,6 +18,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import { CircleHelp } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { METRIC_HELP } from "@/lib/metrics-help"
 import type { PressCenterDashboard } from "@/lib/pio-analytics"
 import type { ContentAnalyticsDashboard } from "@/lib/content-analytics"
 
@@ -28,6 +37,60 @@ type SectionTab = "overview" | "agencies" | "feedback" | "content"
 interface DashboardData {
   pressCenter: PressCenterDashboard
   content: ContentAnalyticsDashboard
+}
+
+const EMPTY_CONTENT: ContentAnalyticsDashboard = {
+  topArticles: [],
+  topCategories: [],
+  unusedArticles: [],
+  totals: { views: 0, copies: 0, downloads: 0 },
+}
+
+function normalizeDashboard(raw: Partial<DashboardData> | null | undefined): DashboardData | null {
+  if (!raw?.pressCenter) return null
+
+  const pc = raw.pressCenter
+  const content = raw.content ?? EMPTY_CONTENT
+
+  return {
+    pressCenter: {
+      ...pc,
+      usageOverTime: pc.usageOverTime ?? [],
+      incidentTypes: pc.incidentTypes ?? [],
+      departmentSignups: pc.departmentSignups ?? [],
+      signupsOverTime: pc.signupsOverTime ?? [],
+      agencyTypeBreakdown: pc.agencyTypeBreakdown ?? [],
+      planBreakdown: pc.planBreakdown ?? [],
+      feedbackByReason: pc.feedbackByReason ?? [],
+      agencyActivity: pc.agencyActivity ?? [],
+      assetUtilization: pc.assetUtilization ?? {
+        pressReleaseSessions: 0,
+        pressReleaseCopies: 0,
+        pressReleaseDownloads: 0,
+        facebookCopies: 0,
+        spanishGenerated: 0,
+        spanishCopies: 0,
+        xCopies: 0,
+        talkingPointDownloads: 0,
+        videoRequestSessions: 0,
+        videoRequestCopies: 0,
+        videoRequestDownloads: 0,
+      },
+      feedback: {
+        positiveCount: pc.feedback?.positiveCount ?? 0,
+        negativeCount: pc.feedback?.negativeCount ?? 0,
+        positivePercent: pc.feedback?.positivePercent ?? 0,
+        mostCommonComplaint: pc.feedback?.mostCommonComplaint ?? null,
+        recent: pc.feedback?.recent ?? [],
+      },
+    },
+    content: {
+      topArticles: content.topArticles ?? [],
+      topCategories: content.topCategories ?? [],
+      unusedArticles: content.unusedArticles ?? [],
+      totals: content.totals ?? EMPTY_CONTENT.totals,
+    },
+  }
 }
 
 function formatDate(ms: number): string {
@@ -58,13 +121,64 @@ function pct(used: number, total: number): number {
   return Math.round((used / total) * 100)
 }
 
-function SummaryCards({ items }: { items: { label: string; value: number | string }[] }) {
+function MetricHelp({ text, className }: { text: string; className?: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            "inline-flex shrink-0 rounded-full text-gray-400 transition-colors hover:text-[#1470AF] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1470AF]/40",
+            className
+          )}
+          aria-label="What does this metric mean?"
+        >
+          <CircleHelp className="h-3.5 w-3.5" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="top" sideOffset={6} className="max-w-[280px] text-left leading-relaxed">
+        {text}
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
+function ChartTitle({
+  title,
+  help,
+  description,
+  className,
+}: {
+  title: string
+  help: string
+  description?: string
+  className?: string
+}) {
+  return (
+    <>
+      <CardTitle className={cn("flex items-center gap-1.5 text-lg", className)}>
+        {title}
+        <MetricHelp text={help} />
+      </CardTitle>
+      {description ? <CardDescription>{description}</CardDescription> : null}
+    </>
+  )
+}
+
+function SummaryCards({
+  items,
+}: {
+  items: { label: string; value: number | string; help?: string }[]
+}) {
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {items.map((c) => (
         <Card key={c.label}>
           <CardContent className="p-4">
-            <p className="text-xs font-medium text-gray-500">{c.label}</p>
+            <p className="inline-flex items-center gap-1 text-xs font-medium text-gray-500">
+              {c.label}
+              {c.help ? <MetricHelp text={c.help} /> : null}
+            </p>
             <p className="text-2xl font-bold text-gray-900">{c.value}</p>
           </CardContent>
         </Card>
@@ -102,7 +216,7 @@ function HorizontalBarChart({
           <CartesianGrid strokeDasharray="3 3" horizontal={false} />
           <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
           <YAxis type="category" dataKey={categoryKey} width={130} tick={{ fontSize: 10 }} />
-          <Tooltip />
+          <RechartsTooltip />
           <Bar dataKey={dataKey} fill={color} radius={[0, 4, 4, 0]} />
         </BarChart>
       </ResponsiveContainer>
@@ -129,7 +243,7 @@ function VerticalBarChart({
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey={categoryKey} tick={{ fontSize: 10 }} interval={0} angle={-25} textAnchor="end" height={60} />
           <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={36} />
-          <Tooltip />
+          <RechartsTooltip />
           <Legend />
           {bars.map((b) => (
             <Bar key={b.dataKey} dataKey={b.dataKey} name={b.name} fill={b.color} radius={[4, 4, 0, 0]} />
@@ -163,7 +277,8 @@ export function MetricsDashboardView() {
     try {
       const res = await fetch(`/api/metrics?${params}`)
       if (res.ok) {
-        setData(await res.json())
+        const json = (await res.json()) as Partial<DashboardData>
+        setData(normalizeDashboard(json))
       } else {
         setData(null)
         setError(`Could not load metrics (${res.status})`)
@@ -185,7 +300,7 @@ export function MetricsDashboardView() {
 
   const usageChart = useMemo(() => {
     if (!pc) return []
-    return pc.usageOverTime.map((d) => ({
+    return (pc.usageOverTime ?? []).map((d) => ({
       ...d,
       label: formatPeriod(d.period, groupBy),
     }))
@@ -193,7 +308,7 @@ export function MetricsDashboardView() {
 
   const signupsChart = useMemo(() => {
     if (!pc) return []
-    return pc.signupsOverTime.map((d) => ({
+    return (pc.signupsOverTime ?? []).map((d) => ({
       ...d,
       label: formatPeriod(d.period, groupBy),
     }))
@@ -201,7 +316,7 @@ export function MetricsDashboardView() {
 
   const topAgenciesChart = useMemo(() => {
     if (!pc) return []
-    return [...pc.agencyActivity]
+    return [...(pc.agencyActivity ?? [])]
       .filter((a) => a.totalSessions > 0)
       .sort((a, b) => b.totalSessions - a.totalSessions)
       .slice(0, 12)
@@ -228,7 +343,7 @@ export function MetricsDashboardView() {
 
   const agencyTypeChart = useMemo(() => {
     if (!pc) return []
-    return pc.agencyTypeBreakdown.slice(0, 12).map((row) => ({
+    return (pc.agencyTypeBreakdown ?? []).slice(0, 12).map((row) => ({
       type: row.type,
       signups: row.signups,
       sessions: row.totalSessions,
@@ -238,7 +353,7 @@ export function MetricsDashboardView() {
 
   const agencyTypeFeedbackChart = useMemo(() => {
     if (!pc) return []
-    return pc.agencyTypeBreakdown
+    return (pc.agencyTypeBreakdown ?? [])
       .filter((r) => r.positiveFeedback + r.negativeFeedback > 0)
       .slice(0, 12)
       .map((row) => ({
@@ -269,7 +384,7 @@ export function MetricsDashboardView() {
 
   const sortedAgencies = useMemo(() => {
     if (!pc) return []
-    const rows = [...pc.agencyActivity]
+    const rows = [...(pc.agencyActivity ?? [])]
     rows.sort((a, b) => {
       let av: number | null = 0
       let bv: number | null = 0
@@ -332,17 +447,22 @@ export function MetricsDashboardView() {
   ]
 
   return (
+    <TooltipProvider delayDuration={200}>
     <div className="p-8 space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Metrics</h1>
         <p className="mt-1 text-gray-500">
           All site analytics in one place — signups by department, usage, agency activity, feedback, and curated content.
+          Hover the <CircleHelp className="inline h-3.5 w-3.5 align-text-bottom text-gray-400" /> icon on any metric for a plain-language explanation.
         </p>
       </div>
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Date range</CardTitle>
+          <CardTitle className="flex items-center gap-1.5 text-base">
+            Date range
+            <MetricHelp text={METRIC_HELP.dateRange} />
+          </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap items-end gap-3">
           <Tabs value={preset} onValueChange={(v) => setPreset(v as Preset)}>
@@ -377,14 +497,14 @@ export function MetricsDashboardView() {
         <TabsContent value="overview" className="mt-6 space-y-6">
           <SummaryCards
             items={[
-              { label: "Total Agencies", value: pc.summary.totalAgencies },
-              { label: "New Signups", value: pc.summary.newSignups },
-              { label: "Press Release Sessions", value: pc.summary.newPressReleaseSessions },
-              { label: "Video Request Sessions", value: pc.summary.videoRequestSessions },
-              { label: "Downloads", value: pc.summary.pressReleaseDownloads + pc.summary.talkingPointDownloads },
-              { label: "Copies", value: pc.summary.totalCopyActions },
-              { label: "Positive Feedback", value: `${pc.feedback.positivePercent}%` },
-              { label: "Curated Views", value: content?.totals.views ?? 0 },
+              { label: "Total Agencies", value: pc.summary.totalAgencies, help: METRIC_HELP.totalAgencies },
+              { label: "New Signups", value: pc.summary.newSignups, help: METRIC_HELP.newSignups },
+              { label: "Press Release Sessions", value: pc.summary.newPressReleaseSessions, help: METRIC_HELP.pressReleaseSessions },
+              { label: "Video Request Sessions", value: pc.summary.videoRequestSessions, help: METRIC_HELP.videoRequestSessions },
+              { label: "Downloads", value: pc.summary.pressReleaseDownloads + pc.summary.talkingPointDownloads, help: METRIC_HELP.downloads },
+              { label: "Copies", value: pc.summary.totalCopyActions, help: METRIC_HELP.copies },
+              { label: "Positive Feedback", value: `${pc.feedback.positivePercent}%`, help: METRIC_HELP.positiveFeedback },
+              { label: "Curated Views", value: content?.totals.views ?? 0, help: METRIC_HELP.curatedViews },
             ]}
           />
 
@@ -392,8 +512,11 @@ export function MetricsDashboardView() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between gap-2">
                 <div>
-                  <CardTitle className="text-lg">Generation sessions</CardTitle>
-                  <CardDescription>Press releases vs video requests over time</CardDescription>
+                  <ChartTitle
+                    title="Generation sessions"
+                    help={METRIC_HELP.generationSessionsChart}
+                    description="Press releases vs video requests over time"
+                  />
                 </div>
                 {groupByTabs}
               </CardHeader>
@@ -406,7 +529,7 @@ export function MetricsDashboardView() {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                       <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={32} />
-                      <Tooltip />
+                      <RechartsTooltip />
                       <Legend />
                       <Line type="monotone" dataKey="newPressReleaseSessions" name="Press Release" stroke="#1470AF" strokeWidth={2} dot={false} />
                       <Line type="monotone" dataKey="videoRequestSessions" name="Video Request" stroke="#7c3aed" strokeWidth={2} dot={false} />
@@ -419,8 +542,11 @@ export function MetricsDashboardView() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between gap-2">
                 <div>
-                  <CardTitle className="text-lg">New signups</CardTitle>
-                  <CardDescription>Member registrations over time</CardDescription>
+                  <ChartTitle
+                    title="New signups"
+                    help={METRIC_HELP.signupsChart}
+                    description="Member registrations over time"
+                  />
                 </div>
                 {groupByTabs}
               </CardHeader>
@@ -433,7 +559,7 @@ export function MetricsDashboardView() {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                       <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={32} />
-                      <Tooltip />
+                      <RechartsTooltip />
                       <Bar dataKey="count" name="Signups" fill="#059669" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -445,7 +571,7 @@ export function MetricsDashboardView() {
           <div className="grid gap-6 lg:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Signups by department type</CardTitle>
+                <ChartTitle title="Signups by department type" help={METRIC_HELP.signupsByDepartment} />
               </CardHeader>
               <CardContent>
                 <HorizontalBarChart data={pc.departmentSignups} dataKey="count" categoryKey="type" color="#059669" />
@@ -454,7 +580,7 @@ export function MetricsDashboardView() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Incident types generated</CardTitle>
+                <ChartTitle title="Incident types generated" help={METRIC_HELP.incidentTypes} />
               </CardHeader>
               <CardContent>
                 <HorizontalBarChart data={pc.incidentTypes.slice(0, 12)} dataKey="count" categoryKey="type" />
@@ -464,8 +590,11 @@ export function MetricsDashboardView() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Output utilization (%)</CardTitle>
-              <CardDescription>How often generated assets are copied or downloaded</CardDescription>
+              <ChartTitle
+                title="Output utilization (%)"
+                help={METRIC_HELP.outputUtilization}
+                description="How often generated assets are copied or downloaded"
+              />
             </CardHeader>
             <CardContent>
               <HorizontalBarChart data={assetUtilChart} dataKey="rate" categoryKey="name" color="#7c3aed" height={300} />
@@ -476,10 +605,10 @@ export function MetricsDashboardView() {
         <TabsContent value="agencies" className="mt-6 space-y-6">
           <SummaryCards
             items={[
-              { label: "New Signups", value: pc.summary.newSignups },
-              { label: "Total Agencies", value: pc.summary.totalAgencies },
-              { label: "Paid", value: pc.summary.paidAgencies },
-              { label: "Free", value: pc.summary.freeAgencies },
+              { label: "New Signups", value: pc.summary.newSignups, help: METRIC_HELP.newSignups },
+              { label: "Total Agencies", value: pc.summary.totalAgencies, help: METRIC_HELP.totalAgencies },
+              { label: "Paid", value: pc.summary.paidAgencies, help: METRIC_HELP.paidAgencies },
+              { label: "Free", value: pc.summary.freeAgencies, help: METRIC_HELP.freeAgencies },
             ]}
           />
 
@@ -487,7 +616,7 @@ export function MetricsDashboardView() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between gap-2">
                 <div>
-                  <CardTitle className="text-lg">Signups over time</CardTitle>
+                  <ChartTitle title="Signups over time" help={METRIC_HELP.signupsChart} />
                 </div>
                 {groupByTabs}
               </CardHeader>
@@ -500,7 +629,7 @@ export function MetricsDashboardView() {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                       <YAxis allowDecimals={false} width={32} />
-                      <Tooltip />
+                      <RechartsTooltip />
                       <Bar dataKey="count" name="Signups" fill="#059669" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -510,8 +639,11 @@ export function MetricsDashboardView() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Signups by department</CardTitle>
-                <CardDescription>Police, Fire, EMS, Sheriff, etc.</CardDescription>
+                <ChartTitle
+                  title="Signups by department"
+                  help={METRIC_HELP.signupsByDepartment}
+                  description="Police, Fire, EMS, Sheriff, etc."
+                />
               </CardHeader>
               <CardContent>
                 <HorizontalBarChart data={pc.departmentSignups} dataKey="count" categoryKey="type" color="#059669" height={300} />
@@ -521,8 +653,11 @@ export function MetricsDashboardView() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Department type breakdown</CardTitle>
-              <CardDescription>Signups, registered agencies, and Press Center activity by type</CardDescription>
+              <ChartTitle
+                title="Department type breakdown"
+                help={METRIC_HELP.departmentBreakdown}
+                description="Signups, registered agencies, and generation activity by type"
+              />
             </CardHeader>
             <CardContent className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -564,7 +699,7 @@ export function MetricsDashboardView() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Signups vs sessions by type</CardTitle>
+              <ChartTitle title="Signups vs sessions by type" help={METRIC_HELP.signupsVsSessions} />
             </CardHeader>
             <CardContent>
               <VerticalBarChart
@@ -582,7 +717,7 @@ export function MetricsDashboardView() {
           <div className="grid gap-6 lg:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Top agencies by sessions</CardTitle>
+                <ChartTitle title="Top agencies by sessions" help={METRIC_HELP.topAgencies} />
               </CardHeader>
               <CardContent>
                 <HorizontalBarChart data={topAgenciesChart} dataKey="sessions" categoryKey="name" height={320} />
@@ -591,7 +726,7 @@ export function MetricsDashboardView() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Active agencies by type</CardTitle>
+                <ChartTitle title="Active agencies by type" help={METRIC_HELP.activeByType} />
               </CardHeader>
               <CardContent>
                 <HorizontalBarChart
@@ -607,8 +742,11 @@ export function MetricsDashboardView() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">All agency activity</CardTitle>
-              <CardDescription>Click column headers to sort</CardDescription>
+              <ChartTitle
+                title="All agency activity"
+                help={METRIC_HELP.agencyTable}
+                description="Click column headers to sort"
+              />
             </CardHeader>
             <CardContent className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -656,17 +794,17 @@ export function MetricsDashboardView() {
         <TabsContent value="feedback" className="mt-6 space-y-6">
           <SummaryCards
             items={[
-              { label: "Positive", value: pc.feedback.positiveCount },
-              { label: "Negative", value: pc.feedback.negativeCount },
-              { label: "Positive Rate", value: `${pc.feedback.positivePercent}%` },
-              { label: "Top Complaint", value: pc.feedback.mostCommonComplaint ?? "—" },
+              { label: "Positive", value: pc.feedback.positiveCount, help: METRIC_HELP.positiveCount },
+              { label: "Negative", value: pc.feedback.negativeCount, help: METRIC_HELP.negativeCount },
+              { label: "Positive Rate", value: `${pc.feedback.positivePercent}%`, help: METRIC_HELP.positiveRate },
+              { label: "Top Complaint", value: pc.feedback.mostCommonComplaint ?? "—", help: METRIC_HELP.topComplaint },
             ]}
           />
 
           <div className="grid gap-6 lg:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Helpful vs not helpful</CardTitle>
+                <ChartTitle title="Helpful vs not helpful" help={METRIC_HELP.feedbackSummary} />
               </CardHeader>
               <CardContent className="h-[260px]">
                 {feedbackSummaryChart.every((d) => d.count === 0) ? (
@@ -677,7 +815,7 @@ export function MetricsDashboardView() {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="name" />
                       <YAxis allowDecimals={false} width={32} />
-                      <Tooltip />
+                      <RechartsTooltip />
                       <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                         <Cell fill="#059669" />
                         <Cell fill="#d97706" />
@@ -690,7 +828,7 @@ export function MetricsDashboardView() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Negative feedback reasons</CardTitle>
+                <ChartTitle title="Negative feedback reasons" help={METRIC_HELP.feedbackReasons} />
               </CardHeader>
               <CardContent>
                 <HorizontalBarChart data={pc.feedbackByReason} dataKey="count" categoryKey="reason" color="#d97706" height={260} />
@@ -700,7 +838,7 @@ export function MetricsDashboardView() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Feedback by department type</CardTitle>
+              <ChartTitle title="Feedback by department type" help={METRIC_HELP.feedbackByType} />
             </CardHeader>
             <CardContent>
               <VerticalBarChart
@@ -717,7 +855,7 @@ export function MetricsDashboardView() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Recent feedback</CardTitle>
+              <ChartTitle title="Recent feedback" help={METRIC_HELP.recentFeedback} />
             </CardHeader>
             <CardContent className="space-y-3 max-h-96 overflow-y-auto">
               {pc.feedback.recent.length === 0 ? (
@@ -746,17 +884,17 @@ export function MetricsDashboardView() {
             <>
               <SummaryCards
                 items={[
-                  { label: "Article Views", value: content.totals.views },
-                  { label: "Copies", value: content.totals.copies },
-                  { label: "Downloads", value: content.totals.downloads },
-                  { label: "Unused Articles (sample)", value: content.unusedArticles.length },
+                  { label: "Article Views", value: content.totals.views, help: METRIC_HELP.curatedViews },
+                  { label: "Copies", value: content.totals.copies, help: METRIC_HELP.curatedCopies },
+                  { label: "Downloads", value: content.totals.downloads, help: METRIC_HELP.curatedDownloads },
+                  { label: "Unused Articles (sample)", value: content.unusedArticles.length, help: METRIC_HELP.unusedArticles },
                 ]}
               />
 
               <div className="grid gap-6 lg:grid-cols-2">
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-lg">Top articles</CardTitle>
+                    <ChartTitle title="Top articles" help={METRIC_HELP.topArticles} />
                   </CardHeader>
                   <CardContent>
                     <VerticalBarChart
@@ -774,7 +912,7 @@ export function MetricsDashboardView() {
 
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-lg">Views by category</CardTitle>
+                    <ChartTitle title="Views by category" help={METRIC_HELP.viewsByCategory} />
                   </CardHeader>
                   <CardContent>
                     <VerticalBarChart
@@ -831,5 +969,9 @@ export function MetricsDashboardView() {
         </TabsContent>
       </Tabs>
     </div>
+    </TooltipProvider>
   )
 }
+
+/** @deprecated Use MetricsDashboardView */
+export const PressCenterDashboardView = MetricsDashboardView
