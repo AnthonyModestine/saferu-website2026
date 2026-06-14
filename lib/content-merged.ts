@@ -101,6 +101,7 @@ export function getCategoryById(
       (a) => a.categoryId === categoryId && a.subcategoryId === sub.id
     )
     for (const a of addedArticles) {
+      if (sub.articles.some((art) => art.id === a.id)) continue
       const addedPosts = add.posts.filter(
         (p) =>
           p.categoryId === categoryId &&
@@ -187,7 +188,26 @@ export function getCategoryById(
     }
   }
 
+  for (const sub of merged.subcategories) {
+    const seen = new Set<string>()
+    sub.articles = sub.articles.filter((art) => {
+      if (seen.has(art.id)) return false
+      seen.add(art.id)
+      return true
+    })
+  }
+
   return merged
+}
+
+export function baseArticleExists(
+  categoryId: string,
+  subcategoryId: string,
+  articleId: string
+): boolean {
+  const base = contentLibrary.find((c) => c.id === categoryId)
+  const sub = base?.subcategories.find((s) => s.id === subcategoryId)
+  return sub?.articles.some((a) => a.id === articleId) ?? false
 }
 
 export function getSubcategoryById(

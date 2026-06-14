@@ -36,11 +36,21 @@ function parseCmsData(raw: unknown): CmsAdditions {
   const data = value as Partial<CmsAdditions>
   return {
     subcategories: Array.isArray(data.subcategories) ? data.subcategories : [],
-    articles: Array.isArray(data.articles) ? data.articles : [],
+    articles: dedupeCmsArticles(Array.isArray(data.articles) ? data.articles : []),
     posts: Array.isArray(data.posts) ? data.posts : [],
     deletedPosts: Array.isArray(data.deletedPosts) ? data.deletedPosts : [],
     deletedArticles: Array.isArray(data.deletedArticles) ? data.deletedArticles : [],
   }
+}
+
+function dedupeCmsArticles(
+  articles: CmsAdditions["articles"]
+): CmsAdditions["articles"] {
+  const byKey = new Map<string, CmsAdditions["articles"][number]>()
+  for (const art of articles) {
+    byKey.set(`${art.categoryId}::${art.subcategoryId}::${art.id}`, art)
+  }
+  return Array.from(byKey.values())
 }
 
 async function dbLoad(): Promise<CmsAdditions> {

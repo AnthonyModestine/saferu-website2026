@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { addArticle, generateId, getAdditions, removeArticle } from "@/lib/cms-additions"
+import { addArticle, generateId, getAdditions, isCmsArticle, removeArticle } from "@/lib/cms-additions"
+import { baseArticleExists } from "@/lib/content-merged"
 import { loadCmsAdditions, persistAdditions } from "@/lib/cms-additions-persist"
 import { setArticlePublished } from "@/lib/content-visibility"
 import { loadVisibility, persistVisibility } from "@/lib/content-visibility-persist"
@@ -33,13 +34,33 @@ export async function POST(request: NextRequest) {
       ? sanitizeSlug(slug) || generateId("art", title)
       : generateId("art", title)
     await Promise.all([loadCmsAdditions(), loadVisibility()])
-    addArticle({
+
+    if (
+      isCmsArticle(categoryId, subcategoryId, id) ||
+      baseArticleExists(categoryId, subcategoryId, id)
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "An article with this URL slug already exists. Choose a different slug or edit the existing article.",
+        },
+        { status: 409 }
+      )
+    }
+
+    const created = addArticle({
       categoryId,
       subcategoryId,
       id,
       title: title.trim(),
       description: (description || "").trim(),
     })
+    if (!created) {
+      return NextResponse.json(
+        { error: "An article with this URL slug already exists." },
+        { status: 409 }
+      )
+    }
     setArticlePublished(categoryId, subcategoryId, id, false)
     await Promise.all([persistAdditions(), persistVisibility()])
 

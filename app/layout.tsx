@@ -29,13 +29,14 @@ export const metadata: Metadata = {
   },
 }
 
-export default function RootLayout({
+export const dynamic = "force-dynamic"
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  loadCmsAdditions().catch(() => {})
-  loadVisibility().catch(() => {})
+  await Promise.all([loadCmsAdditions(), loadVisibility()])
   return (
     <html lang="en">
       <body className={`font-sans antialiased`}>

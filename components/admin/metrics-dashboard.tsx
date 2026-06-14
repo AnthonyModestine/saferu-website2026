@@ -30,13 +30,17 @@ import { METRIC_HELP } from "@/lib/metrics-help"
 import { useIsMobile } from "@/hooks/use-mobile"
 import type { PressCenterDashboard } from "@/lib/pio-analytics"
 import type { ContentAnalyticsDashboard } from "@/lib/content-analytics"
+import {
+  getMetricsStorageWarning,
+  type MetricsStorageMeta,
+} from "@/lib/metrics-storage-message"
 
 type Preset = "7d" | "30d" | "90d" | "year" | "custom"
 type SortKey = "lastActive" | "totalSessions" | "downloads" | "feedbackScore"
 type SectionTab = "overview" | "agencies" | "feedback" | "content"
 
 interface DashboardData {
-  meta?: { storage: "postgres" | "file" }
+  meta?: MetricsStorageMeta
   pressCenter: PressCenterDashboard
   content: ContentAnalyticsDashboard
 }
@@ -339,8 +343,7 @@ export function MetricsDashboardView() {
 
   const pc = data?.pressCenter
   const content = data?.content
-  const storage = data?.meta?.storage ?? "postgres"
-  const showStorageWarning = storage === "file"
+  const storageWarning = data?.meta ? getMetricsStorageWarning(data.meta) : null
 
   const usageChart = useMemo(() => {
     if (!pc) return []
@@ -507,10 +510,9 @@ export function MetricsDashboardView() {
         </p>
       </div>
 
-      {showStorageWarning && (
+      {storageWarning && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          Analytics database is not configured. Metrics may reset on deploy and will not match production activity.
-          Set <code className="text-xs">POSTGRES_URL</code> on Vercel for persistent, accurate data.
+          {storageWarning} Until then, metrics and CMS data may reset on deploy and won&apos;t match real site activity.
         </div>
       )}
 

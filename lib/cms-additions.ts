@@ -72,10 +72,22 @@ export function getAdditions(): CmsAdditions {
   }
 }
 
+function articleKey(categoryId: string, subcategoryId: string, id: string): string {
+  return `${categoryId}::${subcategoryId}::${id}`
+}
+
+function dedupeArticles(articles: CmsArticle[]): CmsArticle[] {
+  const byKey = new Map<string, CmsArticle>()
+  for (const art of articles) {
+    byKey.set(articleKey(art.categoryId, art.subcategoryId, art.id), art)
+  }
+  return Array.from(byKey.values())
+}
+
 export function setAdditions(data: CmsAdditions): void {
   additions = {
     subcategories: data.subcategories || [],
-    articles: data.articles || [],
+    articles: dedupeArticles(data.articles || []),
     posts: data.posts || [],
     deletedPosts: data.deletedPosts || [],
     deletedArticles: data.deletedArticles || [],
@@ -86,8 +98,15 @@ export function addSubcategory(sub: CmsSubcategory): void {
   additions.subcategories.push(sub)
 }
 
-export function addArticle(art: CmsArticle): void {
+/** Returns false if an article with this id already exists (no duplicate created). */
+export function addArticle(art: CmsArticle): boolean {
+  const key = articleKey(art.categoryId, art.subcategoryId, art.id)
+  const exists = additions.articles.some(
+    (a) => articleKey(a.categoryId, a.subcategoryId, a.id) === key
+  )
+  if (exists) return false
   additions.articles.push(art)
+  return true
 }
 
 export function isCmsArticle(categoryId: string, subcategoryId: string, articleId: string): boolean {

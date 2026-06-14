@@ -18,7 +18,7 @@ import {
 } from "lucide-react"
 import { getAllCategories } from "@/lib/content-merged"
 import { getMembersCounts, getRevenueSummary } from "@/lib/admin-members"
-import { getAdminMetricsDashboard } from "@/lib/admin-metrics"
+import { getAdminMetricsDashboard, getMetricsStorageWarning } from "@/lib/admin-metrics"
 import { parseDateRange } from "@/lib/pio-analytics"
 
 export default async function AdminDashboardPage() {
@@ -52,7 +52,9 @@ export default async function AdminDashboardPage() {
   const ms = metricsSnapshot.pressCenter.summary
   const fb = metricsSnapshot.pressCenter.feedback
   const contentTotals = metricsSnapshot.content.totals
-  const metricsStorage = metricsSnapshot.meta?.storage ?? "postgres"
+  const metricsStorageWarning = getMetricsStorageWarning(
+    metricsSnapshot.meta ?? { storage: "file", reason: "missing_env" }
+  )
 
   const stats = [
     { name: "Categories", value: totalCategories, icon: FolderTree, color: "bg-blue-500" },
@@ -146,10 +148,8 @@ export default async function AdminDashboardPage() {
               <CardTitle className="text-lg">Metrics (last 30 days)</CardTitle>
               <CardDescription className="mt-0.5">
                 Live counts from the last 30 days — open Metrics for charts and breakdowns.
-                {metricsStorage === "file" && (
-                  <span className="block mt-1 text-amber-700">
-                    Database not configured; set POSTGRES_URL on Vercel for persistent analytics.
-                  </span>
+                {metricsStorageWarning && (
+                  <span className="block mt-1 text-amber-700">{metricsStorageWarning}</span>
                 )}
               </CardDescription>
             </div>

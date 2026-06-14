@@ -8,8 +8,44 @@ export function isDatabaseConfigured(): boolean {
   return Boolean(getDatabaseUrl())
 }
 
+/** Which env var supplies the database URL (safe to expose in admin UI). */
+export function getConfiguredDatabaseEnvVar(): string | null {
+  if (process.env.POSTGRES_URL) return "POSTGRES_URL"
+  if (process.env.POSTGRES_URL_NON_POOLING) return "POSTGRES_URL_NON_POOLING"
+  if (process.env.DATABASE_URL) return "DATABASE_URL"
+  if (process.env.NEON_DATABASE_URL) return "NEON_DATABASE_URL"
+  return null
+}
+
 function getDatabaseUrl(): string | undefined {
-  return process.env.POSTGRES_URL ?? process.env.DATABASE_URL
+  return (
+    process.env.POSTGRES_URL ??
+    process.env.POSTGRES_URL_NON_POOLING ??
+    process.env.DATABASE_URL ??
+    process.env.NEON_DATABASE_URL
+  )
+}
+
+export type DatabaseStorageMeta = {
+  storage: "postgres" | "file"
+  reason?: "missing_env" | "connection_failed"
+  envVar?: string | null
+}
+
+/** Verify Postgres is configured and reachable (used by admin metrics). */
+export async function getDatabaseStorageMeta(): Promise<DatabaseStorageMeta> {
+  const envVar = getConfiguredDatabaseEnvVar()
+  if (!envVar) {
+    return { storage: "file", reason: "missing_env", envVar: null }
+  }
+  try {
+    const db = getSql()
+    await db`SELECT 1`
+    return { storage: "postgres", envVar }
+  } catch (err) {
+    console.error("[db] connection check failed:", err)
+    return { storage: "file", reason: "connection_failed", envVar }
+  }
 }
 
 export function getSql(): NeonQueryFunction<false, false> {
