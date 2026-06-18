@@ -6,10 +6,24 @@
 const RESEND_API_KEY = process.env.RESEND_API_KEY
 const FROM = process.env.RESEND_FROM ?? "SaferU <onboarding@resend.dev>"
 
-export async function sendPasswordResetEmail(to: string, resetLink: string): Promise<{ ok: boolean; error?: string }> {
+function formatResendError(message: string): string {
+  const lower = message.toLowerCase()
+  if (lower.includes("only send") || lower.includes("testing") || lower.includes("verify")) {
+    return "Email could not be sent. Verify your domain in Resend and set RESEND_FROM to an address on that domain."
+  }
+  if (lower.includes("api key") || lower.includes("unauthorized")) {
+    return "Email is not configured correctly. Check RESEND_API_KEY on Vercel."
+  }
+  return message
+}
+
+export async function sendPasswordResetEmail(
+  to: string,
+  resetLink: string
+): Promise<{ ok: boolean; error?: string }> {
   if (!RESEND_API_KEY) {
-    console.error("RESEND_API_KEY is not set; cannot send password reset email")
-    return { ok: false, error: "Email is not configured" }
+    console.error("[send-reset-email] RESEND_API_KEY is not set")
+    return { ok: false, error: "Email is not configured. Add RESEND_API_KEY on Vercel." }
   }
 
   const { Resend } = await import("resend")
@@ -26,17 +40,18 @@ export async function sendPasswordResetEmail(to: string, resetLink: string): Pro
   try {
     const { error } = await resend.emails.send({
       from: FROM,
-      to: [to],
+      to: [to.trim().toLowerCase()],
       subject,
       html,
     })
     if (error) {
-      console.error("Resend error:", error)
-      return { ok: false, error: error.message }
+      console.error("[send-reset-email] Resend error:", error)
+      return { ok: false, error: formatResendError(error.message) }
     }
     return { ok: true }
   } catch (err) {
-    console.error("Failed to send reset email:", err)
-    return { ok: false, error: err instanceof Error ? err.message : "Failed to send email" }
+    console.error("[send-reset-email] Failed to send:", err)
+    const message = err instanceof Error ? err.message : "Failed to send email"
+    return { ok: false, error: formatResendError(message) }
   }
 }
