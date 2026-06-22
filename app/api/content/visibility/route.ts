@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { setArticlePublished } from "@/lib/content-visibility"
 import { loadVisibility, persistVisibility } from "@/lib/content-visibility-persist"
+import { revalidateContentPages } from "@/lib/revalidate-content"
 import { unauthorizedIfNotAdmin } from "@/lib/require-admin-api"
 
 export async function POST(request: NextRequest) {
@@ -28,6 +29,7 @@ export async function POST(request: NextRequest) {
     await loadVisibility()
     setArticlePublished(categoryId, subcategoryId, articleId, published)
     await persistVisibility()
+    revalidateContentPages(categoryId, subcategoryId)
     return NextResponse.json({ ok: true, published })
   } catch (err) {
     console.error("[content/visibility] error:", err)

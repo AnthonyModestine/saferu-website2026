@@ -17,11 +17,13 @@ import {
   ExternalLink
 } from "lucide-react"
 import { getAllCategories } from "@/lib/content-merged"
+import { ensureContentLoaded } from "@/lib/ensure-content-loaded"
 import { getMembersCounts, getRevenueSummary } from "@/lib/admin-members"
 import { getAdminMetricsDashboard, getMetricsStorageWarning } from "@/lib/admin-metrics"
 import { parseDateRange } from "@/lib/pio-analytics"
 
 export default async function AdminDashboardPage() {
+  await ensureContentLoaded()
   const categories = getAllCategories({ includeUnpublished: true })
   const totalCategories = categories.length
   const totalSubcategories = categories.reduce(

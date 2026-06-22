@@ -31,6 +31,12 @@ export default async function SubcategoryDetailPage({ params }: PageProps) {
     isArticlePublished(categoryId, subcategoryId, a.id)
   )
   const draftCount = subcategory.articles.length - liveArticles.length
+  const publishedByArticleId = Object.fromEntries(
+    subcategory.articles.map((a) => [
+      a.id,
+      isArticlePublished(categoryId, subcategoryId, a.id),
+    ])
+  )
 
   return (
     <div className="p-8">
@@ -71,7 +77,13 @@ export default async function SubcategoryDetailPage({ params }: PageProps) {
         <CardHeader>
           <CardTitle>Articles</CardTitle>
           <CardDescription>
-            {liveArticles.length} live article{liveArticles.length !== 1 ? "s" : ""}
+            {subcategory.articles.length} article{subcategory.articles.length !== 1 ? "s" : ""} total
+            {liveArticles.length > 0 && (
+              <>
+                {" "}
+                · {liveArticles.length} live
+              </>
+            )}
             {draftCount > 0 && (
               <>
                 {" "}
@@ -84,7 +96,7 @@ export default async function SubcategoryDetailPage({ params }: PageProps) {
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
-          {liveArticles.length === 0 ? (
+          {subcategory.articles.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <FileText className="mb-4 h-12 w-12 text-gray-300" />
               <h3 className="text-lg font-medium text-gray-900">No articles yet</h3>
@@ -100,7 +112,8 @@ export default async function SubcategoryDetailPage({ params }: PageProps) {
             <ArticleListOrder
               categoryId={categoryId}
               subcategoryId={subcategoryId}
-              articles={liveArticles}
+              articles={subcategory.articles}
+              publishedByArticleId={publishedByArticleId}
             />
           )}
         </CardContent>

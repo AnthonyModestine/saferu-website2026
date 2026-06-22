@@ -71,6 +71,8 @@ export const METRIC_HELP = {
     "Most-viewed curated articles, with copies and downloads in this period.",
   viewsByCategory:
     "Article views and copies grouped by content category (crime prevention, fire, etc.).",
+  userJourneys:
+    "Page paths visitors took in the same browser session before copying article text or downloading a graphic. Requires session tracking from page views.",
   dateRange:
     "Filters all metrics on this page to the selected time window.",
 } as const

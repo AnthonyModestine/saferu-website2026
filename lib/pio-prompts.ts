@@ -29,6 +29,11 @@ Hard rules:
 - Use "allegedly" or "according to investigators" only when the provided facts describe suspected or unconfirmed conduct. Otherwise report only confirmed procedural facts.
 - If facts are sparse, write a shorter release. Accuracy is more important than length. Never add filler.
 
+Suspect description rule:
+- If facts.suspects contains entries with descriptions, include those specific descriptors in the release.
+- Do not omit provided suspect details or replace them with vague wording such as "unknown suspect," "individuals," or "persons of interest" when specific descriptors were provided.
+- Apply the same rule to suspect-related details in facts.footage_look_for when a footage request is included.
+
 Address rule:
 - Publish an exact address only if policy.publish_exact_address is true and an exact address is explicitly provided.
 - Otherwise use only the general location provided.
@@ -89,6 +94,7 @@ Hard rules:
 - Never name a juvenile or minor.
 - Do not identify a sex-crime victim or include details likely to reveal their identity.
 - If race appears in a suspect description, include it only when at least two additional descriptors are explicitly provided.
+- If facts.suspects contains descriptions, include those specific descriptors. Do not replace them with vague wording when details were provided.
 - Do not promise anonymity unless an anonymous tip option is explicitly provided.
 - Do not include exact addresses unless policy.publish_exact_address is true.
 
@@ -147,6 +153,10 @@ Include:
 - the general area
 - the timeframe for requested footage, if provided
 - what to look for, if provided
+
+Suspect description rule:
+- If suspect_descriptions, incident_summary, or what_to_look_for contain suspect-related details, include those specific descriptors in the request.
+- Do not omit provided suspect details or replace them with vague wording such as "unknown suspect," "individuals," or "suspicious persons" when specific descriptors were provided.
 - how to submit information or footage
 - brief safety line at the end such as not approaching suspects and calling 911 for emergencies, unless a different safety instruction is explicitly provided
 

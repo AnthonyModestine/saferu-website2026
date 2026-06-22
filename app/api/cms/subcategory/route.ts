@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { addSubcategory, generateId } from "@/lib/cms-additions"
 import { loadCmsAdditions, persistAdditions } from "@/lib/cms-additions-persist"
+import { revalidateContentPages } from "@/lib/revalidate-content"
 import { unauthorizedIfNotAdmin } from "@/lib/require-admin-api"
 
 export async function POST(request: NextRequest) {
@@ -27,6 +28,7 @@ export async function POST(request: NextRequest) {
       icon: (icon || "FileText").trim(),
     })
     await persistAdditions()
+    revalidateContentPages(categoryId)
     return NextResponse.json({ ok: true, id })
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 })

@@ -6,6 +6,14 @@ import { checkAdminSession } from "@/lib/admin-auth"
 import { getFreeMembers, deleteFreeMember, addFreeMember } from "@/lib/members-store"
 import { setTrial, getTrialEnd } from "@/lib/pio-trial"
 import { getDisabledEmails, setMemberDisabled as setDisabledInStore } from "@/lib/disabled-members"
+import { addGenerationPack, getGenerationStatuses } from "@/lib/pio-generations"
+
+export interface MemberGenerationInfo {
+  used: number
+  quota: number
+  packs: number
+  remaining: number
+}
 
 export interface MemberRow {
   id: string
@@ -20,6 +28,8 @@ export interface MemberRow {
   trialEndAt: number | null
   /** True if account is disabled by admin */
   disabled: boolean
+  /** Press Center AI generations remaining this month (+ packs) */
+  generations: MemberGenerationInfo | null
 }
 
 export interface MembersResult {
@@ -104,6 +114,7 @@ export async function getMembersList(): Promise<MembersResult> {
           subscriptionStatus: sub?.status ?? null,
           trialEndAt: null,
           disabled: disabledSet.has((c.email ?? "").toLowerCase()),
+          generations: null,
         })
       }
     } catch (e) {
@@ -124,6 +135,7 @@ export async function getMembersList(): Promise<MembersResult> {
       subscriptionStatus: null,
       trialEndAt: null,
       disabled: disabledSet.has(m.email.toLowerCase()),
+      generations: null,
     })
   }
 
@@ -133,6 +145,17 @@ export async function getMembersList(): Promise<MembersResult> {
   const trialEnds = await Promise.all(members.map((m) => (m.email ? getTrialEnd(m.email) : null)))
   members.forEach((m, i) => {
     m.trialEndAt = trialEnds[i]
+  })
+
+  const generationStatuses = await getGenerationStatuses(
+    members.map((m) => m.email ?? "").filter(Boolean)
+  )
+  members.forEach((m) => {
+    if (!m.email) {
+      m.generations = null
+      return
+    }
+    m.generations = generationStatuses.get(m.email.toLowerCase()) ?? null
   })
 
   return { members, total: members.length }
@@ -253,6 +276,26 @@ export async function addMemberAdmin(params: {
   })
   if ("error" in result) return { success: false, error: result.error }
   return { success: true }
+}
+
+/** Grant additional Press Center generation credits (admin only). */
+export async function grantGenerationPack(
+  email: string,
+  count: number
+): Promise<{ success: boolean; error?: string }> {
+  await ensureAdmin()
+  const normalized = email?.trim()?.toLowerCase()
+  if (!normalized) return { success: false, error: "Email is required" }
+  if (!Number.isFinite(count) || count < 1 || count > 100) {
+    return { success: false, error: "Count must be between 1 and 100" }
+  }
+  try {
+    await addGenerationPack(normalized, Math.floor(count))
+    return { success: true }
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Failed to add generations"
+    return { success: false, error: message }
+  }
 }
 
 /** Grant Press Center trial for a member by email (admin only). Days = 7 or 30. */

@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/select"
 import { Download, Users, CreditCard, XCircle, Trash2, Plus, ChevronDown, Sparkles, Search, UserX, UserCheck, Filter, KeyRound } from "lucide-react"
 import type { MemberRow } from "@/lib/admin-members"
-import { deleteMember, addMemberAdmin, grantPioTrial, setMemberDisabled, setMemberTemporaryPassword } from "@/lib/admin-members"
+import { deleteMember, addMemberAdmin, grantPioTrial, grantGenerationPack, setMemberDisabled, setMemberTemporaryPassword } from "@/lib/admin-members"
 
 function formatDate(ts: number): string {
   return new Date(ts * 1000).toLocaleDateString("en-US", {
@@ -55,14 +55,22 @@ function isOnActiveTrial(m: MemberRow): boolean {
   return m.trialEndAt > Math.floor(Date.now() / 1000)
 }
 
+function formatGenerations(m: MemberRow): string {
+  const g = m.generations
+  if (!g) return "—"
+  const packNote = g.packs > 0 ? `, +${g.packs} pack` : ""
+  return `${g.remaining} left (${g.used}/${g.quota} used${packNote})`
+}
+
 function buildCSV(members: MemberRow[]): string {
-  const headers = ["Email", "Name", "Customer ID", "Paid", "Access", "Subscription status", "Joined"]
+  const headers = ["Email", "Name", "Customer ID", "Paid", "Access", "Generations remaining", "Subscription status", "Joined"]
   const rows = members.map((m) => [
     m.email ?? "",
     m.name ?? "",
     m.id,
     m.paid ? "Yes" : "No",
     m.access,
+    m.generations ? String(m.generations.remaining) : "",
     m.subscriptionStatus ?? "",
     formatDate(m.createdAt),
   ])
@@ -116,6 +124,8 @@ export function MembersListClient({ initialMembers, total, error }: Props) {
   const [filterTrial, setFilterTrial] = useState<"all" | "on_trial" | "not_on_trial">("all")
   const [filterJoined, setFilterJoined] = useState<"newest" | "oldest">("newest")
   const [filterDateRange, setFilterDateRange] = useState<"all" | "7d" | "30d" | "90d">("all")
+  const [packGranting, setPackGranting] = useState<string | null>(null)
+  const [packError, setPackError] = useState<string | null>(null)
 
   const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -176,6 +186,19 @@ export function MembersListClient({ initialMembers, total, error }: Props) {
       setTrialError(result.error ?? "Failed to grant trial")
     }
     setTrialGranting(null)
+  }
+
+  const handleGrantPack = async (member: MemberRow, count: number) => {
+    if (member.id.startsWith("example_") || !member.email) return
+    setPackError(null)
+    setPackGranting(`${member.id}-${count}`)
+    const result = await grantGenerationPack(member.email, count)
+    if (result.success) {
+      router.refresh()
+    } else {
+      setPackError(result.error ?? "Failed to add generations")
+    }
+    setPackGranting(null)
   }
 
   const handleSetDisabled = async (member: MemberRow, disabled: boolean) => {
@@ -243,6 +266,7 @@ export function MembersListClient({ initialMembers, total, error }: Props) {
       subscriptionStatus: "active",
       trialEndAt: null,
       disabled: false,
+      generations: { used: 18, quota: 30, packs: 0, remaining: 12 },
     },
     {
       id: "example_2",
@@ -254,6 +278,7 @@ export function MembersListClient({ initialMembers, total, error }: Props) {
       subscriptionStatus: null,
       trialEndAt: Math.floor(Date.now() / 1000) + 5 * 24 * 3600, // 5 days from now
       disabled: false,
+      generations: { used: 4, quota: 30, packs: 5, remaining: 31 },
     },
   ]
 
@@ -485,6 +510,9 @@ export function MembersListClient({ initialMembers, total, error }: Props) {
         {trialError && (
           <p className="mb-3 rounded-lg bg-amber-50 p-2 text-sm text-amber-800">{trialError}</p>
         )}
+        {packError && (
+          <p className="mb-3 rounded-lg bg-amber-50 p-2 text-sm text-amber-800">{packError}</p>
+        )}
         {disableError && (
           <p className="mb-3 rounded-lg bg-red-50 p-2 text-sm text-red-800">{disableError}</p>
         )}
@@ -556,6 +584,7 @@ export function MembersListClient({ initialMembers, total, error }: Props) {
                 <th className="pb-3 pr-4 font-medium">Name</th>
                 <th className="pb-3 pr-4 font-medium">Paid</th>
                 <th className="pb-3 pr-4 font-medium">Access</th>
+                <th className="pb-3 pr-4 font-medium">Generations</th>
                 <th className="pb-3 pr-4 font-medium">Joined</th>
                 <th className="pb-3 pr-4 font-medium">Status</th>
                 <th className="pb-3 pr-4 font-medium text-right">Actions</th>
@@ -564,7 +593,7 @@ export function MembersListClient({ initialMembers, total, error }: Props) {
             <tbody>
               {filteredMembers.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-muted-foreground">
+                  <td colSpan={8} className="py-12 text-center text-muted-foreground">
                     {filteredMembers.length === 0 && membersToShow.length > 0
                       ? "No members match the current filters. Try changing Paid, Trial, or Date joined."
                       : query
@@ -594,6 +623,7 @@ export function MembersListClient({ initialMembers, total, error }: Props) {
                     )}
                   </td>
                   <td className="py-3 pr-4 text-gray-700">{m.access}</td>
+                  <td className="py-3 pr-4 text-gray-600 text-xs sm:text-sm">{formatGenerations(m)}</td>
                   <td className="py-3 pr-4 text-gray-500">{formatDate(m.createdAt)}</td>
                   <td className="py-3 pr-4 text-gray-600">
                     <div className="flex flex-wrap items-center gap-1.5">
@@ -642,6 +672,28 @@ export function MembersListClient({ initialMembers, total, error }: Props) {
                             >
                               <Sparkles className="mr-2 h-4 w-4" />
                               {trialGranting === `${m.id}-30` ? "Granting…" : "Start 30-day Press Center trial"}
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => handleGrantPack(m, 5)}
+                              disabled={packGranting === `${m.id}-5`}
+                            >
+                              <Sparkles className="mr-2 h-4 w-4" />
+                              {packGranting === `${m.id}-5` ? "Adding…" : "Add 5 generations"}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleGrantPack(m, 12)}
+                              disabled={packGranting === `${m.id}-12`}
+                            >
+                              <Sparkles className="mr-2 h-4 w-4" />
+                              {packGranting === `${m.id}-12` ? "Adding…" : "Add 12 generations"}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleGrantPack(m, 35)}
+                              disabled={packGranting === `${m.id}-35`}
+                            >
+                              <Sparkles className="mr-2 h-4 w-4" />
+                              {packGranting === `${m.id}-35` ? "Adding…" : "Add 35 generations"}
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                           </>

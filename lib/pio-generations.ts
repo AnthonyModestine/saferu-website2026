@@ -145,3 +145,14 @@ export async function addGenerationPack(email: string, count: number): Promise<v
   record.packs = (record.packs || 0) + count
   await writeRecord(email, record)
 }
+
+/** Batch lookup for admin member list. */
+export async function getGenerationStatuses(
+  emails: string[]
+): Promise<Map<string, Awaited<ReturnType<typeof getGenerationStatus>>>> {
+  const unique = [...new Set(emails.map((e) => e.trim().toLowerCase()).filter(Boolean))]
+  const entries = await Promise.all(
+    unique.map(async (email) => [email, await getGenerationStatus(email)] as const)
+  )
+  return new Map(entries)
+}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { addPost, generateId, removePost } from "@/lib/cms-additions"
 import { loadCmsAdditions, persistAdditions } from "@/lib/cms-additions-persist"
+import { revalidateContentPages } from "@/lib/revalidate-content"
 import { unauthorizedIfNotAdmin } from "@/lib/require-admin-api"
 
 export async function POST(request: NextRequest) {
@@ -69,6 +70,7 @@ export async function DELETE(request: NextRequest) {
     await loadCmsAdditions()
     removePost(categoryId, subcategoryId, articleId, postId)
     await persistAdditions()
+    revalidateContentPages(categoryId, subcategoryId)
     return NextResponse.json({ ok: true })
   } catch (err) {
     console.error("[cms/post] DELETE error:", err)

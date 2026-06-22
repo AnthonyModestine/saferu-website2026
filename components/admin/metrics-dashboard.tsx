@@ -66,6 +66,12 @@ const EMPTY_CONTENT: ContentAnalyticsDashboard = {
   topCategories: [],
   unusedArticles: [],
   totals: { views: 0, copies: 0, downloads: 0 },
+  journeys: {
+    pathsBeforeCopy: [],
+    pathsBeforeDownload: [],
+    topJourneysToCopy: [],
+    topJourneysToDownload: [],
+  },
 }
 
 function normalizeDashboard(raw: Partial<DashboardData> | null | undefined): DashboardData | null {
@@ -112,6 +118,7 @@ function normalizeDashboard(raw: Partial<DashboardData> | null | undefined): Das
       topCategories: content.topCategories ?? [],
       unusedArticles: content.unusedArticles ?? [],
       totals: content.totals ?? EMPTY_CONTENT.totals,
+      journeys: content.journeys ?? EMPTY_CONTENT.journeys,
     },
   }
 }
@@ -1034,6 +1041,80 @@ export function MetricsDashboardView() {
                       ) : (
                         content.unusedArticles.map((a) => (
                           <li key={a.path}>{a.category}: {a.title}</li>
+                        ))
+                      )}
+                    </ul>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    User journeys
+                    <MetricHelp text={METRIC_HELP.userJourneys} />
+                  </CardTitle>
+                  <CardDescription>
+                    Where visitors went before copying text or downloading a graphic in this period.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-6 lg:grid-cols-2">
+                  <div>
+                    <h3 className="text-sm font-medium mb-2">Paths before copy</h3>
+                    <ul className="space-y-2 text-sm">
+                      {content.journeys.pathsBeforeCopy.length === 0 ? (
+                        <li className="text-gray-500">No copy actions with session data in this period.</li>
+                      ) : (
+                        content.journeys.pathsBeforeCopy.map((row) => (
+                          <li key={row.path} className="flex justify-between gap-2 border-b pb-1">
+                            <span className="truncate">{row.label}</span>
+                            <span className="shrink-0 text-gray-500">{row.count}</span>
+                          </li>
+                        ))
+                      )}
+                    </ul>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium mb-2">Paths before download</h3>
+                    <ul className="space-y-2 text-sm">
+                      {content.journeys.pathsBeforeDownload.length === 0 ? (
+                        <li className="text-gray-500">No downloads with session data in this period.</li>
+                      ) : (
+                        content.journeys.pathsBeforeDownload.map((row) => (
+                          <li key={row.path} className="flex justify-between gap-2 border-b pb-1">
+                            <span className="truncate">{row.label}</span>
+                            <span className="shrink-0 text-gray-500">{row.count}</span>
+                          </li>
+                        ))
+                      )}
+                    </ul>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium mb-2">Common journeys to copy</h3>
+                    <ul className="space-y-2 text-sm">
+                      {content.journeys.topJourneysToCopy.length === 0 ? (
+                        <li className="text-gray-500">No multi-step copy journeys yet.</li>
+                      ) : (
+                        content.journeys.topJourneysToCopy.map((row) => (
+                          <li key={row.journey} className="flex justify-between gap-2 border-b pb-1">
+                            <span className="truncate">{row.journey}</span>
+                            <span className="shrink-0 text-gray-500">{row.count}</span>
+                          </li>
+                        ))
+                      )}
+                    </ul>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium mb-2">Common journeys to download</h3>
+                    <ul className="space-y-2 text-sm">
+                      {content.journeys.topJourneysToDownload.length === 0 ? (
+                        <li className="text-gray-500">No multi-step download journeys yet.</li>
+                      ) : (
+                        content.journeys.topJourneysToDownload.map((row) => (
+                          <li key={row.journey} className="flex justify-between gap-2 border-b pb-1">
+                            <span className="truncate">{row.journey}</span>
+                            <span className="shrink-0 text-gray-500">{row.count}</span>
+                          </li>
                         ))
                       )}
                     </ul>

@@ -212,6 +212,7 @@ export function buildCall3UserPayload(input: {
     general_area: orNull(input.location),
     incident_date: orNull(input.incidentDate),
     incident_summary: summaryParts.length > 0 ? summaryParts.join("\n\n") : null,
+    suspect_descriptions: orNull(input.suspectDescriptions),
     timeframe_needed: orNull(input.footageTimeframe),
     what_to_look_for: orNull(input.whatToLookFor),
     submission_methods: submissionMethods,

@@ -1,19 +1,21 @@
 import React from "react"
 import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { 
-  ChevronRight, 
-  ShieldCheck, 
-  Flame, 
+import {
+  ChevronRight,
+  ShieldCheck,
+  Flame,
   Star,
   FolderOpen,
   CloudLightning,
   AlertTriangle,
-  Users
+  Users,
 } from "lucide-react"
 import { getAllCategories } from "@/lib/content-merged"
+import { ensureContentLoaded } from "@/lib/ensure-content-loaded"
+
+export const dynamic = "force-dynamic"
 
 const categoryIcons: Record<string, React.ElementType> = {
   "crime-prevention": ShieldCheck,
@@ -33,12 +35,12 @@ const categoryColors: Record<string, string> = {
   "community-awareness": "bg-[#4a9d6b]",
 }
 
-export default function CategoriesPage() {
+export default async function CategoriesPage() {
+  await ensureContentLoaded()
   const mainCategories = getAllCategories({ includeUnpublished: true })
 
   return (
     <div className="p-8">
-      {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Categories</h1>
         <p className="mt-1 text-gray-500">
@@ -46,18 +48,19 @@ export default function CategoriesPage() {
         </p>
       </div>
 
-      {/* Categories List */}
       <div className="space-y-6">
         {mainCategories.map((category) => {
           const Icon = categoryIcons[category.id] || FolderOpen
           const bgColor = categoryColors[category.id] || "bg-gray-500"
           const totalArticles = category.subcategories.reduce(
-            (acc, sub) => acc + sub.articles.length, 0
+            (acc, sub) => acc + sub.articles.length,
+            0
           )
           const totalPosts = category.subcategories.reduce(
-            (acc, sub) => acc + sub.articles.reduce(
-              (artAcc, art) => artAcc + art.posts.length, 0
-            ), 0
+            (acc, sub) =>
+              acc +
+              sub.articles.reduce((artAcc, art) => artAcc + art.posts.length, 0),
+            0
           )
 
           return (
@@ -65,7 +68,9 @@ export default function CategoriesPage() {
               <CardHeader className="border-b">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${bgColor}`}>
+                    <div
+                      className={`flex h-12 w-12 items-center justify-center rounded-xl ${bgColor}`}
+                    >
                       <Icon className="h-6 w-6 text-white" />
                     </div>
                     <div>
@@ -87,7 +92,8 @@ export default function CategoriesPage() {
                   {category.subcategories.map((subcategory) => {
                     const subArticleCount = subcategory.articles.length
                     const subPostCount = subcategory.articles.reduce(
-                      (acc, art) => acc + art.posts.length, 0
+                      (acc, art) => acc + art.posts.length,
+                      0
                     )
 
                     return (

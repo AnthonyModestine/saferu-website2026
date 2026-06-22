@@ -16,13 +16,14 @@ function getClientIp(request: NextRequest): string | undefined {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { event, path, name, postId, postTitle, source, ...rest } = body as {
+    const { event, path, name, postId, postTitle, source, sessionId, ...rest } = body as {
       event: TrackEvent
       path?: string
       name?: string
       postId?: string
       postTitle?: string
       source?: string
+      sessionId?: string
       [key: string]: unknown
     }
     if (!event || typeof event !== "string") {
@@ -48,18 +49,18 @@ export async function POST(request: NextRequest) {
 
     if (event === "page_view" || event === "copy" || event === "download") {
       const parsed = path ? parseContentPath(path) : {}
-      if (parsed.articleId) {
-        await recordContentEvent({
-          eventType: event,
-          path,
-          postId,
-          postTitle,
-          categoryId: parsed.categoryId,
-          subcategoryId: parsed.subcategoryId,
-          articleId: parsed.articleId,
-          ip,
-        })
-      }
+      await recordContentEvent({
+        eventType: event,
+        path,
+        postId,
+        postTitle,
+        sessionId: typeof sessionId === "string" ? sessionId.slice(0, 80) : undefined,
+        categoryId: parsed.categoryId,
+        subcategoryId: parsed.subcategoryId,
+        articleId: parsed.articleId,
+        articleTitle: postTitle,
+        ip,
+      })
     }
 
     return NextResponse.json({ ok: true })

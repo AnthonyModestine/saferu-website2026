@@ -3,6 +3,7 @@ import { removeArticle } from "@/lib/cms-additions"
 import { loadCmsAdditions, persistAdditions } from "@/lib/cms-additions-persist"
 import { setArticlePublished } from "@/lib/content-visibility"
 import { loadVisibility, persistVisibility } from "@/lib/content-visibility-persist"
+import { revalidateContentPages } from "@/lib/revalidate-content"
 import { unauthorizedIfNotAdmin } from "@/lib/require-admin-api"
 
 export async function POST(request: NextRequest) {
@@ -23,6 +24,14 @@ export async function POST(request: NextRequest) {
       setArticlePublished(categoryId, subcategoryId, articleId, true)
     }
     await Promise.all([persistAdditions(), persistVisibility()])
+    const touched = new Set<string>()
+    for (const { categoryId } of articles) {
+      if (categoryId) touched.add(categoryId)
+    }
+    revalidateContentPages()
+    for (const categoryId of touched) {
+      revalidateContentPages(categoryId)
+    }
     return NextResponse.json({ ok: true, deleted: articles.length })
   } catch (err) {
     console.error("[cms/articles/bulk-delete] error:", err)

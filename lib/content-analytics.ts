@@ -22,6 +22,7 @@ export interface ContentEvent {
   postId?: string
   postTitle?: string
   path?: string
+  sessionId?: string
   memberEmail?: string
   ip?: string
   createdAt: number
@@ -32,6 +33,94 @@ export interface ContentAnalyticsDashboard {
   topCategories: { category: string; views: number; copies: number; downloads: number }[]
   unusedArticles: { title: string; path: string; category: string }[]
   totals: { views: number; copies: number; downloads: number }
+  journeys: {
+    pathsBeforeCopy: { path: string; label: string; count: number }[]
+    pathsBeforeDownload: { path: string; label: string; count: number }[]
+    topJourneysToCopy: { journey: string; count: number }[]
+    topJourneysToDownload: { journey: string; count: number }[]
+  }
+}
+
+/** Short label for admin journey charts */
+export function pathToJourneyLabel(pathname: string | undefined): string {
+  if (!pathname || pathname === "/") return "Home"
+  const segments = pathname.replace(/^\/|\/$/g, "").split("/").filter(Boolean)
+  if (segments.length === 0) return "Home"
+  if (segments[0] === "whats-new" && segments[1]) {
+    return segments[1].replace(/-/g, " ")
+  }
+  return segments[segments.length - 1]?.replace(/-/g, " ") || pathname
+}
+
+
+function buildJourneyAnalytics(events: ContentEvent[]): ContentAnalyticsDashboard["journeys"] {
+  const bySession = new Map<string, ContentEvent[]>()
+  for (const e of events) {
+    if (!e.sessionId) continue
+    const list = bySession.get(e.sessionId) ?? []
+    list.push(e)
+    bySession.set(e.sessionId, list)
+  }
+
+  const beforeCopy = new Map<string, number>()
+  const beforeDownload = new Map<string, number>()
+  const journeysToCopy = new Map<string, number>()
+  const journeysToDownload = new Map<string, number>()
+
+  for (const sessionEvents of bySession.values()) {
+    const sorted = [...sessionEvents].sort((a, b) => a.createdAt - b.createdAt)
+    const viewPaths = sorted
+      .filter((e) => e.eventType === "page_view" && e.path)
+      .map((e) => e.path as string)
+
+    const dedupedViews: string[] = []
+    for (const p of viewPaths) {
+      if (dedupedViews[dedupedViews.length - 1] !== p) dedupedViews.push(p)
+    }
+
+    for (const e of sorted) {
+      if (e.eventType !== "copy" && e.eventType !== "download") continue
+      const priorViews = dedupedViews.filter((p) => {
+        const viewEvents = sorted.filter((ev) => ev.eventType === "page_view" && ev.path === p)
+        const lastView = viewEvents[viewEvents.length - 1]
+        return lastView && lastView.createdAt <= e.createdAt
+      })
+      const lastPath = priorViews[priorViews.length - 1] ?? "/"
+      const target =
+        e.eventType === "copy" ? beforeCopy : beforeDownload
+      target.set(lastPath, (target.get(lastPath) ?? 0) + 1)
+
+      const journeySteps = [...priorViews.slice(-4), e.eventType === "copy" ? "Copy" : "Download"]
+      const journeyKey = journeySteps
+        .map((p) => (p === "Copy" || p === "Download" ? p : pathToJourneyLabel(p)))
+        .join(" → ")
+      const journeyTarget = e.eventType === "copy" ? journeysToCopy : journeysToDownload
+      journeyTarget.set(journeyKey, (journeyTarget.get(journeyKey) ?? 0) + 1)
+    }
+  }
+
+  const toRanked = (map: Map<string, number>, includeLabel = false) =>
+    Array.from(map.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([path, count]) =>
+        includeLabel
+          ? { path, label: pathToJourneyLabel(path), count }
+          : { path, label: path, count }
+      )
+
+  return {
+    pathsBeforeCopy: toRanked(beforeCopy, true),
+    pathsBeforeDownload: toRanked(beforeDownload, true),
+    topJourneysToCopy: Array.from(journeysToCopy.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([journey, count]) => ({ journey, count })),
+    topJourneysToDownload: Array.from(journeysToDownload.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([journey, count]) => ({ journey, count })),
+  }
 }
 
 function newId(): string {
@@ -83,6 +172,7 @@ export async function recordContentEvent(params: {
   articleTitle?: string
   postId?: string
   postTitle?: string
+  sessionId?: string
   memberEmail?: string
   ip?: string
 }): Promise<void> {
@@ -100,7 +190,7 @@ export async function recordContentEvent(params: {
     await db`
       INSERT INTO content_events (
         id, event_type, category_id, subcategory_id, article_id, article_title,
-        post_id, post_title, path, member_email, ip, created_at
+        post_id, post_title, path, session_id, member_email, ip, created_at
       ) VALUES (
         ${id},
         ${params.eventType},
@@ -111,6 +201,7 @@ export async function recordContentEvent(params: {
         ${params.postId ?? null},
         ${params.postTitle ?? null},
         ${params.path ?? null},
+        ${params.sessionId ?? null},
         ${params.memberEmail?.toLowerCase() ?? null},
         ${params.ip ?? null},
         ${createdAt}
@@ -130,6 +221,7 @@ export async function recordContentEvent(params: {
     postId: params.postId,
     postTitle: params.postTitle,
     path: params.path,
+    sessionId: params.sessionId,
     memberEmail: params.memberEmail?.toLowerCase(),
     ip: params.ip,
     createdAt,
@@ -155,6 +247,7 @@ async function loadEventsInRange(range: DateRange): Promise<ContentEvent[]> {
       postId: r.post_id ? String(r.post_id) : undefined,
       postTitle: r.post_title ? String(r.post_title) : undefined,
       path: r.path ? String(r.path) : undefined,
+      sessionId: r.session_id ? String(r.session_id) : undefined,
       memberEmail: r.member_email ? String(r.member_email) : undefined,
       ip: r.ip ? String(r.ip) : undefined,
       createdAt: Number(r.created_at),
@@ -185,10 +278,14 @@ export async function getContentAnalytics(
   let totalDownloads = 0
 
   for (const e of events) {
-    const pathKey = e.path || [e.categoryId, e.subcategoryId, e.articleId].filter(Boolean).join("/")
+    const parsed = e.path ? parseContentPath(e.path) : {}
+    const articleId = e.articleId ?? parsed.articleId
+    if (!articleId) continue
+
+    const pathKey = e.path || [e.categoryId ?? parsed.categoryId, e.subcategoryId ?? parsed.subcategoryId, articleId].filter(Boolean).join("/")
     if (!pathKey) continue
 
-    const title = e.articleTitle || e.articleId || pathKey
+    const title = e.articleTitle || articleId || pathKey
     const cur = articleStats.get(pathKey) ?? {
       title,
       path: e.path || `/${pathKey}`,
@@ -208,7 +305,7 @@ export async function getContentAnalytics(
     }
     articleStats.set(pathKey, cur)
 
-    const cat = e.categoryId || "unknown"
+    const cat = e.categoryId ?? parsed.categoryId ?? "unknown"
     const catCur = categoryStats.get(cat) ?? { views: 0, copies: 0, downloads: 0 }
     if (e.eventType === "page_view") catCur.views += 1
     else if (e.eventType === "copy") catCur.copies += 1
@@ -235,5 +332,6 @@ export async function getContentAnalytics(
       .slice(0, 10),
     unusedArticles,
     totals: { views: totalViews, copies: totalCopies, downloads: totalDownloads },
+    journeys: buildJourneyAnalytics(events),
   }
 }

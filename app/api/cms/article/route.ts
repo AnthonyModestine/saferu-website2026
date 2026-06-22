@@ -4,6 +4,7 @@ import { baseArticleExists } from "@/lib/content-merged"
 import { loadCmsAdditions, persistAdditions } from "@/lib/cms-additions-persist"
 import { setArticlePublished } from "@/lib/content-visibility"
 import { loadVisibility, persistVisibility } from "@/lib/content-visibility-persist"
+import { revalidateContentPages } from "@/lib/revalidate-content"
 import { unauthorizedIfNotAdmin } from "@/lib/require-admin-api"
 
 /** Sanitize custom slug: letters, numbers, hyphens only; preserve case */
@@ -74,6 +75,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    revalidateContentPages(categoryId, subcategoryId)
     return NextResponse.json({ ok: true, id })
   } catch (err) {
     console.error("[cms/article] ERROR:", err)
@@ -104,6 +106,7 @@ export async function DELETE(request: NextRequest) {
     removeArticle(categoryId, subcategoryId, articleId)
     setArticlePublished(categoryId, subcategoryId, articleId, true)
     await Promise.all([persistAdditions(), persistVisibility()])
+    revalidateContentPages(categoryId, subcategoryId)
     return NextResponse.json({ ok: true })
   } catch (err) {
     console.error("[cms/article] DELETE error:", err)

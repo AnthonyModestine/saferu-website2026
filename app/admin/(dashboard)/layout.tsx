@@ -2,8 +2,7 @@ import React from "react"
 import { redirect } from "next/navigation"
 import { checkAdminSession } from "@/lib/admin-auth"
 import { AdminSidebar, AdminMobileHeader } from "@/components/admin/admin-sidebar"
-import { loadCmsAdditions } from "@/lib/cms-additions-persist"
-import { loadVisibility } from "@/lib/content-visibility-persist"
+import { ensureContentLoaded } from "@/lib/ensure-content-loaded"
 
 export default async function AdminDashboardLayout({
   children,
@@ -16,7 +15,7 @@ export default async function AdminDashboardLayout({
     redirect("/admin/login")
   }
 
-  await Promise.all([loadCmsAdditions(), loadVisibility()])
+  await ensureContentLoaded()
 
   return (
     <div className="flex min-h-screen bg-gray-50">
