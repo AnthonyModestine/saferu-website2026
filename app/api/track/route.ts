@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { recordEvent } from "@/lib/metrics"
 import type { TrackEvent } from "@/lib/metrics"
 import { recordContentEvent, parseContentPath } from "@/lib/content-analytics"
+import { getMemberSession } from "@/lib/member-session"
 
 function getClientIp(request: NextRequest): string | undefined {
   const forwarded = request.headers.get("x-forwarded-for")
@@ -35,6 +36,8 @@ export async function POST(request: NextRequest) {
     }
     const ip = getClientIp(request)
     const userAgent = request.headers.get("user-agent") ?? undefined
+    const memberSession = await getMemberSession()
+    const memberEmail = memberSession?.email
     recordEvent({
       event,
       path,
@@ -55,6 +58,7 @@ export async function POST(request: NextRequest) {
         postId,
         postTitle,
         sessionId: typeof sessionId === "string" ? sessionId.slice(0, 80) : undefined,
+        memberEmail,
         categoryId: parsed.categoryId,
         subcategoryId: parsed.subcategoryId,
         articleId: parsed.articleId,

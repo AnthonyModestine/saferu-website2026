@@ -30,6 +30,7 @@ import { METRIC_HELP } from "@/lib/metrics-help"
 import { useIsMobile } from "@/hooks/use-mobile"
 import type { PressCenterDashboard } from "@/lib/pio-analytics"
 import type { ContentAnalyticsDashboard } from "@/lib/content-analytics"
+import type { PaymentSegmentAnalytics } from "@/lib/payment-segment-analytics"
 import {
   getMetricsStorageWarning,
   type MetricsStorageMeta,
@@ -37,13 +38,16 @@ import {
 
 type Preset = "7d" | "30d" | "90d" | "year" | "custom"
 type SortKey = "lastActive" | "totalSessions" | "downloads" | "feedbackScore"
-type SectionTab = "overview" | "agencies" | "feedback" | "content"
+type SectionTab = "overview" | "agencies" | "feedback" | "content" | "segments"
 
 interface DashboardData {
   meta?: MetricsStorageMeta
   pressCenter: PressCenterDashboard
   content: ContentAnalyticsDashboard
+  paymentSegments?: PaymentSegmentAnalytics
 }
+
+const EMPTY_SEGMENTS: PaymentSegmentAnalytics = { segments: [] }
 
 function hasTrackedActivity(
   pc: PressCenterDashboard,
@@ -120,6 +124,7 @@ function normalizeDashboard(raw: Partial<DashboardData> | null | undefined): Das
       totals: content.totals ?? EMPTY_CONTENT.totals,
       journeys: content.journeys ?? EMPTY_CONTENT.journeys,
     },
+    paymentSegments: raw.paymentSegments ?? EMPTY_SEGMENTS,
   }
 }
 
@@ -350,6 +355,7 @@ export function MetricsDashboardView() {
 
   const pc = data?.pressCenter
   const content = data?.content
+  const paymentSegments = data?.paymentSegments
   const storageWarning = data?.meta ? getMetricsStorageWarning(data.meta) : null
 
   const usageChart = useMemo(() => {
@@ -573,6 +579,10 @@ export function MetricsDashboardView() {
             <TabsTrigger value="content" className="px-2.5 text-xs sm:px-3 sm:text-sm">
               <span className="sm:hidden">Content</span>
               <span className="hidden sm:inline">Curated Content</span>
+            </TabsTrigger>
+            <TabsTrigger value="segments" className="px-2.5 text-xs sm:px-3 sm:text-sm">
+              <span className="sm:hidden">Segments</span>
+              <span className="hidden sm:inline">By payment status</span>
             </TabsTrigger>
           </TabsList>
         </div>
@@ -1125,6 +1135,86 @@ export function MetricsDashboardView() {
           ) : (
             <ChartEmpty message="Curated content analytics unavailable." />
           )}
+        </TabsContent>
+
+        <TabsContent value="segments" className="mt-6 space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                Activity by payment status
+                <MetricHelp text={METRIC_HELP.paymentSegments} />
+              </CardTitle>
+              <CardDescription>
+                What currently paying, past paying, never paid, and anonymous visitors do in this period.
+                Signed-in activity is tied to member email; anonymous is logged-out browsing.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+
+          {(paymentSegments?.segments ?? []).map((seg) => (
+            <Card key={seg.id}>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">{seg.label}</CardTitle>
+                <CardDescription>
+                  {seg.id === "anonymous"
+                    ? `${seg.activeMembers} visitor sessions with activity`
+                    : `${seg.registeredMembers} registered · ${seg.activeMembers} active in period`}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-6 lg:grid-cols-2">
+                <div>
+                  <h3 className="text-sm font-medium mb-2">Content library</h3>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    {seg.contentViews} views · {seg.contentCopies} copies · {seg.contentDownloads} downloads
+                  </p>
+                  <ul className="space-y-1 text-sm">
+                    {seg.topPages.length === 0 ? (
+                      <li className="text-gray-500">No page views in this period.</li>
+                    ) : (
+                      seg.topPages.map((p) => (
+                        <li key={p.path} className="flex justify-between gap-2 border-b pb-1">
+                          <span className="truncate">{p.label}</span>
+                          <span className="shrink-0 text-gray-500">{p.count}</span>
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium mb-2">Press Center</h3>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    {seg.pressReleaseSessions} press releases · {seg.videoRequestSessions} video requests ·{" "}
+                    {seg.pressCenterCopies} copies · {seg.pressCenterDownloads} downloads
+                  </p>
+                  <ul className="space-y-1 text-sm">
+                    {seg.topIncidentTypes.length === 0 ? (
+                      <li className="text-gray-500">No generations in this period.</li>
+                    ) : (
+                      seg.topIncidentTypes.map((t) => (
+                        <li key={t.type} className="flex justify-between gap-2 border-b pb-1">
+                          <span className="truncate capitalize">{t.type.replace(/_/g, " ")}</span>
+                          <span className="shrink-0 text-gray-500">{t.count}</span>
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                </div>
+                {seg.topJourneysToCopy.length > 0 && (
+                  <div className="lg:col-span-2">
+                    <h3 className="text-sm font-medium mb-2">Common paths before copy</h3>
+                    <ul className="space-y-1 text-sm">
+                      {seg.topJourneysToCopy.map((j) => (
+                        <li key={j.journey} className="flex justify-between gap-2 border-b pb-1">
+                          <span className="truncate">{j.journey}</span>
+                          <span className="shrink-0 text-gray-500">{j.count}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
         </TabsContent>
       </Tabs>
     </div>

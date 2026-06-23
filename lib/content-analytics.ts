@@ -229,7 +229,7 @@ export async function recordContentEvent(params: {
   await writeStore(events)
 }
 
-async function loadEventsInRange(range: DateRange): Promise<ContentEvent[]> {
+export async function loadContentEventsInRange(range: DateRange): Promise<ContentEvent[]> {
   if (isDatabaseConfigured()) {
     await ensureSchema()
     const db = getSql()
@@ -262,7 +262,7 @@ export async function getContentAnalytics(
   range: DateRange,
   allArticlePaths: { path: string; title: string; category: string }[]
 ): Promise<ContentAnalyticsDashboard> {
-  const events = await loadEventsInRange(range)
+  const events = await loadContentEventsInRange(range)
 
   const articleStats = new Map<
     string,

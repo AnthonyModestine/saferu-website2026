@@ -12,7 +12,8 @@ export default async function AdminMembersPage() {
   ])
   const revenueAvailable = revenueResult.error ? 0 : revenueResult.availableCents / 100
   const revenueTotal = revenueResult.error ? 0 : revenueResult.totalRevenueCents / 100
-  const payingCount = membersResult.members.filter((m) => m.paid).length
+  const activeCount = membersResult.members.filter((m) => m.paymentStatus === "active").length
+  const pastCount = membersResult.members.filter((m) => m.paymentStatus === "past").length
 
   return (
     <div className="p-8">
@@ -20,7 +21,7 @@ export default async function AdminMembersPage() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Members</h1>
           <p className="mt-1 text-gray-500">
-            Anyone can become a member (free signup on the site); paying members have a Stripe subscription or payment. List includes both. No passwords or payment card details are stored or exported.
+            Anyone can become a member (free signup on the site). Payment status shows who is currently subscribed, who paid in the past, or who has never paid. No passwords or payment card details are stored or exported.
           </p>
         </div>
         <Button asChild variant="outline" size="sm" className="shrink-0">
@@ -38,8 +39,12 @@ export default async function AdminMembersPage() {
             <p className="text-xl font-bold text-gray-900">{membersResult.total}</p>
           </div>
           <div className="rounded-xl border border-gray-200 bg-white px-5 py-3">
-            <p className="text-sm text-gray-500">Paying members</p>
-            <p className="text-xl font-bold text-emerald-700">{payingCount}</p>
+            <p className="text-sm text-gray-500">Currently paying</p>
+            <p className="text-xl font-bold text-emerald-700">{activeCount}</p>
+          </div>
+          <div className="rounded-xl border border-gray-200 bg-white px-5 py-3">
+            <p className="text-sm text-gray-500">Paid in the past</p>
+            <p className="text-xl font-bold text-amber-700">{pastCount}</p>
           </div>
         </div>
       )}

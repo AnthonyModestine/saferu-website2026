@@ -440,7 +440,7 @@ export async function recordGenerationFeedback(params: {
   await writeStore(store)
 }
 
-async function loadSessionsInRange(range: DateRange): Promise<GenerationSession[]> {
+export async function loadGenerationSessionsInRange(range: DateRange): Promise<GenerationSession[]> {
   if (isDatabaseConfigured()) {
     await ensureSchema()
     const db = getSql()
@@ -469,7 +469,7 @@ async function loadAllSessions(): Promise<GenerationSession[]> {
   return store.sessions
 }
 
-async function loadActionsInRange(range: DateRange): Promise<GenerationAction[]> {
+export async function loadGenerationActionsInRange(range: DateRange): Promise<GenerationAction[]> {
   if (isDatabaseConfigured()) {
     await ensureSchema()
     const db = getSql()
@@ -557,11 +557,11 @@ export async function getPressCenterDashboard(
   range: DateRange,
   groupBy: "day" | "week" | "month" = "day"
 ): Promise<PressCenterDashboard> {
-  const sessionsInRange = await loadSessionsInRange(range)
+  const sessionsInRange = await loadGenerationSessionsInRange(range)
   const allSessions = await loadAllSessions()
   const registeredMembers = await getFreeMembers()
   const sessionById = new Map(sessionsInRange.map((s) => [s.id, s]))
-  const actions = await loadActionsInRange(range)
+  const actions = await loadGenerationActionsInRange(range)
   const feedback = await loadFeedbackInRange(range)
 
   const pressSessions = sessionsInRange.filter((s) => s.generationType === "new_press_release")

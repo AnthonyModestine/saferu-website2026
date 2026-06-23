@@ -73,6 +73,8 @@ export const METRIC_HELP = {
     "Article views and copies grouped by content category (crime prevention, fire, etc.).",
   userJourneys:
     "Page paths visitors took in the same browser session before copying article text or downloading a graphic. Requires session tracking from page views.",
+  paymentSegments:
+    "Compare content library and Press Center activity for currently paying members, past payers, never-paid signups, and anonymous visitors in the selected date range.",
   dateRange:
     "Filters all metrics on this page to the selected time window.",
 } as const

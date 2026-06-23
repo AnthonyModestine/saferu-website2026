@@ -19,6 +19,7 @@ import {
   CreditCard,
   MessageSquare,
   Menu,
+  Mail,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -33,6 +34,7 @@ import { cn } from "@/lib/utils"
 const navigation = [
   { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
   { name: "Members", href: "/admin/members", icon: Users },
+  { name: "Email", href: "/admin/email", icon: Mail },
   { name: "Tickets", href: "/admin/tickets", icon: MessageSquare },
   { name: "Categories", href: "/admin/categories", icon: FolderTree },
   { name: "Articles", href: "/admin/articles", icon: FileText },

@@ -7,6 +7,13 @@ import { getFreeMembers, deleteFreeMember, addFreeMember } from "@/lib/members-s
 import { setTrial, getTrialEnd } from "@/lib/pio-trial"
 import { getDisabledEmails, setMemberDisabled as setDisabledInStore } from "@/lib/disabled-members"
 import { addGenerationPack, getGenerationStatuses } from "@/lib/pio-generations"
+import {
+  accessLabel,
+  derivePaymentStatus,
+  type MemberPaymentStatus,
+} from "@/lib/member-payment-status"
+
+export type { MemberPaymentStatus } from "@/lib/member-payment-status"
 
 export interface MemberGenerationInfo {
   used: number
@@ -20,7 +27,10 @@ export interface MemberRow {
   email: string | null
   name: string | null
   createdAt: number
+  /** True when the member has an active Stripe subscription right now */
   paid: boolean
+  /** Currently paying, paid in the past, or never paid */
+  paymentStatus: MemberPaymentStatus
   access: string
   /** Stripe subscription status if any */
   subscriptionStatus: string | null
@@ -78,16 +88,22 @@ export async function getMembersList(): Promise<MembersResult> {
         })
         if (c.email) stripeEmails.add(c.email.toLowerCase())
       }
-      const subsByCustomer = new Map<string, { status: string; product?: string }>()
+      const subsByCustomer = new Map<string, { status: string; hadAny: boolean; product?: string }>()
       const subscriptionRows = await stripeListAll((params) =>
         stripeClient.subscriptions.list({ status: "all", ...params })
       )
       for (const sub of subscriptionRows) {
         if (sub.customer && typeof sub.customer === "string") {
           const existing = subsByCustomer.get(sub.customer)
-          if (!existing || sub.status === "active") {
-            const productName = sub.items?.data?.[0]?.price?.nickname ?? sub.items?.data?.[0]?.price?.recurring ? "Subscription" : "One-time"
-            subsByCustomer.set(sub.customer, { status: sub.status, product: productName })
+          const productName = sub.items?.data?.[0]?.price?.nickname ?? sub.items?.data?.[0]?.price?.recurring ? "Subscription" : "One-time"
+          if (!existing) {
+            subsByCustomer.set(sub.customer, { status: sub.status, hadAny: true, product: productName })
+          } else {
+            existing.hadAny = true
+            if (sub.status === "active") {
+              existing.status = "active"
+              existing.product = productName
+            }
           }
         }
       }
@@ -100,18 +116,20 @@ export async function getMembersList(): Promise<MembersResult> {
       }
       for (const c of customers) {
         const sub = subsByCustomer.get(c.id)
-        const hasPayment = paidCustomerIds.has(c.id) || (sub?.status === "active")
-        let access = "Free"
-        if (sub?.status === "active") access = "Press Center Subscriber"
-        else if (paidCustomerIds.has(c.id)) access = "Paid (one-time or past)"
+        const hasActiveSub = sub?.status === "active"
+        const hasSuccessfulCharge = paidCustomerIds.has(c.id)
+        const hasAnySubscription = sub?.hadAny ?? false
+        const paymentStatus = derivePaymentStatus(hasActiveSub, hasSuccessfulCharge, hasAnySubscription)
+        const subscriptionStatus = sub?.status ?? null
         members.push({
           id: c.id,
           email: c.email,
           name: c.name,
           createdAt: c.created,
-          paid: hasPayment,
-          access,
-          subscriptionStatus: sub?.status ?? null,
+          paid: hasActiveSub,
+          paymentStatus,
+          access: accessLabel(paymentStatus, subscriptionStatus),
+          subscriptionStatus,
           trialEndAt: null,
           disabled: disabledSet.has((c.email ?? "").toLowerCase()),
           generations: null,
@@ -131,6 +149,7 @@ export async function getMembersList(): Promise<MembersResult> {
       name: m.name,
       createdAt: m.createdAt,
       paid: false,
+      paymentStatus: "never",
       access: "Free",
       subscriptionStatus: null,
       trialEndAt: null,
@@ -161,10 +180,11 @@ export async function getMembersList(): Promise<MembersResult> {
   return { members, total: members.length }
 }
 
-/** Count of members (free + Stripe) and paying members (Stripe only). */
+/** Count of members and payment breakdown from Stripe + free signups. */
 export async function getMembersCounts(): Promise<{
   total: number
   paying: number
+  pastPayers: number
   error?: string
 }> {
   await ensureAdmin()
@@ -173,7 +193,8 @@ export async function getMembersCounts(): Promise<{
 
   let stripeCount = 0
   const stripeEmails = new Set<string>()
-  const paidCustomerIds = new Set<string>()
+  const activeCustomerIds = new Set<string>()
+  const pastPayerCustomerIds = new Set<string>()
 
   if (stripeClient) {
     try {
@@ -186,25 +207,32 @@ export async function getMembersCounts(): Promise<{
         stripeClient.subscriptions.list({ status: "all", ...params })
       )
       for (const sub of subscriptionRows) {
-        if (sub.customer && typeof sub.customer === "string" && sub.status === "active") {
-          paidCustomerIds.add(sub.customer)
+        if (sub.customer && typeof sub.customer === "string") {
+          if (sub.status === "active") {
+            activeCustomerIds.add(sub.customer)
+          } else {
+            pastPayerCustomerIds.add(sub.customer)
+          }
         }
       }
       const chargeRows = await stripeListAll((params) => stripeClient.charges.list(params))
       for (const charge of chargeRows) {
         if (charge.customer && typeof charge.customer === "string" && charge.paid) {
-          paidCustomerIds.add(charge.customer)
+          if (!activeCustomerIds.has(charge.customer)) {
+            pastPayerCustomerIds.add(charge.customer)
+          }
         }
       }
     } catch (e) {
-      return { total: 0, paying: 0, error: e instanceof Error ? e.message : "Failed to count" }
+      return { total: 0, paying: 0, pastPayers: 0, error: e instanceof Error ? e.message : "Failed to count" }
     }
   }
 
   const freeOnlyCount = freeMembers.filter((m) => !stripeEmails.has(m.email.toLowerCase())).length
   const total = stripeCount + freeOnlyCount
-  const paying = paidCustomerIds.size
-  return { total, paying }
+  const paying = activeCustomerIds.size
+  const pastPayers = [...pastPayerCustomerIds].filter((id) => !activeCustomerIds.has(id)).length
+  return { total, paying, pastPayers }
 }
 
 /** Revenue summary from Stripe balance and charges. */

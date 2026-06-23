@@ -30,7 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Download, Users, CreditCard, XCircle, Trash2, Plus, ChevronDown, Sparkles, Search, UserX, UserCheck, Filter, KeyRound } from "lucide-react"
-import type { MemberRow } from "@/lib/admin-members"
+import type { MemberRow, MemberPaymentStatus } from "@/lib/admin-members"
 import { deleteMember, addMemberAdmin, grantPioTrial, grantGenerationPack, setMemberDisabled, setMemberTemporaryPassword } from "@/lib/admin-members"
 
 function formatDate(ts: number): string {
@@ -62,13 +62,49 @@ function formatGenerations(m: MemberRow): string {
   return `${g.remaining} left (${g.used}/${g.quota} used${packNote})`
 }
 
+function paymentStatusLabel(status: MemberPaymentStatus): string {
+  switch (status) {
+    case "active":
+      return "Currently paying"
+    case "past":
+      return "Paid (past)"
+    case "never":
+      return "Never paid"
+  }
+}
+
+function PaymentBadge({ status }: { status: MemberPaymentStatus }) {
+  if (status === "active") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-green-800">
+        <CreditCard className="h-3.5 w-3.5" />
+        Currently paying
+      </span>
+    )
+  }
+  if (status === "past") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-amber-900">
+        <CreditCard className="h-3.5 w-3.5" />
+        Paid (past)
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-gray-600">
+      <XCircle className="h-3.5 w-3.5" />
+      Never paid
+    </span>
+  )
+}
+
 function buildCSV(members: MemberRow[]): string {
-  const headers = ["Email", "Name", "Customer ID", "Paid", "Access", "Generations remaining", "Subscription status", "Joined"]
+  const headers = ["Email", "Name", "Customer ID", "Payment status", "Access", "Generations remaining", "Subscription status", "Joined"]
   const rows = members.map((m) => [
     m.email ?? "",
     m.name ?? "",
     m.id,
-    m.paid ? "Yes" : "No",
+    paymentStatusLabel(m.paymentStatus),
     m.access,
     m.generations ? String(m.generations.remaining) : "",
     m.subscriptionStatus ?? "",
@@ -120,7 +156,7 @@ export function MembersListClient({ initialMembers, total, error }: Props) {
   const [tempPasswordSaving, setTempPasswordSaving] = useState(false)
   const [tempPasswordError, setTempPasswordError] = useState<string | null>(null)
   const [tempPasswordSuccess, setTempPasswordSuccess] = useState<string | null>(null)
-  const [filterPaid, setFilterPaid] = useState<"all" | "paying" | "free">("all")
+  const [filterPaid, setFilterPaid] = useState<"all" | "active" | "past" | "never">("all")
   const [filterTrial, setFilterTrial] = useState<"all" | "on_trial" | "not_on_trial">("all")
   const [filterJoined, setFilterJoined] = useState<"newest" | "oldest">("newest")
   const [filterDateRange, setFilterDateRange] = useState<"all" | "7d" | "30d" | "90d">("all")
@@ -262,6 +298,7 @@ export function MembersListClient({ initialMembers, total, error }: Props) {
       name: "Jane Doe",
       createdAt: Math.floor(Date.now() / 1000) - 14 * 24 * 3600,
       paid: true,
+      paymentStatus: "active",
       access: "Press Center Subscriber",
       subscriptionStatus: "active",
       trialEndAt: null,
@@ -274,8 +311,9 @@ export function MembersListClient({ initialMembers, total, error }: Props) {
       name: "John Smith",
       createdAt: Math.floor(Date.now() / 1000) - 12 * 24 * 3600,
       paid: false,
-      access: "Free",
-      subscriptionStatus: null,
+      paymentStatus: "past",
+      access: "Lapsed (canceled)",
+      subscriptionStatus: "canceled",
       trialEndAt: Math.floor(Date.now() / 1000) + 5 * 24 * 3600, // 5 days from now
       disabled: false,
       generations: { used: 4, quota: 30, packs: 5, remaining: 31 },
@@ -300,8 +338,9 @@ export function MembersListClient({ initialMembers, total, error }: Props) {
       const id = (m.id ?? "").toLowerCase()
       if (!email.includes(query) && !name.includes(query) && !id.includes(query)) return false
     }
-    if (filterPaid === "paying" && !m.paid) return false
-    if (filterPaid === "free" && m.paid) return false
+    if (filterPaid === "active" && m.paymentStatus !== "active") return false
+    if (filterPaid === "past" && m.paymentStatus !== "past") return false
+    if (filterPaid === "never" && m.paymentStatus !== "never") return false
     if (filterTrial === "on_trial" && !isOnActiveTrial(m)) return false
     if (filterTrial === "not_on_trial" && isOnActiveTrial(m)) return false
     if (dateRangeCutoff > 0 && m.createdAt < dateRangeCutoff) return false
@@ -325,9 +364,14 @@ export function MembersListClient({ initialMembers, total, error }: Props) {
             )}
           </CardTitle>
           <CardDescription>
-            {total > 0 && `${initialMembers.filter((m) => m.paid).length} paying. `}
+            {total > 0 && (
+              <>
+                {initialMembers.filter((m) => m.paymentStatus === "active").length} currently paying ·{" "}
+                {initialMembers.filter((m) => m.paymentStatus === "past").length} paid in the past.{" "}
+              </>
+            )}
             {isExample && "Showing example rows. Real members appear when people sign up or pay. "}
-            Delete members with the row action. Export downloads all members to CSV (email, name, customer ID, paid, access, join date). No passwords or card details.
+            Delete members with the row action. Export downloads all members to CSV (email, name, customer ID, payment status, access, join date). No passwords or card details.
           </CardDescription>
         </div>
         <div className="flex shrink-0 gap-2">
@@ -529,14 +573,15 @@ export function MembersListClient({ initialMembers, total, error }: Props) {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
-            <Select value={filterPaid} onValueChange={(v) => setFilterPaid(v as "all" | "paying" | "free")}>
-              <SelectTrigger className="w-[130px]" size="sm">
-                <SelectValue placeholder="Paid" />
+            <Select value={filterPaid} onValueChange={(v) => setFilterPaid(v as "all" | "active" | "past" | "never")}>
+              <SelectTrigger className="w-[160px]" size="sm">
+                <SelectValue placeholder="Payment" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="paying">Paying</SelectItem>
-                <SelectItem value="free">Not paying</SelectItem>
+                <SelectItem value="all">All payments</SelectItem>
+                <SelectItem value="active">Currently paying</SelectItem>
+                <SelectItem value="past">Paid (past)</SelectItem>
+                <SelectItem value="never">Never paid</SelectItem>
               </SelectContent>
             </Select>
             <Select value={filterTrial} onValueChange={(v) => setFilterTrial(v as "all" | "on_trial" | "not_on_trial")}>
@@ -582,7 +627,7 @@ export function MembersListClient({ initialMembers, total, error }: Props) {
               <tr className="border-b border-gray-200 text-left text-gray-500">
                 <th className="pb-3 pr-4 font-medium">Email</th>
                 <th className="pb-3 pr-4 font-medium">Name</th>
-                <th className="pb-3 pr-4 font-medium">Paid</th>
+                <th className="pb-3 pr-4 font-medium">Payment</th>
                 <th className="pb-3 pr-4 font-medium">Access</th>
                 <th className="pb-3 pr-4 font-medium">Generations</th>
                 <th className="pb-3 pr-4 font-medium">Joined</th>
@@ -595,7 +640,7 @@ export function MembersListClient({ initialMembers, total, error }: Props) {
                 <tr>
                   <td colSpan={8} className="py-12 text-center text-muted-foreground">
                     {filteredMembers.length === 0 && membersToShow.length > 0
-                      ? "No members match the current filters. Try changing Paid, Trial, or Date joined."
+                      ? "No members match the current filters. Try changing Payment, Trial, or Date joined."
                       : query
                         ? "No members match your search. Try a different email, name, or customer ID."
                         : "No members yet."}
@@ -610,17 +655,7 @@ export function MembersListClient({ initialMembers, total, error }: Props) {
                   <td className="py-3 pr-4 text-gray-900">{m.email ?? "—"}</td>
                   <td className="py-3 pr-4 text-gray-700">{m.name ?? "—"}</td>
                   <td className="py-3 pr-4">
-                    {m.paid ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-green-800">
-                        <CreditCard className="h-3.5 w-3.5" />
-                        Yes
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-gray-600">
-                        <XCircle className="h-3.5 w-3.5" />
-                        No
-                      </span>
-                    )}
+                    <PaymentBadge status={m.paymentStatus} />
                   </td>
                   <td className="py-3 pr-4 text-gray-700">{m.access}</td>
                   <td className="py-3 pr-4 text-gray-600 text-xs sm:text-sm">{formatGenerations(m)}</td>
