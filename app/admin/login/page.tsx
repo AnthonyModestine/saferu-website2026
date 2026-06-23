@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { PasswordInput } from "@/components/ui/password-input"
 import { Shield, Lock, AlertCircle } from "lucide-react"
-import { verifyAdminPassword } from "@/lib/admin-auth"
 
 export default function AdminLoginPage() {
   const [identifier, setIdentifier] = useState("")
@@ -25,12 +24,17 @@ export default function AdminLoginPage() {
     setError(null)
 
     try {
-      const isValid = await verifyAdminPassword(identifier.trim(), password)
-      if (isValid) {
+      const res = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identifier: identifier.trim(), password }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
         router.push("/admin")
         router.refresh()
       } else {
-        setError("Invalid username or password. Please try again.")
+        setError(data.error ?? "Invalid username or password. Please try again.")
       }
     } catch {
       setError("An error occurred. Please try again.")

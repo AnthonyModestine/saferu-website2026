@@ -28,6 +28,7 @@ next-env.d.ts
 
 # sensitive data files
 data/admin-users.json
+data/admin-sessions.json
 data/member-sessions.json
 data/free-members.json
 data/pio-trials.json

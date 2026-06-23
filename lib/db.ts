@@ -89,6 +89,16 @@ export async function ensureSchema(): Promise<void> {
   `
 
   await db`
+    CREATE TABLE IF NOT EXISTS admin_sessions (
+      id TEXT PRIMARY KEY,
+      admin_id TEXT NOT NULL,
+      email TEXT NOT NULL,
+      expires_at BIGINT NOT NULL
+    )
+  `
+  await db`CREATE INDEX IF NOT EXISTS idx_admin_sessions_expires ON admin_sessions (expires_at)`
+
+  await db`
     CREATE TABLE IF NOT EXISTS cms_additions (
       id TEXT PRIMARY KEY DEFAULT 'singleton',
       data JSONB NOT NULL DEFAULT '{}'

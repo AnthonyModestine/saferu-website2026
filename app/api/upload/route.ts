@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { unauthorizedIfNotAdmin } from "@/lib/require-admin-api"
 import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_SIZE, storeImage } from "@/lib/media-storage"
+import { isAllowedImageBuffer } from "@/lib/image-validation"
 
 export async function POST(request: NextRequest) {
   const denied = await unauthorizedIfNotAdmin()
@@ -14,7 +15,9 @@ export async function POST(request: NextRequest) {
     if (file.size > MAX_IMAGE_SIZE) {
       return NextResponse.json({ error: "File too large (max 10MB)" }, { status: 400 })
     }
-    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+
+    const buffer = Buffer.from(await file.arrayBuffer())
+    if (!isAllowedImageBuffer(buffer, ALLOWED_IMAGE_TYPES)) {
       return NextResponse.json({ error: "Invalid type. Use JPEG, PNG, WebP, or GIF." }, { status: 400 })
     }
 

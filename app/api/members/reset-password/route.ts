@@ -1,8 +1,18 @@
 import { NextResponse } from "next/server"
 import { getFreeMemberByEmail, updateMemberPassword } from "@/lib/members-store"
 import { consumeResetToken } from "@/lib/password-reset-tokens"
+import { clearMemberSessionsForUser } from "@/lib/member-session"
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
 
 export async function POST(request: Request) {
+  const ip = getClientIp(request)
+  if (!checkRateLimit(`reset-password:${ip}`, 10, 60 * 60 * 1000)) {
+    return NextResponse.json(
+      { error: "Too many attempts. Please try again later." },
+      { status: 429 }
+    )
+  }
+
   try {
     const body = await request.json()
     const token = typeof body.token === "string" ? body.token.trim() : ""
@@ -22,13 +32,15 @@ export async function POST(request: Request) {
 
     const member = await getFreeMemberByEmail(email)
     if (!member) {
-      return NextResponse.json({ error: "Account not found" }, { status: 400 })
+      return NextResponse.json({ error: "Invalid or expired reset link. Please request a new one." }, { status: 400 })
     }
 
     const updated = await updateMemberPassword(member.id, password)
     if (!updated) {
       return NextResponse.json({ error: "Failed to update password" }, { status: 500 })
     }
+
+    await clearMemberSessionsForUser(member.id)
 
     return NextResponse.json({ ok: true, message: "Password updated. You can sign in now." })
   } catch {

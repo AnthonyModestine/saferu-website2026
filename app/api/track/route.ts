@@ -3,18 +3,14 @@ import { recordEvent } from "@/lib/metrics"
 import type { TrackEvent } from "@/lib/metrics"
 import { recordContentEvent, parseContentPath } from "@/lib/content-analytics"
 import { getMemberSession } from "@/lib/member-session"
-
-function getClientIp(request: NextRequest): string | undefined {
-  const forwarded = request.headers.get("x-forwarded-for")
-  if (forwarded) return forwarded.split(",")[0]?.trim() || undefined
-  const realIp = request.headers.get("x-real-ip")
-  if (realIp) return realIp
-  const cf = request.headers.get("cf-connecting-ip")
-  if (cf) return cf
-  return undefined
-}
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
 
 export async function POST(request: NextRequest) {
+  const ip = getClientIp(request)
+  if (!checkRateLimit(`track:${ip}`, 120, 60 * 1000)) {
+    return NextResponse.json({ ok: true })
+  }
+
   try {
     const body = await request.json()
     const { event, path, name, postId, postTitle, source, sessionId, ...rest } = body as {

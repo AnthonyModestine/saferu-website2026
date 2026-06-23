@@ -24,6 +24,7 @@ export default function AccountPage() {
   const [passwordLoading, setPasswordLoading] = useState(false)
   const [passwordMessage, setPasswordMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deletePassword, setDeletePassword] = useState("")
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
@@ -96,7 +97,11 @@ export default function AccountPage() {
     setDeleteError(null)
     setDeleteLoading(true)
     try {
-      const res = await fetch("/api/account/delete", { method: "POST" })
+      const res = await fetch("/api/account/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: deletePassword }),
+      })
       const data = await res.json()
       if (res.ok) {
         router.replace("/")
@@ -301,10 +306,25 @@ export default function AccountPage() {
                   {deleteError && (
                     <p className="text-sm text-red-700 bg-red-100 rounded p-2">{deleteError}</p>
                   )}
+                  <div className="space-y-2">
+                    <Label htmlFor="delete-password">Confirm your password</Label>
+                    <PasswordInput
+                      id="delete-password"
+                      autoComplete="current-password"
+                      value={deletePassword}
+                      onChange={(e) => setDeletePassword(e.target.value)}
+                      required
+                      placeholder="Enter your password to confirm"
+                    />
+                  </div>
                   <div className="flex gap-3">
                     <Button
                       variant="outline"
-                      onClick={() => { setShowDeleteConfirm(false); setDeleteError(null) }}
+                      onClick={() => {
+                        setShowDeleteConfirm(false)
+                        setDeleteError(null)
+                        setDeletePassword("")
+                      }}
                       disabled={deleteLoading}
                     >
                       No, keep my account
@@ -312,7 +332,7 @@ export default function AccountPage() {
                     <Button
                       className="bg-red-600 text-white hover:bg-red-700"
                       onClick={handleDeleteAccount}
-                      disabled={deleteLoading}
+                      disabled={deleteLoading || !deletePassword}
                     >
                       {deleteLoading ? (
                         <>

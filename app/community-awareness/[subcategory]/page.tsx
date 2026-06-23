@@ -1,16 +1,23 @@
-"use client"
-
-import { use } from "react"
 import { ArticlesPage } from "@/components/articles-page"
 import { getCategoryById, getSubcategoryById } from "@/lib/content-merged"
 import { notFound } from "next/navigation"
 
-export default function CommunityAwarenessSubcategoryPage({
-  params,
-}: {
+interface Props {
   params: Promise<{ subcategory: string }>
-}) {
-  const { subcategory: subcategoryId } = use(params)
+}
+
+export async function generateMetadata({ params }: Props) {
+  const { subcategory: subcategoryId } = await params
+  const subcategory = getSubcategoryById("community-awareness", subcategoryId)
+
+  return {
+    title: subcategory ? `${subcategory.title} - Community Awareness - SaferU` : "Community Awareness - SaferU",
+    description: subcategory?.description || "Community awareness tips and resources.",
+  }
+}
+
+export default async function CommunityAwarenessSubcategoryPage({ params }: Props) {
+  const { subcategory: subcategoryId } = await params
   const category = getCategoryById("community-awareness")
   const subcategory = getSubcategoryById("community-awareness", subcategoryId)
 

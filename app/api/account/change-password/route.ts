@@ -1,9 +1,19 @@
 import { NextResponse } from "next/server"
-import { getMemberSession } from "@/lib/member-session"
+import {
+  getMemberSession,
+  getCurrentMemberSessionId,
+  clearMemberSessionsForUser,
+} from "@/lib/member-session"
 import { getFreeMemberByEmail, updateMemberPassword } from "@/lib/members-store"
 import { verifyPassword } from "@/lib/password"
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
 
 export async function POST(request: Request) {
+  const ip = getClientIp(request)
+  if (!checkRateLimit(`change-password:${ip}`, 10, 60 * 60 * 1000)) {
+    return NextResponse.json({ error: "Too many attempts. Please try again later." }, { status: 429 })
+  }
+
   try {
     const session = await getMemberSession()
     if (!session?.email) {
@@ -23,10 +33,10 @@ export async function POST(request: Request) {
 
     const member = await getFreeMemberByEmail(session.email)
     if (!member) {
-      return NextResponse.json({ error: "Account not found. Password change is only for members who sign in with email and password." }, { status: 400 })
+      return NextResponse.json({ error: "Account not found." }, { status: 400 })
     }
     if (!member.passwordHash) {
-      return NextResponse.json({ error: "This account does not use a password. Sign in with the method you used to create your account." }, { status: 400 })
+      return NextResponse.json({ error: "This account does not use a password." }, { status: 400 })
     }
 
     const valid = await verifyPassword(currentPassword, member.passwordHash)
@@ -38,6 +48,9 @@ export async function POST(request: Request) {
     if (!updated) {
       return NextResponse.json({ error: "Failed to update password. Please try again." }, { status: 500 })
     }
+
+    const currentSessionId = await getCurrentMemberSessionId()
+    await clearMemberSessionsForUser(member.id, currentSessionId ?? undefined)
 
     return NextResponse.json({ ok: true, message: "Password updated. Use your new password next time you sign in." })
   } catch {

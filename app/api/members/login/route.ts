@@ -3,8 +3,17 @@ import { getFreeMemberByEmail } from "@/lib/members-store"
 import { verifyPassword } from "@/lib/password"
 import { createMemberSession } from "@/lib/member-session"
 import { isDisabled } from "@/lib/disabled-members"
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
 
 export async function POST(request: Request) {
+  const ip = getClientIp(request)
+  if (!checkRateLimit(`member-login:${ip}`, 15, 15 * 60 * 1000)) {
+    return NextResponse.json(
+      { error: "Too many login attempts. Please try again in 15 minutes." },
+      { status: 429 }
+    )
+  }
+
   try {
     const body = await request.json()
     const email = typeof body.email === "string" ? body.email.trim() : ""

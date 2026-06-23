@@ -1,6 +1,6 @@
 "use server"
 
-import { scrypt, randomBytes } from "crypto"
+import { scrypt, randomBytes, timingSafeEqual } from "crypto"
 import { promisify } from "util"
 
 const scryptAsync = promisify(scrypt)
@@ -20,5 +20,8 @@ export async function verifyPassword(plain: string, stored: string): Promise<boo
   if (!saltHex || !hashHex) return false
   const salt = Buffer.from(saltHex, "hex")
   const hash = (await scryptAsync(plain, salt, KEY_LEN)) as Buffer
-  return hash.toString("hex") === hashHex
+  const expected = Buffer.from(hashHex, "hex")
+  const actual = hash
+  if (expected.length !== actual.length) return false
+  return timingSafeEqual(expected, actual)
 }

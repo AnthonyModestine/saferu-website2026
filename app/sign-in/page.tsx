@@ -9,10 +9,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { PasswordInput } from "@/components/ui/password-input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { sanitizeReturnUrl } from "@/lib/safe-redirect"
 
 function SignInForm() {
   const searchParams = useSearchParams()
-  const returnUrl = searchParams.get("returnUrl") || "/"
+  const returnUrl = sanitizeReturnUrl(searchParams.get("returnUrl"))
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 

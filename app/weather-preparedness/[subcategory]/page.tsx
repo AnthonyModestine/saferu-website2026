@@ -1,16 +1,23 @@
-"use client"
-
-import { use } from "react"
 import { ArticlesPage } from "@/components/articles-page"
 import { getCategoryById, getSubcategoryById } from "@/lib/content-merged"
 import { notFound } from "next/navigation"
 
-export default function WeatherSubcategoryPage({
-  params,
-}: {
+interface Props {
   params: Promise<{ subcategory: string }>
-}) {
-  const { subcategory: subcategoryId } = use(params)
+}
+
+export async function generateMetadata({ params }: Props) {
+  const { subcategory: subcategoryId } = await params
+  const subcategory = getSubcategoryById("weather-preparedness", subcategoryId)
+
+  return {
+    title: subcategory ? `${subcategory.title} - Weather Preparedness - SaferU` : "Weather Preparedness - SaferU",
+    description: subcategory?.description || "Weather preparedness tips and resources.",
+  }
+}
+
+export default async function WeatherSubcategoryPage({ params }: Props) {
+  const { subcategory: subcategoryId } = await params
   const category = getCategoryById("weather-preparedness")
   const subcategory = getSubcategoryById("weather-preparedness", subcategoryId)
 

@@ -6,34 +6,31 @@ import path from "path"
 import { ensureSchema, getSql, isDatabaseConfigured } from "@/lib/db"
 
 const DATA_DIR = path.join(process.cwd(), "data")
-const SESSIONS_FILE = path.join(DATA_DIR, "member-sessions.json")
-const COOKIE_NAME = "saferu_member_session"
-const MAX_AGE_DAYS = 14
+const SESSIONS_FILE = path.join(DATA_DIR, "admin-sessions.json")
+const COOKIE_NAME = "saferu_admin_session"
+const MAX_AGE_DAYS = 7
 
-export interface MemberSessionData {
-  memberId: string
+export interface AdminSessionData {
+  adminId: string
   email: string
-  name?: string
   expiresAt: number
 }
 
 interface SessionsStore {
-  [sessionId: string]: MemberSessionData
+  [sessionId: string]: AdminSessionData
 }
 
 interface SessionRow {
   id: string
-  member_id: string
+  admin_id: string
   email: string
-  name: string | null
   expires_at: string | number
 }
 
-function rowToSession(row: SessionRow): MemberSessionData {
+function rowToSession(row: SessionRow): AdminSessionData {
   return {
-    memberId: row.member_id,
+    adminId: row.admin_id,
     email: row.email,
-    name: row.name ?? undefined,
     expiresAt: Number(row.expires_at),
   }
 }
@@ -53,30 +50,23 @@ async function writeSessions(store: SessionsStore): Promise<void> {
   await writeFile(SESSIONS_FILE, JSON.stringify(store, null, 2), "utf-8")
 }
 
-export async function createMemberSession(params: {
-  memberId: string
+export async function createAdminSession(params: {
+  adminId: string
   email: string
-  name?: string
 }): Promise<string> {
   const sessionId = crypto.randomUUID()
   const expiresAt = Math.floor(Date.now() / 1000) + MAX_AGE_DAYS * 24 * 60 * 60
   const email = params.email.trim().toLowerCase()
-  const name = params.name?.trim() || null
 
   if (isDatabaseConfigured()) {
     await ensureSchema()
     await getSql()`
-      INSERT INTO member_sessions (id, member_id, email, name, expires_at)
-      VALUES (${sessionId}, ${params.memberId}, ${email}, ${name}, ${expiresAt})
+      INSERT INTO admin_sessions (id, admin_id, email, expires_at)
+      VALUES (${sessionId}, ${params.adminId}, ${email}, ${expiresAt})
     `
   } else {
     const store = await readSessions()
-    store[sessionId] = {
-      memberId: params.memberId,
-      email,
-      name: name ?? undefined,
-      expiresAt,
-    }
+    store[sessionId] = { adminId: params.adminId, email, expiresAt }
     await writeSessions(store)
   }
 
@@ -91,7 +81,7 @@ export async function createMemberSession(params: {
   return sessionId
 }
 
-export async function getMemberSession(): Promise<MemberSessionData | null> {
+export async function getAdminSession(): Promise<AdminSessionData | null> {
   const cookieStore = await cookies()
   const cookie = cookieStore.get(COOKIE_NAME)
   if (!cookie?.value) return null
@@ -101,8 +91,8 @@ export async function getMemberSession(): Promise<MemberSessionData | null> {
   if (isDatabaseConfigured()) {
     await ensureSchema()
     const rows = await getSql()`
-      SELECT id, member_id, email, name, expires_at
-      FROM member_sessions
+      SELECT id, admin_id, email, expires_at
+      FROM admin_sessions
       WHERE id = ${cookie.value}
       LIMIT 1
     `
@@ -117,14 +107,14 @@ export async function getMemberSession(): Promise<MemberSessionData | null> {
   return data
 }
 
-export async function clearMemberSession(): Promise<void> {
+export async function clearAdminSession(): Promise<void> {
   const cookieStore = await cookies()
   const cookie = cookieStore.get(COOKIE_NAME)
 
   if (cookie?.value) {
     if (isDatabaseConfigured()) {
       await ensureSchema()
-      await getSql()`DELETE FROM member_sessions WHERE id = ${cookie.value}`
+      await getSql()`DELETE FROM admin_sessions WHERE id = ${cookie.value}`
     } else {
       const store = await readSessions()
       delete store[cookie.value]
@@ -133,36 +123,4 @@ export async function clearMemberSession(): Promise<void> {
   }
 
   cookieStore.delete(COOKIE_NAME)
-}
-
-/** Invalidate all sessions for a member (e.g. after password change). Optionally keep current session. */
-export async function clearMemberSessionsForUser(
-  memberId: string,
-  exceptSessionId?: string
-): Promise<void> {
-  if (isDatabaseConfigured()) {
-    await ensureSchema()
-    if (exceptSessionId) {
-      await getSql()`
-        DELETE FROM member_sessions
-        WHERE member_id = ${memberId} AND id <> ${exceptSessionId}
-      `
-    } else {
-      await getSql()`DELETE FROM member_sessions WHERE member_id = ${memberId}`
-    }
-    return
-  }
-
-  const store = await readSessions()
-  for (const [sid, data] of Object.entries(store)) {
-    if (data.memberId === memberId && sid !== exceptSessionId) {
-      delete store[sid]
-    }
-  }
-  await writeSessions(store)
-}
-
-export async function getCurrentMemberSessionId(): Promise<string | null> {
-  const cookieStore = await cookies()
-  return cookieStore.get(COOKIE_NAME)?.value ?? null
 }
