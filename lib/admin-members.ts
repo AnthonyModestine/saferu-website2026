@@ -3,7 +3,8 @@
 import { stripe } from "@/lib/stripe"
 import { stripeListAll } from "@/lib/stripe-list-all"
 import { checkAdminSession } from "@/lib/admin-auth"
-import { getFreeMembers, deleteFreeMember, addFreeMember } from "@/lib/members-store"
+import { getFreeMembers, getFreeMemberByEmail, deleteFreeMember, addFreeMember } from "@/lib/members-store"
+import { purgeAllMemberData } from "@/lib/purge-member-data"
 import { setTrial, getTrialEnd } from "@/lib/pio-trial"
 import { getDisabledEmails, setMemberDisabled as setDisabledInStore } from "@/lib/disabled-members"
 import { addGenerationPack, getGenerationStatuses } from "@/lib/pio-generations"
@@ -272,6 +273,21 @@ export async function deleteMember(id: string): Promise<{ success: boolean; erro
     const stripeClient = getStripe()
     if (!stripeClient) return { success: false, error: "Stripe not configured" }
     try {
+      const customer = await stripeClient.customers.retrieve(id)
+      const email =
+        typeof customer === "object" && !customer.deleted && customer.email
+          ? customer.email.trim().toLowerCase()
+          : null
+
+      if (email) {
+        const freeMember = await getFreeMemberByEmail(email)
+        if (freeMember) {
+          await deleteFreeMember(freeMember.id)
+        } else {
+          await purgeAllMemberData({ email, removeStripe: false })
+        }
+      }
+
       await stripeClient.customers.del(id)
       return { success: true }
     } catch (e) {

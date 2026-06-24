@@ -26,6 +26,7 @@ import {
   Film,
 } from "lucide-react"
 import { isVideoMediaUrl } from "@/lib/media-url"
+import { uploadAdminMediaFile } from "@/lib/upload-media-client"
 
 interface MediaItem {
   name: string
@@ -108,18 +109,15 @@ export default function MediaLibraryPage() {
     setUploadResults([])
     const results: { name: string; ok: boolean; error?: string }[] = []
     for (const file of uploadFiles) {
-      const form = new FormData()
-      form.append("file", file)
       try {
-        const res = await fetch("/api/upload", { method: "POST", body: form })
-        const data = await res.json()
-        if (res.ok && data.url) {
-          results.push({ name: file.name, ok: true })
-        } else {
-          results.push({ name: file.name, ok: false, error: data.error ?? "Upload failed" })
-        }
-      } catch {
-        results.push({ name: file.name, ok: false, error: "Network error" })
+        await uploadAdminMediaFile(file)
+        results.push({ name: file.name, ok: true })
+      } catch (err) {
+        results.push({
+          name: file.name,
+          ok: false,
+          error: err instanceof Error ? err.message : "Upload failed",
+        })
       }
     }
     setUploadResults(results)

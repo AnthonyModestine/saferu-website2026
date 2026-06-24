@@ -7,6 +7,7 @@
 import { readFile, writeFile, mkdir } from "fs/promises"
 import path from "path"
 import { hashPassword } from "@/lib/password"
+import { purgeAllMemberData } from "@/lib/purge-member-data"
 import { ensureSchema, getSql, isDatabaseConfigured } from "@/lib/db"
 import type { DepartmentType } from "@/lib/department-types"
 
@@ -191,7 +192,35 @@ export async function updateMemberPassword(memberId: string, newPassword: string
   return true
 }
 
+export async function getFreeMemberById(id: string): Promise<FreeMember | null> {
+  if (!id?.trim()) return null
+
+  if (isDatabaseConfigured()) {
+    await ensureSchema()
+    const rows = await getSql()`
+      SELECT id, email, name, agency, department_type, department_other, password_hash, created_at
+      FROM free_members
+      WHERE id = ${id}
+      LIMIT 1
+    `
+    const row = (rows as MemberRow[])[0]
+    return row ? rowToMember(row) : null
+  }
+
+  const store = await ensureFile()
+  return store.members.find((m) => m.id === id) ?? null
+}
+
 export async function deleteFreeMember(id: string): Promise<boolean> {
+  const member = await getFreeMemberById(id)
+  if (!member) return false
+
+  await purgeAllMemberData({
+    email: member.email,
+    memberId: member.id,
+    removeStripe: true,
+  })
+
   if (isDatabaseConfigured()) {
     await ensureSchema()
     const rows = await getSql()`

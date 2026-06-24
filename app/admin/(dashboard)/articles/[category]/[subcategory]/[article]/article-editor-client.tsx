@@ -43,6 +43,7 @@ import type { Article, Category, Subcategory } from "@/lib/data/content-library"
 import { Checkbox } from "@/components/ui/checkbox"
 import { BulkActionBar } from "@/components/admin/bulk-action-bar"
 import { setArticleVisibility } from "@/lib/admin-visibility-client"
+import { uploadAdminMediaFile } from "@/lib/upload-media-client"
 
 type ArticleEditorClientProps = {
   category: Category
@@ -142,17 +143,10 @@ export default function ArticleEditorClient({
     setUploadingImage(true)
     setUploadError(null)
     try {
-      const formData = new FormData()
-      formData.set("file", file)
-      const res = await fetch("/api/upload", { method: "POST", body: formData })
-      const data = await res.json().catch(() => ({}))
-      if (res.ok && data.url) {
-        setNewPost((prev) => ({ ...prev, image: data.url }))
-      } else {
-        setUploadError(data.error || "Upload failed. Try a smaller file or paste a URL.")
-      }
-    } catch {
-      setUploadError("Upload failed. Check your connection and try again.")
+      const data = await uploadAdminMediaFile(file)
+      setNewPost((prev) => ({ ...prev, image: data.url }))
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Upload failed. Try a smaller file or paste a URL.")
     } finally {
       setUploadingImage(false)
       e.target.value = ""

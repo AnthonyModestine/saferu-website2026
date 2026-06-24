@@ -7,9 +7,13 @@
 import { writeFile, mkdir, readdir, stat, unlink } from "fs/promises"
 import path from "path"
 import { put, list, del } from "@vercel/blob"
+import {
+  BLOB_PREFIX,
+  mediaKindFromFilename,
+  sanitizeMediaFilename,
+} from "@/lib/media-filename"
 
 const UPLOAD_DIR = "public/images/posts"
-const BLOB_PREFIX = "posts/"
 const MEDIA_FILE_PATTERN = /\.(jpe?g|png|webp|gif|mp4)$/i
 
 export const MAX_IMAGE_SIZE = 10 * 1024 * 1024 // 10MB
@@ -30,14 +34,7 @@ export function isBlobStorageConfigured(): boolean {
 }
 
 function sanitizeFilename(originalName: string, fallbackExt = ".jpg"): string {
-  let ext = path.extname(originalName)
-  if (!ext) ext = fallbackExt
-  const base = path.basename(originalName, ext).replace(/[^a-z0-9-_]/gi, "-").slice(0, 40)
-  return `${base}-${Date.now()}${ext.toLowerCase()}`
-}
-
-function mediaKindFromName(name: string): "image" | "video" {
-  return /\.mp4$/i.test(name) ? "video" : "image"
+  return sanitizeMediaFilename(originalName, fallbackExt)
 }
 
 export async function storeImage(file: File): Promise<StoredImage> {
@@ -51,7 +48,7 @@ export async function storeMediaFile(file: File): Promise<StoredImage> {
   const bytes = await file.arrayBuffer()
   const buffer = Buffer.from(bytes)
   const uploadedAt = new Date().toISOString()
-  const kind = mediaKindFromName(filename)
+  const kind = mediaKindFromFilename(filename)
   const contentType =
     file.type ||
     (kind === "video" ? "video/mp4" : "application/octet-stream")
@@ -103,7 +100,7 @@ export async function listImages(): Promise<StoredImage[]> {
           url: blob.url,
           size: blob.size,
           uploadedAt: blob.uploadedAt.toISOString(),
-          kind: mediaKindFromName(name),
+          kind: mediaKindFromFilename(name),
         }
       })
       .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())
@@ -122,7 +119,7 @@ export async function listImages(): Promise<StoredImage[]> {
             url: `/images/posts/${f}`,
             size: info.size,
             uploadedAt: info.mtime.toISOString(),
-            kind: mediaKindFromName(f),
+            kind: mediaKindFromFilename(f),
           }
         })
     )
