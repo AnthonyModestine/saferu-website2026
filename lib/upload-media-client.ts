@@ -1,6 +1,6 @@
 "use client"
 
-import { upload } from "@vercel/blob/client"
+import { put } from "@vercel/blob/client"
 import {
   buildMediaPathname,
   isVideoFile,
@@ -14,8 +14,19 @@ export interface UploadMediaResult {
   kind: "image" | "video"
 }
 
+export interface UploadProgress {
+  loaded: number
+  total: number
+  percentage: number
+}
+
 const BLOB_SETUP_MESSAGE =
-  "Video upload is not configured. In Vercel: Storage → your Blob store → Connect to saferu-backend (Production + Preview), then redeploy so BLOB_READ_WRITE_TOKEN is added."
+  "Video upload is not configured. Add BLOB_READ_WRITE_TOKEN to saferu-backend in Vercel, then redeploy."
+
+/** Use multipart only above this size (single PUT is faster and more reliable for smaller videos). */
+const MULTIPART_THRESHOLD_BYTES = 8 * 1024 * 1024
+
+const UPLOAD_TIMEOUT_MS = 15 * 60 * 1000
 
 let clientUploadAvailable: boolean | null = null
 
@@ -41,6 +52,21 @@ function shouldUseClientUpload(file: File, blobConfigured: boolean): boolean {
   return isVideoFile(file) || file.size > SERVER_UPLOAD_MAX_BYTES
 }
 
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms)
+    promise
+      .then((value) => {
+        clearTimeout(timer)
+        resolve(value)
+      })
+      .catch((err) => {
+        clearTimeout(timer)
+        reject(err)
+      })
+  })
+}
+
 async function uploadViaServer(file: File): Promise<UploadMediaResult> {
   const form = new FormData()
   form.append("file", file)
@@ -56,54 +82,55 @@ async function uploadViaServer(file: File): Promise<UploadMediaResult> {
   }
 }
 
-async function fetchBlobUploadError(pathname: string, multipart: boolean): Promise<string | null> {
-  try {
-    const res = await fetch("/api/upload/blob", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        type: "blob.generate-client-token",
-        payload: { pathname, clientPayload: null, multipart },
-      }),
-    })
-    const data = (await res.json().catch(() => ({}))) as { error?: string }
-    return data.error ?? null
-  } catch {
-    return null
-  }
-}
-
-async function uploadViaBlobClient(file: File): Promise<UploadMediaResult> {
+async function uploadViaBlobClient(
+  file: File,
+  onProgress?: (progress: UploadProgress) => void
+): Promise<UploadMediaResult> {
   const isVideo = isVideoFile(file)
   const pathname = buildMediaPathname(file.name, isVideo)
-  const multipart = isVideo || file.size > 10 * 1024 * 1024
+  const multipart = file.size > MULTIPART_THRESHOLD_BYTES
 
-  try {
-    const blob = await upload(pathname, file, {
+  const tokenRes = await fetch("/api/upload/client-token", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pathname, multipart }),
+  })
+  const tokenData = (await tokenRes.json().catch(() => ({}))) as {
+    clientToken?: string
+    error?: string
+  }
+  if (!tokenRes.ok || !tokenData.clientToken) {
+    throw new Error(tokenData.error ?? BLOB_SETUP_MESSAGE)
+  }
+
+  const contentType = file.type || (isVideo ? "video/mp4" : "application/octet-stream")
+
+  const blob = await withTimeout(
+    put(pathname, file, {
       access: "public",
-      handleUploadUrl: "/api/upload/blob",
+      token: tokenData.clientToken,
       multipart,
-      contentType: file.type || (isVideo ? "video/mp4" : undefined),
-    })
-    const name = pathname.replace(/^posts\//, "")
-    return {
-      url: blob.url,
-      name,
-      kind: mediaKindFromFilename(name),
-    }
-  } catch (err) {
-    const message = err instanceof Error ? err.message : ""
-    if (message.includes("Failed to retrieve the client token")) {
-      const serverError = await fetchBlobUploadError(pathname, multipart)
-      throw new Error(serverError ?? BLOB_SETUP_MESSAGE)
-    }
-    throw err
+      contentType,
+      onUploadProgress: onProgress,
+    }),
+    UPLOAD_TIMEOUT_MS,
+    "Upload timed out. Check your connection and try again, or use a smaller file."
+  )
+
+  const name = pathname.replace(/^posts\//, "")
+  return {
+    url: blob.url,
+    name,
+    kind: mediaKindFromFilename(name),
   }
 }
 
 /** Upload an image or MP4 from the admin UI. Uses direct Blob upload for videos and large files on Vercel. */
-export async function uploadAdminMediaFile(file: File): Promise<UploadMediaResult> {
+export async function uploadAdminMediaFile(
+  file: File,
+  onProgress?: (progress: UploadProgress) => void
+): Promise<UploadMediaResult> {
   const isVideo = isVideoFile(file)
   const blobConfigured = await canUseClientUpload()
 
@@ -112,7 +139,7 @@ export async function uploadAdminMediaFile(file: File): Promise<UploadMediaResul
   }
 
   if (shouldUseClientUpload(file, blobConfigured)) {
-    return uploadViaBlobClient(file)
+    return uploadViaBlobClient(file, onProgress)
   }
 
   return uploadViaServer(file)

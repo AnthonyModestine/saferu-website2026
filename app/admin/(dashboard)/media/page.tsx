@@ -55,6 +55,7 @@ export default function MediaLibraryPage() {
   const [isUploadOpen, setIsUploadOpen] = useState(false)
   const [uploadFiles, setUploadFiles] = useState<File[]>([])
   const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({})
   const [uploadResults, setUploadResults] = useState<{ name: string; ok: boolean; error?: string }[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -101,26 +102,38 @@ export default function MediaLibraryPage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setUploadFiles(Array.from(e.target.files ?? []))
     setUploadResults([])
+    setUploadProgress({})
   }
 
   const handleUpload = async () => {
     if (!uploadFiles.length) return
     setUploading(true)
     setUploadResults([])
+    setUploadProgress({})
     const results: { name: string; ok: boolean; error?: string }[] = []
     for (const file of uploadFiles) {
+      setUploadProgress((prev) => ({ ...prev, [file.name]: 0 }))
       try {
-        await uploadAdminMediaFile(file)
+        await uploadAdminMediaFile(file, (progress) => {
+          setUploadProgress((prev) => ({ ...prev, [file.name]: progress.percentage }))
+        })
+        setUploadProgress((prev) => ({ ...prev, [file.name]: 100 }))
         results.push({ name: file.name, ok: true })
+        setUploadResults([...results])
       } catch (err) {
+        setUploadProgress((prev) => {
+          const next = { ...prev }
+          delete next[file.name]
+          return next
+        })
         results.push({
           name: file.name,
           ok: false,
           error: err instanceof Error ? err.message : "Upload failed",
         })
+        setUploadResults([...results])
       }
     }
-    setUploadResults(results)
     setUploading(false)
     if (results.some((r) => r.ok)) {
       await fetchItems()
@@ -146,7 +159,7 @@ export default function MediaLibraryPage() {
 
         <Dialog open={isUploadOpen} onOpenChange={(open) => {
           setIsUploadOpen(open)
-          if (!open) { setUploadFiles([]); setUploadResults([]) }
+          if (!open) { setUploadFiles([]); setUploadResults([]); setUploadProgress({}) }
         }}>
           <DialogTrigger asChild>
             <Button className="bg-[#1470AF] text-white hover:bg-[#1470AF]/90">
@@ -188,20 +201,34 @@ export default function MediaLibraryPage() {
                 <div className="space-y-1">
                   {uploadFiles.map((f) => {
                     const result = uploadResults.find((r) => r.name === f.name)
+                    const progress = uploadProgress[f.name]
+                    const inProgress = uploading && progress !== undefined && !result
                     return (
-                      <div key={f.name} className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm">
-                        <span className="truncate max-w-[200px] text-foreground">{f.name}</span>
-                        <span className="ml-2 shrink-0">
-                          {result ? (
-                            result.ok ? (
-                              <span className="text-green-600 flex items-center gap-1"><Check className="h-3.5 w-3.5" /> Uploaded</span>
+                      <div key={f.name} className="rounded-md border border-border px-3 py-2 text-sm">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="truncate max-w-[200px] text-foreground">{f.name}</span>
+                          <span className="ml-2 shrink-0">
+                            {result ? (
+                              result.ok ? (
+                                <span className="text-green-600 flex items-center gap-1"><Check className="h-3.5 w-3.5" /> Uploaded</span>
+                              ) : (
+                                <span className="text-red-600 flex items-center gap-1"><X className="h-3.5 w-3.5" /> {result.error}</span>
+                              )
+                            ) : inProgress ? (
+                              <span className="text-[#1470AF] flex items-center gap-1"><Loader2 className="h-3.5 w-3.5 animate-spin" /> {progress}%</span>
                             ) : (
-                              <span className="text-red-600 flex items-center gap-1"><X className="h-3.5 w-3.5" /> {result.error}</span>
-                            )
-                          ) : (
-                            <span className="text-muted-foreground">{formatBytes(f.size)}</span>
-                          )}
-                        </span>
+                              <span className="text-muted-foreground">{formatBytes(f.size)}</span>
+                            )}
+                          </span>
+                        </div>
+                        {inProgress && (
+                          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
+                            <div
+                              className="h-full rounded-full bg-[#1470AF] transition-all duration-300"
+                              style={{ width: `${Math.max(progress, 5)}%` }}
+                            />
+                          </div>
+                        )}
                       </div>
                     )
                   })}
