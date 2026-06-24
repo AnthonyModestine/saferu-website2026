@@ -215,7 +215,10 @@ export default function MediaLibraryPage() {
                                 <span className="text-red-600 flex items-center gap-1"><X className="h-3.5 w-3.5" /> {result.error}</span>
                               )
                             ) : inProgress ? (
-                              <span className="text-[#1470AF] flex items-center gap-1"><Loader2 className="h-3.5 w-3.5 animate-spin" /> {progress}%</span>
+                              <span className="text-[#1470AF] flex items-center gap-1">
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                {progress <= 3 ? "Preparing…" : `${progress}%`}
+                              </span>
                             ) : (
                               <span className="text-muted-foreground">{formatBytes(f.size)}</span>
                             )}

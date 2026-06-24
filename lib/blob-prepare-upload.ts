@@ -19,6 +19,8 @@ export interface PreparedBlobUpload {
   name: string
   contentType: string
   kind: "image" | "video"
+  /** Required headers for browser PUT to the Vercel Blob API (not standard Content-Type). */
+  uploadHeaders: Record<string, string>
 }
 
 export async function prepareBlobDirectUpload(params: {
@@ -66,6 +68,10 @@ export async function prepareBlobDirectUpload(params: {
     : presignedUrl
 
   const name = pathname.replace(/^posts\//, "")
+  if (!storeId) {
+    throw new Error("Could not resolve Blob store ID. Reconnect SaferU-Images to saferu-backend in Vercel.")
+  }
+
   return {
     uploadUrl: presignedUrl,
     publicUrl,
@@ -73,5 +79,14 @@ export async function prepareBlobDirectUpload(params: {
     name,
     contentType,
     kind: mediaKindFromFilename(name),
+    uploadHeaders: {
+      "x-content-type": contentType,
+      "x-vercel-blob-access": "public",
+      "x-content-length": String(params.size),
+      "x-vercel-blob-store-id": storeId,
+      "x-api-version": "12",
+      "x-add-random-suffix": "0",
+      "x-allow-overwrite": "1",
+    },
   }
 }
