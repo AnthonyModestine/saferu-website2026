@@ -8,7 +8,7 @@ import {
   isClientBlobUploadAvailable,
 } from "@/lib/media-storage"
 
-const VIDEO_CONTENT_TYPES = ["video/mp4", "application/octet-stream", "video/*"]
+const VIDEO_CONTENT_TYPES = ["video/mp4", "application/octet-stream"]
 const BLOB_SETUP_MESSAGE =
   "Video upload is not configured. Add BLOB_READ_WRITE_TOKEN to saferu-backend in Vercel, then redeploy."
 

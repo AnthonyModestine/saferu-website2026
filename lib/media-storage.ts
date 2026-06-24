@@ -38,6 +38,17 @@ export function isClientBlobUploadAvailable(): boolean {
   return Boolean(process.env.BLOB_READ_WRITE_TOKEN?.trim())
 }
 
+/** Presigned client uploads work with BLOB_STORE_ID + OIDC on Vercel (no read-write token required). */
+export function isPresignedBlobUploadAvailable(): boolean {
+  return Boolean(
+    process.env.BLOB_STORE_ID?.trim() && process.env.BLOB_WEBHOOK_PUBLIC_KEY?.trim()
+  )
+}
+
+export function isDirectBlobUploadAvailable(): boolean {
+  return isPresignedBlobUploadAvailable() || isClientBlobUploadAvailable()
+}
+
 function sanitizeFilename(originalName: string, fallbackExt = ".jpg"): string {
   return sanitizeMediaFilename(originalName, fallbackExt)
 }

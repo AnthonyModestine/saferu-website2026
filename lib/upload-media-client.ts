@@ -1,6 +1,6 @@
 "use client"
 
-import { put } from "@vercel/blob/client"
+import { put, uploadPresigned } from "@vercel/blob/client"
 import {
   buildMediaPathname,
   isVideoFile,
@@ -21,34 +21,42 @@ export interface UploadProgress {
 }
 
 const BLOB_SETUP_MESSAGE =
-  "Video upload is not configured. Add BLOB_READ_WRITE_TOKEN to saferu-backend in Vercel, then redeploy."
+  "Video upload is not configured. In Vercel, connect SaferU-Images to saferu-backend (Production + Preview), then redeploy."
 
-/** Use multipart only above this size (single PUT is faster and more reliable for smaller videos). */
-const MULTIPART_THRESHOLD_BYTES = 8 * 1024 * 1024
-
+const MULTIPART_THRESHOLD_BYTES = 20 * 1024 * 1024
 const UPLOAD_TIMEOUT_MS = 15 * 60 * 1000
 
-let clientUploadAvailable: boolean | null = null
+interface UploadCapabilities {
+  clientUpload: boolean
+  presignedUpload: boolean
+  readWriteToken: boolean
+}
 
-async function canUseClientUpload(): Promise<boolean> {
-  if (clientUploadAvailable !== null) return clientUploadAvailable
+let cachedCapabilities: UploadCapabilities | null = null
+
+async function getUploadCapabilities(): Promise<UploadCapabilities> {
+  if (cachedCapabilities) return cachedCapabilities
   try {
     const res = await fetch("/api/upload/capabilities", { credentials: "same-origin" })
     if (!res.ok) {
-      clientUploadAvailable = false
-      return false
+      cachedCapabilities = { clientUpload: false, presignedUpload: false, readWriteToken: false }
+      return cachedCapabilities
     }
-    const data = (await res.json()) as { clientUpload?: boolean }
-    clientUploadAvailable = Boolean(data.clientUpload)
-    return clientUploadAvailable
+    const data = (await res.json()) as Partial<UploadCapabilities>
+    cachedCapabilities = {
+      clientUpload: Boolean(data.clientUpload),
+      presignedUpload: Boolean(data.presignedUpload),
+      readWriteToken: Boolean(data.readWriteToken),
+    }
+    return cachedCapabilities
   } catch {
-    clientUploadAvailable = false
-    return false
+    cachedCapabilities = { clientUpload: false, presignedUpload: false, readWriteToken: false }
+    return cachedCapabilities
   }
 }
 
-function shouldUseClientUpload(file: File, blobConfigured: boolean): boolean {
-  if (!blobConfigured) return false
+function shouldUseDirectBlobUpload(file: File, caps: UploadCapabilities): boolean {
+  if (!caps.clientUpload) return false
   return isVideoFile(file) || file.size > SERVER_UPLOAD_MAX_BYTES
 }
 
@@ -82,14 +90,33 @@ async function uploadViaServer(file: File): Promise<UploadMediaResult> {
   }
 }
 
-async function uploadViaBlobClient(
+async function uploadViaPresigned(
   file: File,
+  pathname: string,
+  multipart: boolean,
+  contentType: string,
   onProgress?: (progress: UploadProgress) => void
-): Promise<UploadMediaResult> {
-  const isVideo = isVideoFile(file)
-  const pathname = buildMediaPathname(file.name, isVideo)
-  const multipart = file.size > MULTIPART_THRESHOLD_BYTES
+) {
+  return withTimeout(
+    uploadPresigned(pathname, file, {
+      access: "public",
+      handleUploadUrl: "/api/upload/presigned",
+      multipart,
+      contentType,
+      onUploadProgress: onProgress,
+    }),
+    UPLOAD_TIMEOUT_MS,
+    "Upload timed out. Try again or use a smaller file."
+  )
+}
 
+async function uploadViaReadWriteToken(
+  file: File,
+  pathname: string,
+  multipart: boolean,
+  contentType: string,
+  onProgress?: (progress: UploadProgress) => void
+) {
   const tokenRes = await fetch("/api/upload/client-token", {
     method: "POST",
     credentials: "same-origin",
@@ -104,9 +131,7 @@ async function uploadViaBlobClient(
     throw new Error(tokenData.error ?? BLOB_SETUP_MESSAGE)
   }
 
-  const contentType = file.type || (isVideo ? "video/mp4" : "application/octet-stream")
-
-  const blob = await withTimeout(
+  return withTimeout(
     put(pathname, file, {
       access: "public",
       token: tokenData.clientToken,
@@ -115,8 +140,41 @@ async function uploadViaBlobClient(
       onUploadProgress: onProgress,
     }),
     UPLOAD_TIMEOUT_MS,
-    "Upload timed out. Check your connection and try again, or use a smaller file."
+    "Upload timed out. Try again or use a smaller file."
   )
+}
+
+async function uploadViaBlobClient(
+  file: File,
+  onProgress?: (progress: UploadProgress) => void
+): Promise<UploadMediaResult> {
+  const isVideo = isVideoFile(file)
+  const pathname = buildMediaPathname(file.name, isVideo)
+  const multipart = file.size > MULTIPART_THRESHOLD_BYTES
+  const contentType = file.type || (isVideo ? "video/mp4" : "application/octet-stream")
+  const caps = await getUploadCapabilities()
+
+  let blob
+  try {
+    if (caps.presignedUpload) {
+      blob = await uploadViaPresigned(file, pathname, multipart, contentType, onProgress)
+    } else if (caps.readWriteToken) {
+      blob = await uploadViaReadWriteToken(file, pathname, multipart, contentType, onProgress)
+    } else {
+      throw new Error(BLOB_SETUP_MESSAGE)
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : ""
+    if (
+      caps.presignedUpload &&
+      caps.readWriteToken &&
+      (message.includes("Failed to retrieve") || message.includes("presigned"))
+    ) {
+      blob = await uploadViaReadWriteToken(file, pathname, multipart, contentType, onProgress)
+    } else {
+      throw err
+    }
+  }
 
   const name = pathname.replace(/^posts\//, "")
   return {
@@ -126,19 +184,20 @@ async function uploadViaBlobClient(
   }
 }
 
-/** Upload an image or MP4 from the admin UI. Uses direct Blob upload for videos and large files on Vercel. */
+/** Upload an image or MP4 from the admin UI. */
 export async function uploadAdminMediaFile(
   file: File,
   onProgress?: (progress: UploadProgress) => void
 ): Promise<UploadMediaResult> {
+  cachedCapabilities = null
+  const caps = await getUploadCapabilities()
   const isVideo = isVideoFile(file)
-  const blobConfigured = await canUseClientUpload()
 
-  if (isVideo && !blobConfigured) {
+  if (isVideo && !caps.clientUpload) {
     throw new Error(BLOB_SETUP_MESSAGE)
   }
 
-  if (shouldUseClientUpload(file, blobConfigured)) {
+  if (shouldUseDirectBlobUpload(file, caps)) {
     return uploadViaBlobClient(file, onProgress)
   }
 
