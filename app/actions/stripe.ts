@@ -78,7 +78,7 @@ export async function startHostedCheckoutSession(productId: string) {
         quantity: 1,
       },
     ],
-    success_url: `${appUrl}/pio-tool?subscribed=1`,
+    success_url: `${appUrl}/pio-tool/checkout-success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${appUrl}/pio-tool`,
     metadata: {
       memberId: session?.memberId ?? '',

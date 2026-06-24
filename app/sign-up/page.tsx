@@ -1,8 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { Suspense, useEffect, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
+import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -21,14 +22,27 @@ import { Check } from "lucide-react"
 import { DepartmentTypeFields } from "@/components/department-type-fields"
 import { FREE_MEMBER_BENEFITS, SIGNUP_PLACEHOLDER_CLASS } from "@/lib/signup-form-copy"
 import { useSignupPlaceholders } from "@/hooks/use-signup-placeholders"
+import { sanitizeReturnUrl } from "@/lib/safe-redirect"
 
-export default function SignUpPage() {
+function SignUpForm() {
+  const searchParams = useSearchParams()
+  const prefillEmail = searchParams.get("email")?.trim() ?? ""
+  const returnUrl = sanitizeReturnUrl(searchParams.get("returnUrl"), "/")
+  const forPressCenter = searchParams.get("pressCenter") === "1"
   const [success, setSuccess] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<SignupFieldErrors>({})
   const [loading, setLoading] = useState(false)
   const [departmentType, setDepartmentType] = useState("")
   const [departmentOther, setDepartmentOther] = useState("")
   const { inputProps, hide } = useSignupPlaceholders()
+
+  useEffect(() => {
+    if (prefillEmail) hide("email")
+  }, [prefillEmail, hide])
+
+  const signInHref = prefillEmail
+    ? `/sign-in?email=${encodeURIComponent(prefillEmail)}&returnUrl=${encodeURIComponent(returnUrl)}`
+    : `/sign-in?returnUrl=${encodeURIComponent(returnUrl)}`
 
   const clearFieldError = (field: keyof SignupFieldErrors) => {
     setFieldErrors((prev) => {
@@ -86,7 +100,7 @@ export default function SignUpPage() {
         body: JSON.stringify({ email, password }),
       })
       if (loginRes.ok) {
-        window.location.href = "/"
+        window.location.href = returnUrl
         return
       }
       setSuccess(true)
@@ -106,9 +120,15 @@ export default function SignUpPage() {
               <Check className="h-7 w-7 text-green-600" />
             </div>
             <h2 className="mt-4 text-xl font-semibold text-[#1a365d]">You&apos;re a member</h2>
-            <p className="mt-2 text-muted-foreground">Start exploring What&apos;s New and our free content library.</p>
+            <p className="mt-2 text-muted-foreground">
+              {forPressCenter
+                ? "Your Press Center subscription is linked to your account."
+                : "Start exploring What's New and our free content library."}
+            </p>
             <Button asChild className="mt-6 bg-[#1470AF] text-white hover:bg-[#1470AF]/90">
-              <Link href="/">Go to SaferU</Link>
+              <Link href={forPressCenter ? "/pio-tool" : "/"}>
+                {forPressCenter ? "Open Press Center" : "Go to SaferU"}
+              </Link>
             </Button>
           </CardContent>
         </Card>
@@ -149,9 +169,13 @@ export default function SignUpPage() {
         </CardHeader>
         <CardContent className="space-y-4 border-t pt-6">
           <div className="text-center">
-            <h2 className="text-xl font-bold text-[#1a365d]">Create Your Free Account</h2>
+            <h2 className="text-xl font-bold text-[#1a365d]">
+              {forPressCenter ? "Create your account" : "Create Your Free Account"}
+            </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Join today and start posting in minutes.
+              {forPressCenter
+                ? "One last step — use the same email you paid with in Stripe."
+                : "Join today and start posting in minutes."}
             </p>
           </div>
 
@@ -189,6 +213,7 @@ export default function SignUpPage() {
                 type="email"
                 autoComplete="email"
                 aria-invalid={Boolean(fieldErrors.email)}
+                defaultValue={prefillEmail}
                 {...inputProps("email", "you@agency.gov", {
                   onChange: () => clearFieldError("email"),
                   className: fieldErrors.email ? invalidFieldClass : undefined,
@@ -220,12 +245,16 @@ export default function SignUpPage() {
               className="w-full bg-[#f2b233] text-[#1a365d] hover:bg-[#e5a52e] font-bold text-base py-6 shadow-md"
               disabled={loading}
             >
-              {loading ? "Creating your account…" : "Create Your Free Account"}
+              {loading
+                ? "Creating your account…"
+                : forPressCenter
+                  ? "Create account & open Press Center"
+                  : "Create Your Free Account"}
             </Button>
           </form>
           <div className="text-center text-sm text-muted-foreground">
             Already have an account?{" "}
-            <Link href="/sign-in" className="text-primary font-medium hover:underline">
+            <Link href={signInHref} className="text-primary font-medium hover:underline">
               Sign in
             </Link>
           </div>
@@ -238,5 +267,19 @@ export default function SignUpPage() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+export default function SignUpPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center text-muted-foreground">
+          Loading…
+        </div>
+      }
+    >
+      <SignUpForm />
+    </Suspense>
   )
 }

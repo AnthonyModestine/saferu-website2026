@@ -14,6 +14,7 @@ import { sanitizeReturnUrl } from "@/lib/safe-redirect"
 function SignInForm() {
   const searchParams = useSearchParams()
   const returnUrl = sanitizeReturnUrl(searchParams.get("returnUrl"))
+  const prefillEmail = searchParams.get("email")?.trim() ?? ""
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -85,6 +86,7 @@ function SignInForm() {
                 placeholder="you@agency.gov"
                 className="placeholder:text-muted-foreground/60"
                 autoComplete="email"
+                defaultValue={prefillEmail}
               />
             </div>
             <div className="space-y-2">

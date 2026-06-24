@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { useEffect, useState, Fragment } from "react"
+import { useRouter } from "next/navigation"
 import {
   Card,
   CardContent,
@@ -22,6 +23,7 @@ import {
 import { useSubscription } from "@/lib/use-subscription"
 import { useMemberSession } from "@/lib/use-member-session"
 import { startHostedCheckoutSession } from "@/app/actions/stripe"
+import { pressCenterSignInUrl, pressCenterSignUpUrl } from "@/lib/press-center-routes"
 
 const MONTHLY_PRODUCT = "pio-tool-monthly"
 
@@ -61,6 +63,7 @@ const howItWorksSteps = [
 ]
 
 export default function PIODashboardPage() {
+  const router = useRouter()
   const { member, isLoading: sessionLoading } = useMemberSession()
   const { isSubscribed, isLoading: subLoading } = useSubscription()
   const [genStatus, setGenStatus] = useState<GenerationStatus | null>(null)
@@ -81,6 +84,11 @@ export default function PIODashboardPage() {
 
   async function handleSubscribe() {
     if (sessionLoading || subLoading) return
+
+    if (!member) {
+      router.push(pressCenterSignUpUrl())
+      return
+    }
 
     setCheckoutLoading(true)
     try {
@@ -238,12 +246,12 @@ export default function PIODashboardPage() {
                 size="lg"
                 className="bg-[#f2b233] text-[#1a365d] hover:bg-[#f2b233]/90 font-semibold shadow-sm"
               >
-                {member ? "Subscribe — $30/month" : "Get started — $30/month"}
+                {member ? "Subscribe — $30/month" : "Create account & subscribe"}
                 {!checkoutLoading && <ArrowRight className="ml-2 h-4 w-4" />}
               </SubscribeButton>
               {!member && (
                 <Button asChild variant="outline" size="lg">
-                  <Link href="/sign-in?returnUrl=%2Fpio-tool">Sign in</Link>
+                  <Link href={pressCenterSignInUrl()}>Sign in</Link>
                 </Button>
               )}
               <span className="text-sm text-muted-foreground">Cancel anytime</span>
@@ -278,7 +286,7 @@ export default function PIODashboardPage() {
               size="lg"
               className="bg-[#f2b233] text-[#1a365d] hover:bg-[#f2b233]/90 font-semibold px-8"
             >
-              {member ? "Subscribe — $30/month" : "Get started — $30/month"}
+              {member ? "Subscribe — $30/month" : "Create account & subscribe"}
             </SubscribeButton>
           </div>
         </>

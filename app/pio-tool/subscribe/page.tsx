@@ -44,14 +44,25 @@ export default function SubscribePage() {
   const monthlyPlan = PRODUCTS.find((p) => p.id === "pio-tool-monthly")
 
   useEffect(() => {
-    if (subLoading) return
+    if (sessionLoading || subLoading) return
     if (isSubscribed) {
       router.replace("/pio-tool")
+      return
     }
-  }, [isSubscribed, subLoading, router])
+    if (!member) {
+      const params = new URLSearchParams(window.location.search)
+      const returnPath =
+        params.get("checkout") === "1"
+          ? "/pio-tool/subscribe?checkout=1"
+          : "/pio-tool/subscribe"
+      router.replace(
+        `/sign-up?returnUrl=${encodeURIComponent(returnPath)}&pressCenter=1`
+      )
+    }
+  }, [member, isSubscribed, sessionLoading, subLoading, router])
 
   useEffect(() => {
-    if (subLoading || isSubscribed) return
+    if (sessionLoading || subLoading || isSubscribed || !member) return
     const params = new URLSearchParams(window.location.search)
     if (params.get("checkout") !== "1") return
 
@@ -70,7 +81,7 @@ export default function SubscribePage() {
     return () => {
       cancelled = true
     }
-  }, [isSubscribed, subLoading])
+  }, [member, isSubscribed, sessionLoading, subLoading])
 
   async function handleSubscribe() {
     setRedirectingToStripe(true)
@@ -83,7 +94,7 @@ export default function SubscribePage() {
     }
   }
 
-  if (subLoading || isSubscribed || redirectingToStripe) {
+  if (sessionLoading || subLoading || isSubscribed || !member || redirectingToStripe) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[40vh] gap-4">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#1470AF] border-t-transparent" />
@@ -99,9 +110,7 @@ export default function SubscribePage() {
       <div className="text-center">
         <h1 className="text-3xl font-bold text-[#1a365d]">Upgrade to Press Center</h1>
         <p className="mt-2 text-lg text-muted-foreground">
-          {member
-            ? `Signed in as ${member.email}. Subscribe to unlock press release and video request drafting.`
-            : "Subscribe to unlock press release and video request drafting. Stripe will collect your email at checkout."}
+          Signed in as {member.email}. Subscribe to unlock press release and video request drafting.
         </p>
       </div>
 

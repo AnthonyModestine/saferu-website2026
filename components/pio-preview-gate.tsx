@@ -7,8 +7,9 @@ import { useSubscription } from "@/lib/use-subscription"
 import { useMemberSession } from "@/lib/use-member-session"
 import { cn } from "@/lib/utils"
 
-const SUBSCRIBE_PATH = "/pio-tool/subscribe"
-const PRICING_PATH = "/pricing"
+import { pressCenterSignUpUrl } from "@/lib/press-center-routes"
+
+const SUBSCRIBE_PATH = "/pio-tool/subscribe?checkout=1"
 
 export function PIOPreviewGate({ children }: { children: React.ReactNode }) {
   const { member, isLoading: sessionLoading } = useMemberSession()
@@ -19,7 +20,7 @@ export function PIOPreviewGate({ children }: { children: React.ReactNode }) {
 
   function getUpgradePath(): string {
     if (member) return SUBSCRIBE_PATH
-    return PRICING_PATH
+    return pressCenterSignUpUrl()
   }
 
   function handleGreyClick(e: React.MouseEvent<HTMLDivElement>) {
@@ -58,7 +59,7 @@ export function PIOPreviewGate({ children }: { children: React.ReactNode }) {
             {member ? (
               <Link href={SUBSCRIBE_PATH}>Subscribe Now</Link>
             ) : (
-              <Link href={PRICING_PATH}>See plans</Link>
+              <Link href={pressCenterSignUpUrl()}>Create account & subscribe</Link>
             )}
           </Button>
         </div>
