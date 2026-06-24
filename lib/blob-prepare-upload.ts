@@ -43,7 +43,9 @@ export async function prepareBlobDirectUpload(params: {
     throw new Error(`File too large (max ${Math.round(maxSize / (1024 * 1024))}MB)`)
   }
 
+  const readWriteToken = process.env.BLOB_READ_WRITE_TOKEN?.trim()
   const signedToken = await issueSignedToken({
+    ...(readWriteToken ? { token: readWriteToken } : {}),
     pathname,
     operations: ["put"],
     maximumSizeInBytes: maxSize,

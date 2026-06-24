@@ -1,7 +1,7 @@
 import { handleUploadPresigned, type HandleUploadPresignedBody } from "@vercel/blob/client"
 import { issueSignedToken } from "@vercel/blob"
 import { NextResponse } from "next/server"
-import { checkAdminSession } from "@/lib/admin-auth"
+import { isAdminRequest } from "@/lib/validate-admin-session"
 import {
   ALLOWED_IMAGE_TYPES,
   MAX_IMAGE_SIZE,
@@ -26,7 +26,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       body,
       request,
       getSignedToken: async (pathname, _clientPayload, _multipart) => {
-        const isAdmin = await checkAdminSession()
+        const isAdmin = await isAdminRequest()
         if (!isAdmin) {
           throw new Error("Unauthorized")
         }

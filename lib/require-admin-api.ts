@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { checkAdminSession } from "@/lib/admin-auth"
+import { isAdminRequest } from "@/lib/validate-admin-session"
 
 /**
  * Call at the top of any admin API route handler.
@@ -7,7 +7,7 @@ import { checkAdminSession } from "@/lib/admin-auth"
  * or null if the session is valid (meaning the route can proceed).
  */
 export async function unauthorizedIfNotAdmin(): Promise<NextResponse | null> {
-  const isAdmin = await checkAdminSession()
+  const isAdmin = await isAdminRequest()
   if (!isAdmin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }

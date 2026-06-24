@@ -1,6 +1,5 @@
 "use client"
 
-import { put, uploadPresigned } from "@vercel/blob/client"
 import {
   buildMediaPathname,
   isVideoFile,
@@ -21,8 +20,16 @@ export interface UploadProgress {
   status?: "preparing" | "uploading"
 }
 
+interface PreparedUpload {
+  uploadUrl: string
+  publicUrl: string
+  name: string
+  kind: "image" | "video"
+  uploadHeaders: Record<string, string>
+}
+
+const PREPARE_TIMEOUT_MS = 45_000
 const UPLOAD_TIMEOUT_MS = 10 * 60 * 1000
-const MULTIPART_THRESHOLD_BYTES = 20 * 1024 * 1024
 
 function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -39,16 +46,11 @@ function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promi
   })
 }
 
-function resultFromPathname(pathname: string, url: string): UploadMediaResult {
-  const name = pathname.replace(/^posts\//, "")
-  return { url, name, kind: mediaKindFromFilename(name) }
-}
-
 async function uploadViaServer(
   file: File,
   onProgress?: (progress: UploadProgress) => void
 ): Promise<UploadMediaResult> {
-  onProgress?.({ loaded: 0, total: file.size, percentage: 15, status: "uploading" })
+  onProgress?.({ loaded: 0, total: file.size, percentage: 10, status: "uploading" })
 
   const form = new FormData()
   form.append("file", file)
@@ -101,91 +103,121 @@ function isPayloadTooLargeMessage(message: string): boolean {
 }
 
 function isPayloadTooLarge(error: unknown): boolean {
-  return error instanceof PayloadTooLargeError || (
-    error instanceof Error && isPayloadTooLargeMessage(error.message)
+  return (
+    error instanceof PayloadTooLargeError ||
+    (error instanceof Error && isPayloadTooLargeMessage(error.message))
   )
 }
 
-async function fetchClientToken(
-  pathname: string,
-  multipart: boolean
-): Promise<{ clientToken?: string; error?: string; usePresigned?: boolean }> {
-  const res = await fetch("/api/upload/client-token", {
-    method: "POST",
-    credentials: "same-origin",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ pathname, multipart }),
+async function prepareDirectUpload(file: File, isVideo: boolean): Promise<PreparedUpload> {
+  const controller = new AbortController()
+  const timer = window.setTimeout(() => controller.abort(), PREPARE_TIMEOUT_MS)
+
+  try {
+    const res = await fetch("/api/upload/prepare", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        filename: file.name,
+        size: file.size,
+        contentType: file.type || (isVideo ? "video/mp4" : "application/octet-stream"),
+        isVideo,
+      }),
+      signal: controller.signal,
+    })
+
+    const data = (await res.json().catch(() => ({}))) as PreparedUpload & { error?: string }
+    if (!res.ok || !data.uploadUrl || !data.publicUrl) {
+      throw new Error(data.error ?? `Could not prepare upload (${res.status})`)
+    }
+
+    return data
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error("Preparing upload timed out. Refresh the page and try again.")
+    }
+    throw err
+  } finally {
+    window.clearTimeout(timer)
+  }
+}
+
+function xhrPutToBlob(
+  file: File,
+  prepared: PreparedUpload,
+  onProgress?: (progress: UploadProgress) => void
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    const timeout = window.setTimeout(() => {
+      xhr.abort()
+      reject(new Error("Upload timed out. Try again on a faster connection."))
+    }, UPLOAD_TIMEOUT_MS)
+
+    xhr.open("PUT", prepared.uploadUrl, true)
+    for (const [key, value] of Object.entries(prepared.uploadHeaders)) {
+      xhr.setRequestHeader(key, value)
+    }
+
+    xhr.upload.onprogress = (event) => {
+      if (!event.lengthComputable) return
+      const percentage = Math.max(5, Math.round((event.loaded / event.total) * 100))
+      onProgress?.({
+        loaded: event.loaded,
+        total: event.total,
+        percentage,
+        status: "uploading",
+      })
+    }
+
+    xhr.onload = () => {
+      window.clearTimeout(timeout)
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve()
+        return
+      }
+      const detail = xhr.responseText?.trim()
+      reject(
+        new Error(
+          detail
+            ? `Storage rejected upload (${xhr.status}): ${detail.slice(0, 200)}`
+            : `Storage rejected upload (${xhr.status})`
+        )
+      )
+    }
+
+    xhr.onerror = () => {
+      window.clearTimeout(timeout)
+      reject(new Error("Network error while uploading to storage. Check your connection and try again."))
+    }
+
+    xhr.onabort = () => {
+      window.clearTimeout(timeout)
+      reject(new Error("Upload cancelled."))
+    }
+
+    onProgress?.({ loaded: 0, total: file.size, percentage: 5, status: "uploading" })
+    xhr.send(file)
   })
-  const data = (await res.json().catch(() => ({}))) as {
-    clientToken?: string
-    error?: string
-  }
-
-  if (res.ok && data.clientToken) {
-    return { clientToken: data.clientToken }
-  }
-
-  return {
-    error: data.error ?? `Could not prepare upload (${res.status})`,
-    usePresigned: res.status === 503,
-  }
 }
 
 async function uploadLargeVideo(
   file: File,
   onProgress?: (progress: UploadProgress) => void
 ): Promise<UploadMediaResult> {
-  const pathname = buildMediaPathname(file.name, true)
-  const contentType = file.type || "video/mp4"
-  const multipart = file.size > MULTIPART_THRESHOLD_BYTES
+  onProgress?.({ loaded: 0, total: file.size, percentage: 2, status: "preparing" })
 
-  onProgress?.({ loaded: 0, total: file.size, percentage: 5, status: "preparing" })
+  const prepared = await prepareDirectUpload(file, true)
 
-  const tokenPrep = await fetchClientToken(pathname, multipart)
-  let lastError: unknown
+  onProgress?.({ loaded: 0, total: file.size, percentage: 8, status: "uploading" })
+  await xhrPutToBlob(file, prepared, onProgress)
 
-  if (tokenPrep.clientToken) {
-    try {
-      const blob = await withTimeout(
-        put(pathname, file, {
-          access: "public",
-          token: tokenPrep.clientToken,
-          contentType,
-          multipart,
-          onUploadProgress: (p) => onProgress?.({ ...p, status: "uploading" }),
-        }),
-        UPLOAD_TIMEOUT_MS,
-        "Upload timed out. Try again on a faster connection."
-      )
-      onProgress?.({ loaded: file.size, total: file.size, percentage: 100, status: "uploading" })
-      return resultFromPathname(pathname, blob.url)
-    } catch (err) {
-      lastError = err
-    }
-  }
-
-  // OIDC presigned upload — works with BLOB_STORE_ID (no read-write token required)
-  try {
-    const blob = await withTimeout(
-      uploadPresigned(pathname, file, {
-        access: "public",
-        handleUploadUrl: "/api/upload/presigned",
-        contentType,
-        multipart,
-        onUploadProgress: (p) => onProgress?.({ ...p, status: "uploading" }),
-      }),
-      UPLOAD_TIMEOUT_MS,
-      "Upload timed out. Try again on a faster connection."
-    )
-    onProgress?.({ loaded: file.size, total: file.size, percentage: 100, status: "uploading" })
-    return resultFromPathname(pathname, blob.url)
-  } catch (presignedErr) {
-    const parts: string[] = []
-    if (tokenPrep.error) parts.push(tokenPrep.error)
-    if (lastError instanceof Error && lastError.message) parts.push(lastError.message)
-    if (presignedErr instanceof Error && presignedErr.message) parts.push(presignedErr.message)
-    const detail = [...new Set(parts.filter(Boolean))].join(" — ")
-    throw new Error(detail || "Video upload failed. Try again or contact support.")
+  onProgress?.({ loaded: file.size, total: file.size, percentage: 100, status: "uploading" })
+  return {
+    url: prepared.publicUrl,
+    name: prepared.name,
+    kind: prepared.kind,
   }
 }
 

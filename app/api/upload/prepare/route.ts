@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import { unauthorizedIfNotAdmin } from "@/lib/require-admin-api"
 import { prepareBlobDirectUpload } from "@/lib/blob-prepare-upload"
 
+export const maxDuration = 60
+
 export async function POST(request: Request) {
   const denied = await unauthorizedIfNotAdmin()
   if (denied) return denied

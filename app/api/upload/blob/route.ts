@@ -1,6 +1,6 @@
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client"
 import { NextResponse } from "next/server"
-import { checkAdminSession } from "@/lib/admin-auth"
+import { isAdminRequest } from "@/lib/validate-admin-session"
 import {
   ALLOWED_IMAGE_TYPES,
   isClientBlobUploadAvailable,
@@ -27,7 +27,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       request,
       token: readWriteToken,
       onBeforeGenerateToken: async (pathname, _clientPayload, _multipart) => {
-        const isAdmin = await checkAdminSession()
+        const isAdmin = await isAdminRequest()
         if (!isAdmin) {
           throw new Error("Unauthorized")
         }
