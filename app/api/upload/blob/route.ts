@@ -4,27 +4,31 @@ import { checkAdminSession } from "@/lib/admin-auth"
 import {
   ALLOWED_IMAGE_TYPES,
   ALLOWED_VIDEO_TYPES,
-  isBlobStorageConfigured,
+  isClientBlobUploadAvailable,
   MAX_IMAGE_SIZE,
   MAX_VIDEO_SIZE,
 } from "@/lib/media-storage"
+
+const BLOB_SETUP_MESSAGE =
+  "Video upload is not configured. In Vercel: Storage → your Blob store → Connect to saferu-backend (Production + Preview), then redeploy so BLOB_READ_WRITE_TOKEN is added."
 
 export async function POST(request: Request): Promise<NextResponse> {
   const body = (await request.json()) as HandleUploadBody
 
   try {
+    const readWriteToken = process.env.BLOB_READ_WRITE_TOKEN?.trim()
+    if (!isClientBlobUploadAvailable()) {
+      return NextResponse.json({ error: BLOB_SETUP_MESSAGE }, { status: 503 })
+    }
+
     const jsonResponse = await handleUpload({
       body,
       request,
+      token: readWriteToken,
       onBeforeGenerateToken: async (pathname) => {
         const isAdmin = await checkAdminSession()
         if (!isAdmin) {
           throw new Error("Unauthorized")
-        }
-        if (!isBlobStorageConfigured()) {
-          throw new Error(
-            "Media storage is not linked to this site. In Vercel: open your Blob store → Projects → Connect to Project, then redeploy."
-          )
         }
 
         const isVideo = /\.mp4$/i.test(pathname)

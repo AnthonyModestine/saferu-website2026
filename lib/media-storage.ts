@@ -33,6 +33,11 @@ export function isBlobStorageConfigured(): boolean {
   return Boolean(process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID)
 }
 
+/** Client-side Blob uploads require BLOB_READ_WRITE_TOKEN (OIDC / BLOB_STORE_ID alone is not enough). */
+export function isClientBlobUploadAvailable(): boolean {
+  return Boolean(process.env.BLOB_READ_WRITE_TOKEN?.trim())
+}
+
 function sanitizeFilename(originalName: string, fallbackExt = ".jpg"): string {
   return sanitizeMediaFilename(originalName, fallbackExt)
 }
