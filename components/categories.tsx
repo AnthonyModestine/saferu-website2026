@@ -36,15 +36,7 @@ const categories = [
 
 export function Categories() {
   return (
-    <section className="relative bg-gradient-to-b from-[#f0f4f8] to-[#dae6f0] py-20">
-      {/* Subtle background pattern */}
-      <div className="absolute inset-0 opacity-30" style={{
-        backgroundImage: "url('/images/hero-background.jpg')",
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-      }} />
-      <div className="absolute inset-0 bg-gradient-to-b from-[#f0f4f8]/80 to-[#dae6f0]/90" />
-      
+    <section className="relative z-0 -mt-1 bg-[#f0f4f8] bg-gradient-to-b from-[#f0f4f8] to-[#dae6f0] py-20">
       <div className="relative mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-bold tracking-tight text-[#1a365d] sm:text-4xl">

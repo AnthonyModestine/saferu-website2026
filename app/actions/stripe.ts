@@ -79,7 +79,7 @@ export async function startHostedCheckoutSession(productId: string) {
       },
     ],
     success_url: `${appUrl}/pio-tool?subscribed=1`,
-    cancel_url: `${appUrl}/pricing`,
+    cancel_url: `${appUrl}/pio-tool`,
     metadata: {
       memberId: session?.memberId ?? '',
       memberEmail: session?.email ?? '',

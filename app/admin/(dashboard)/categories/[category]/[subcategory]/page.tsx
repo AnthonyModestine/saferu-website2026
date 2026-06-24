@@ -6,6 +6,7 @@ import { Plus, ArrowLeft, ChevronRight, FileText } from "lucide-react"
 import { getCategoryById, getSubcategory } from "@/lib/content-merged"
 import { isArticlePublished } from "@/lib/content-visibility"
 import { ArticleListOrder } from "@/components/admin/article-list-order"
+import { SubcategoryHeaderActions } from "@/components/admin/subcategory-header-actions"
 import { loadCmsAdditions } from "@/lib/cms-additions-persist"
 import { loadVisibility } from "@/lib/content-visibility-persist"
 
@@ -52,7 +53,7 @@ export default async function SubcategoryDetailPage({ params }: PageProps) {
       </div>
 
       {/* Header */}
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <Button asChild variant="ghost" size="icon" className="bg-transparent">
             <Link href={`/admin/categories/${categoryId}`}>
@@ -64,12 +65,22 @@ export default async function SubcategoryDetailPage({ params }: PageProps) {
             <p className="mt-1 text-gray-500">{subcategory.description}</p>
           </div>
         </div>
-        <Button asChild className="bg-[#1470AF] text-white hover:bg-[#1470AF]/90">
-          <Link href={`/admin/articles/new?category=${categoryId}&subcategory=${subcategoryId}`}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Article
-          </Link>
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <SubcategoryHeaderActions
+            categoryId={categoryId}
+            subcategoryId={subcategoryId}
+            title={subcategory.title}
+            description={subcategory.description}
+            articleCount={subcategory.articles.length}
+            canDelete={category.subcategories.length > 1}
+          />
+          <Button asChild className="bg-[#1470AF] text-white hover:bg-[#1470AF]/90">
+            <Link href={`/admin/articles/new?category=${categoryId}&subcategory=${subcategoryId}`}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Article
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* Articles List */}

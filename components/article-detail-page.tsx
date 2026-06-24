@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { track } from "@/lib/track"
 import { copyTextToClipboard } from "@/lib/copy-to-clipboard"
-import { downloadImageFile } from "@/lib/download-image"
+import { downloadMediaFile } from "@/lib/download-image"
+import { isVideoMediaUrl } from "@/lib/media-url"
 import { getPostMessage } from "@/lib/post-message"
 import type { ImageOverrides } from "@/lib/content-overrides"
 import { Header } from "@/components/header"
@@ -14,6 +14,7 @@ import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { ChevronRight, ArrowLeft, Download, ExternalLink, ShieldCheck, Flame, Star, CloudLightning, AlertTriangle, Users, Shield } from "lucide-react"
 import { PostMessageBlock } from "@/components/post-message-block"
+import { PostMediaPreview, PostMediaPlaceholder } from "@/components/post-media-preview"
 import type { Article, Subcategory, Category } from "@/lib/data/content-library"
 import type { LucideIcon } from "lucide-react"
 
@@ -169,35 +170,19 @@ export function ArticleDetailPage({
                 const message = getPostMessage(post)
                 const overrideUrl = imageOverrides[category.id]?.[subcategory.id]?.[article.id]?.[post.id]
                 const imageSrc = overrideUrl ?? post.image ?? null
+                const isVideo = isVideoMediaUrl(imageSrc)
                 
                 return (
                   <div key={post.id} className="flex flex-col rounded-2xl bg-white shadow-md overflow-hidden border border-gray-100">
-                    {/* Image - 16:9 aspect ratio (safe fallback when no image or load error) */}
+                    {/* Graphic or video — 16:9 */}
                     <div className="relative aspect-video bg-muted overflow-hidden">
                       {imageSrc ? (
-                        <Image
-                          src={imageSrc}
-                          alt={post.title}
-                          fill
-                          className="object-cover"
-                          unoptimized={imageSrc.startsWith("/images/") || imageSrc.startsWith("http")}
-                          onError={(e) => {
-                            const target = e.currentTarget
-                            target.style.display = "none"
-                            const parent = target.closest(".relative")
-                            const fallback = parent?.querySelector("[data-image-fallback]") as HTMLElement
-                            if (fallback) fallback.style.display = "flex"
-                          }}
-                        />
+                        <PostMediaPreview src={imageSrc} alt={post.title} />
                       ) : null}
-                      <div
-                        data-image-fallback
-                        className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm"
-                        style={{ display: imageSrc ? "none" : "flex", background: "linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%)" }}
-                        aria-hidden
-                      >
-                        <span className="font-medium">No graphic</span>
-                      </div>
+                      <PostMediaPlaceholder
+                        label="No graphic"
+                        className={imageSrc ? "hidden" : undefined}
+                      />
                       {imageSrc ? (
                         <button
                           type="button"
@@ -205,7 +190,7 @@ export function ArticleDetailPage({
                           onClick={async () => {
                             setDownloadingPostId(post.id)
                             try {
-                              await downloadImageFile(
+                              await downloadMediaFile(
                                 imageSrc,
                                 post.title.toLowerCase().replace(/\s+/g, "-")
                               )
@@ -216,15 +201,23 @@ export function ArticleDetailPage({
                                 postTitle: post.title,
                               })
                             } catch {
-                              window.alert("Could not download this image. Try again in a moment.")
+                              window.alert(
+                                isVideo
+                                  ? "Could not download this video. Try again in a moment."
+                                  : "Could not download this image. Try again in a moment."
+                              )
                             } finally {
                               setDownloadingPostId(null)
                             }
                           }}
-                          className="absolute bottom-3 right-3 z-10 flex items-center gap-1.5 rounded-lg bg-white/95 backdrop-blur-sm px-3 py-2 text-sm font-medium text-[#1a365d] shadow-lg hover:bg-white transition-colors disabled:opacity-70"
+                          className={`absolute right-3 z-10 flex items-center gap-1.5 rounded-lg bg-white/95 backdrop-blur-sm px-3 py-2 text-sm font-medium text-[#1a365d] shadow-lg hover:bg-white transition-colors disabled:opacity-70 ${isVideo ? "top-3" : "bottom-3"}`}
                         >
                           <Download className="h-4 w-4" />
-                          {downloadingPostId === post.id ? "Downloading…" : "Download"}
+                          {downloadingPostId === post.id
+                            ? "Downloading…"
+                            : isVideo
+                              ? "Download video"
+                              : "Download"}
                         </button>
                       ) : null}
                     </div>

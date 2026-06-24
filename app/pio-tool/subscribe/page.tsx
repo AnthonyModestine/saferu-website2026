@@ -6,9 +6,11 @@ import { Check, FileText, Zap, Shield, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { PRODUCTS } from "@/lib/products"
-import { Checkout } from "@/components/checkout"
 import { useMemberSession } from "@/lib/use-member-session"
 import { useSubscription } from "@/lib/use-subscription"
+import { startHostedCheckoutSession } from "@/app/actions/stripe"
+
+const MONTHLY_PRODUCT = "pio-tool-monthly"
 
 const features = [
   {
@@ -37,61 +39,57 @@ export default function SubscribePage() {
   const router = useRouter()
   const { member, isLoading: sessionLoading } = useMemberSession()
   const { isSubscribed, isLoading: subLoading } = useSubscription()
-  const [selectedPlan, setSelectedPlan] = useState<string | null>(null)
-  const [showCheckout, setShowCheckout] = useState(false)
+  const [redirectingToStripe, setRedirectingToStripe] = useState(false)
 
   const monthlyPlan = PRODUCTS.find((p) => p.id === "pio-tool-monthly")
 
   useEffect(() => {
-    if (sessionLoading || subLoading) return
+    if (subLoading) return
     if (isSubscribed) {
       router.replace("/pio-tool")
-      return
     }
-    if (!member) {
-      router.replace("/sign-in?returnUrl=%2Fpio-tool%2Fsubscribe")
-    }
-  }, [member, isSubscribed, sessionLoading, subLoading, router])
+  }, [isSubscribed, subLoading, router])
 
-  const handleSubscribe = (productId: string) => {
-    setSelectedPlan(productId)
-    setShowCheckout(true)
+  useEffect(() => {
+    if (subLoading || isSubscribed) return
+    const params = new URLSearchParams(window.location.search)
+    if (params.get("checkout") !== "1") return
+
+    let cancelled = false
+    setRedirectingToStripe(true)
+    startHostedCheckoutSession(MONTHLY_PRODUCT)
+      .then((url) => {
+        if (cancelled) return
+        if (url) window.location.href = url
+        else setRedirectingToStripe(false)
+      })
+      .catch(() => {
+        if (!cancelled) setRedirectingToStripe(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [isSubscribed, subLoading])
+
+  async function handleSubscribe() {
+    setRedirectingToStripe(true)
+    try {
+      const url = await startHostedCheckoutSession(MONTHLY_PRODUCT)
+      if (url) window.location.href = url
+      else setRedirectingToStripe(false)
+    } catch {
+      setRedirectingToStripe(false)
+    }
   }
 
-  if (sessionLoading || subLoading || !member || isSubscribed) {
+  if (subLoading || isSubscribed || redirectingToStripe) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[40vh] gap-4">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#1470AF] border-t-transparent" />
-        <p className="text-sm text-muted-foreground">Loading...</p>
-      </div>
-    )
-  }
-
-  if (showCheckout && selectedPlan) {
-    return (
-      <div className="mx-auto max-w-2xl space-y-6">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-[#1a365d]">Complete Your Subscription</h1>
-          <p className="mt-2 text-muted-foreground">
-            Secure checkout powered by Stripe
-          </p>
-        </div>
-        <Card>
-          <CardContent className="pt-6">
-            <Checkout productId={selectedPlan} />
-          </CardContent>
-        </Card>
-        <div className="text-center">
-          <Button
-            variant="ghost"
-            onClick={() => {
-              setShowCheckout(false)
-              setSelectedPlan(null)
-            }}
-          >
-            Back to plans
-          </Button>
-        </div>
+        <p className="text-sm text-muted-foreground">
+          {redirectingToStripe ? "Redirecting to secure checkout…" : "Loading..."}
+        </p>
       </div>
     )
   }
@@ -101,7 +99,9 @@ export default function SubscribePage() {
       <div className="text-center">
         <h1 className="text-3xl font-bold text-[#1a365d]">Upgrade to Press Center</h1>
         <p className="mt-2 text-lg text-muted-foreground">
-          Signed in as {member.email}. Subscribe to unlock press release and video request drafting.
+          {member
+            ? `Signed in as ${member.email}. Subscribe to unlock press release and video request drafting.`
+            : "Subscribe to unlock press release and video request drafting. Stripe will collect your email at checkout."}
         </p>
       </div>
 
@@ -161,7 +161,8 @@ export default function SubscribePage() {
             <Button
               size="lg"
               className="bg-[#f2b233] text-[#1a365d] hover:bg-[#e5a52e] font-semibold px-12"
-              onClick={() => handleSubscribe("pio-tool-monthly")}
+              onClick={handleSubscribe}
+              disabled={redirectingToStripe}
             >
               Subscribe — $30/month
             </Button>

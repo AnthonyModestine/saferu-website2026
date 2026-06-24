@@ -30,3 +30,9 @@ export function isAllowedImageBuffer(
   const mime = detectImageMime(buffer)
   return mime !== null && allowedTypes.includes(mime)
 }
+
+/** MP4 files contain an `ftyp` box starting at byte offset 4. */
+export function isMp4Buffer(buffer: Buffer): boolean {
+  if (buffer.length < 12) return false
+  return buffer.toString("ascii", 4, 8) === "ftyp"
+}

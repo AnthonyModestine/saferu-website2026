@@ -21,8 +21,10 @@ import {
   type SignupFieldErrors,
 } from "@/lib/signup-validation"
 import { cn } from "@/lib/utils"
-import { CheckCircle, ArrowRight } from "lucide-react"
+import { CheckCircle, ArrowRight, Sparkles } from "lucide-react"
 import { DepartmentTypeFields } from "@/components/department-type-fields"
+import { FREE_MEMBER_BENEFITS, SIGNUP_PLACEHOLDER_CLASS } from "@/lib/signup-form-copy"
+import { useSignupPlaceholders } from "@/hooks/use-signup-placeholders"
 
 export default function MemberSitePage() {
   const [signUpSuccess, setSignUpSuccess] = useState(false)
@@ -32,6 +34,7 @@ export default function MemberSitePage() {
   const [departmentOther, setDepartmentOther] = useState("")
   const [signInError, setSignInError] = useState<string | null>(null)
   const [signInLoading, setSignInLoading] = useState(false)
+  const { inputProps, hide } = useSignupPlaceholders()
 
   const clearSignUpFieldError = (field: keyof SignupFieldErrors) => {
     setSignUpFieldErrors((prev) => {
@@ -152,24 +155,21 @@ export default function MemberSitePage() {
             <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
               {/* Left Column - Benefits */}
               <div>
+                <div className="inline-flex items-center gap-1.5 rounded-full bg-[#f2b233]/20 px-3 py-1 text-xs font-semibold text-[#1a365d] mb-4">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Free for public safety agencies
+                </div>
                 <h1 className="text-3xl font-bold tracking-tight text-[#1a365d] sm:text-4xl">
-                  Join SaferU for Free
+                  Join SaferU — free membership for your agency
                 </h1>
                 <p className="mt-4 text-lg text-muted-foreground">
-                  Become a member and get weekly access to What&apos;s New — plus our full library of ready-to-share safety content for your agency.
+                  Sign up in under a minute and unlock weekly What&apos;s New content plus our full library of ready-to-share safety posts, graphics, and captions — built for PIOs and outreach teams.
                 </p>
 
                 <ul className="mt-8 space-y-4">
-                  {[
-                    "What's New — fresh content added every week",
-                    "Access to all content categories",
-                    "Copy captions with one click",
-                    "Download high-quality graphics",
-                    "Save favorites for quick access",
-                    "100% free for public safety agencies",
-                  ].map((benefit) => (
-                    <li key={benefit} className="flex items-center gap-3">
-                      <CheckCircle className="h-5 w-5 text-primary" />
+                  {FREE_MEMBER_BENEFITS.map((benefit) => (
+                    <li key={benefit} className="flex items-start gap-3">
+                      <CheckCircle className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
                       <span className="text-muted-foreground">{benefit}</span>
                     </li>
                   ))}
@@ -180,9 +180,9 @@ export default function MemberSitePage() {
               <div>
                 <Card>
                   <CardHeader>
-                    <CardTitle>Get Started</CardTitle>
+                    <CardTitle>Create your free account</CardTitle>
                     <CardDescription>
-                      Create your free account or sign in to access content.
+                      Members get What&apos;s New every week and instant access to our content library.
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -220,10 +220,11 @@ export default function MemberSitePage() {
                                 <Label htmlFor="firstName">First Name</Label>
                                 <Input
                                   id="firstName"
-                                  placeholder="John"
                                   aria-invalid={Boolean(signUpFieldErrors.firstName)}
-                                  className={signUpFieldErrors.firstName ? invalidFieldClass : undefined}
-                                  onChange={() => clearSignUpFieldError("firstName")}
+                                  {...inputProps("firstName", "John", {
+                                    onChange: () => clearSignUpFieldError("firstName"),
+                                    className: signUpFieldErrors.firstName ? invalidFieldClass : undefined,
+                                  })}
                                 />
                                 <FieldError message={signUpFieldErrors.firstName} />
                               </div>
@@ -231,10 +232,11 @@ export default function MemberSitePage() {
                                 <Label htmlFor="lastName">Last Name</Label>
                                 <Input
                                   id="lastName"
-                                  placeholder="Smith"
                                   aria-invalid={Boolean(signUpFieldErrors.lastName)}
-                                  className={signUpFieldErrors.lastName ? invalidFieldClass : undefined}
-                                  onChange={() => clearSignUpFieldError("lastName")}
+                                  {...inputProps("lastName", "Smith", {
+                                    onChange: () => clearSignUpFieldError("lastName"),
+                                    className: signUpFieldErrors.lastName ? invalidFieldClass : undefined,
+                                  })}
                                 />
                                 <FieldError message={signUpFieldErrors.lastName} />
                               </div>
@@ -244,11 +246,12 @@ export default function MemberSitePage() {
                               <Input
                                 id="signupEmail"
                                 type="email"
-                                placeholder="you@agency.gov"
                                 autoComplete="email"
                                 aria-invalid={Boolean(signUpFieldErrors.email)}
-                                className={signUpFieldErrors.email ? invalidFieldClass : undefined}
-                                onChange={() => clearSignUpFieldError("email")}
+                                {...inputProps("email", "you@agency.gov", {
+                                  onChange: () => clearSignUpFieldError("email"),
+                                  className: signUpFieldErrors.email ? invalidFieldClass : undefined,
+                                })}
                               />
                               <FieldError message={signUpFieldErrors.email} />
                             </div>
@@ -256,10 +259,11 @@ export default function MemberSitePage() {
                               <Label htmlFor="agency">Agency Name</Label>
                               <Input
                                 id="agency"
-                                placeholder="Metro Police Department"
                                 aria-invalid={Boolean(signUpFieldErrors.agency)}
-                                className={signUpFieldErrors.agency ? invalidFieldClass : undefined}
-                                onChange={() => clearSignUpFieldError("agency")}
+                                {...inputProps("agency", "Metro Police Department", {
+                                  onChange: () => clearSignUpFieldError("agency"),
+                                  className: signUpFieldErrors.agency ? invalidFieldClass : undefined,
+                                })}
                               />
                               <FieldError message={signUpFieldErrors.agency} />
                             </div>
@@ -272,21 +276,29 @@ export default function MemberSitePage() {
                               departmentOtherError={signUpFieldErrors.departmentOther}
                               onClearDepartmentTypeError={() => clearSignUpFieldError("departmentType")}
                               onClearDepartmentOtherError={() => clearSignUpFieldError("departmentOther")}
+                              onDepartmentOtherFocus={() => hide("departmentOther")}
                             />
                             <div className="space-y-2">
                               <Label htmlFor="signupPassword">Password (min 8 characters)</Label>
                               <PasswordInput
                                 id="signupPassword"
-                                placeholder="Create a password"
                                 autoComplete="new-password"
                                 aria-invalid={Boolean(signUpFieldErrors.password)}
-                                className={signUpFieldErrors.password ? invalidFieldClass : undefined}
-                                onChange={() => clearSignUpFieldError("password")}
+                                placeholder={inputProps("password", "Create a password").placeholder}
+                                onFocus={() => hide("password")}
+                                onChange={() => {
+                                  hide("password")
+                                  clearSignUpFieldError("password")
+                                }}
+                                className={cn(
+                                  SIGNUP_PLACEHOLDER_CLASS,
+                                  signUpFieldErrors.password ? invalidFieldClass : undefined
+                                )}
                               />
                               <FieldError message={signUpFieldErrors.password} />
                             </div>
-                            <Button type="submit" className="w-full" disabled={signUpLoading}>
-                              {signUpLoading ? "Creating…" : "Create Free Account"}
+                            <Button type="submit" className="w-full font-semibold" disabled={signUpLoading}>
+                              {signUpLoading ? "Creating your account…" : "Create My Free Account"}
                             </Button>
                             <p className="text-center text-xs text-muted-foreground">
                               By signing up, you agree to our Terms of Service
@@ -306,6 +318,7 @@ export default function MemberSitePage() {
                                 id="signinEmail"
                                 type="email"
                                 placeholder="you@agency.gov"
+                                className={SIGNUP_PLACEHOLDER_CLASS}
                                 required
                               />
                             </div>
@@ -314,6 +327,7 @@ export default function MemberSitePage() {
                               <PasswordInput
                                 id="signinPassword"
                                 placeholder="Your password"
+                                className={SIGNUP_PLACEHOLDER_CLASS}
                                 required
                               />
                             </div>

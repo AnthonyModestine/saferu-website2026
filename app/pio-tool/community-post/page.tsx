@@ -23,6 +23,7 @@ import {
 } from "lucide-react"
 import { useAgency } from "@/lib/agency-context"
 import { addPioHistoryItem } from "@/lib/pio-history-store"
+import { VideoRequestGuidelinesNote } from "@/components/pio/video-request-guidelines-note"
 import { PIOPreviewGate } from "@/components/pio-preview-gate"
 import { GenerationLimitModal } from "@/components/generation-limit-modal"
 import { track } from "@/lib/track"
@@ -212,9 +213,10 @@ export default function CommunityPostPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Video Request</h1>
-        <p className="text-muted-foreground">
-          Draft a direct message requesting security camera or doorbell footage for an active investigation. Use on Neighbors by Ring, social media, or your usual channels.
+        <p className="text-muted-foreground mt-1">
+          Draft a direct message requesting security camera or doorbell footage for an active investigation.
         </p>
+        <VideoRequestGuidelinesNote className="mt-4" />
       </div>
 
       {/* Form Section - Full Width */}

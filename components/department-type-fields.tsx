@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import {
@@ -11,6 +12,7 @@ import {
 } from "@/components/ui/select"
 import { FieldError } from "@/components/form-messages"
 import { DEPARTMENT_TYPES } from "@/lib/department-types"
+import { SIGNUP_PLACEHOLDER_CLASS, SIGNUP_SELECT_PLACEHOLDER_CLASS } from "@/lib/signup-form-copy"
 import { cn } from "@/lib/utils"
 import { invalidFieldClass } from "@/lib/signup-validation"
 
@@ -24,6 +26,7 @@ interface DepartmentTypeFieldsProps {
   departmentOtherError?: string
   onClearDepartmentTypeError?: () => void
   onClearDepartmentOtherError?: () => void
+  onDepartmentOtherFocus?: () => void
 }
 
 export function DepartmentTypeFields({
@@ -36,9 +39,11 @@ export function DepartmentTypeFields({
   departmentOtherError,
   onClearDepartmentTypeError,
   onClearDepartmentOtherError,
+  onDepartmentOtherFocus,
 }: DepartmentTypeFieldsProps) {
   const typeId = `${idPrefix}departmentType`
   const otherId = `${idPrefix}departmentOther`
+  const [otherTouched, setOtherTouched] = useState(false)
 
   return (
     <>
@@ -57,7 +62,10 @@ export function DepartmentTypeFields({
           <SelectTrigger
             id={typeId}
             aria-invalid={Boolean(departmentTypeError)}
-            className={cn(departmentTypeError && invalidFieldClass)}
+            className={cn(
+              SIGNUP_SELECT_PLACEHOLDER_CLASS,
+              departmentTypeError && invalidFieldClass
+            )}
           >
             <SelectValue placeholder="Select department type" />
           </SelectTrigger>
@@ -79,15 +87,22 @@ export function DepartmentTypeFields({
           </Label>
           <Input
             id={otherId}
-            placeholder="e.g. Campus Security, Tribal Police, Public Works"
+            placeholder={
+              otherTouched && !departmentOther ? "" : "e.g. Campus Security, Tribal Police"
+            }
             value={departmentOther}
+            onFocus={() => {
+              setOtherTouched(true)
+              onDepartmentOtherFocus?.()
+            }}
             onChange={(e) => {
+              setOtherTouched(true)
               onDepartmentOtherChange(e.target.value)
               onClearDepartmentOtherError?.()
             }}
             aria-invalid={Boolean(departmentOtherError)}
             className={cn(
-              "placeholder:text-muted-foreground/60",
+              SIGNUP_PLACEHOLDER_CLASS,
               departmentOtherError && invalidFieldClass
             )}
           />

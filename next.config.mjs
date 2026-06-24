@@ -26,6 +26,7 @@ const nextConfig = {
               "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https:",
+              "media-src 'self' blob: https:",
               "font-src 'self'",
               "connect-src 'self' https://api.stripe.com https://api.openai.com",
               "frame-src https://js.stripe.com https://hooks.stripe.com",

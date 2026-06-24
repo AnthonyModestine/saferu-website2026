@@ -16,6 +16,8 @@ import {
 } from "@/lib/signup-validation"
 import { cn } from "@/lib/utils"
 import { DepartmentTypeFields } from "@/components/department-type-fields"
+import { FREE_MEMBER_BENEFITS, SIGNUP_PLACEHOLDER_CLASS } from "@/lib/signup-form-copy"
+import { useSignupPlaceholders } from "@/hooks/use-signup-placeholders"
 import {
   Dialog,
   DialogContent,
@@ -33,6 +35,7 @@ export function SignUpModal() {
   const [loading, setLoading] = useState(false)
   const [departmentType, setDepartmentType] = useState("")
   const [departmentOther, setDepartmentOther] = useState("")
+  const { inputProps, hide } = useSignupPlaceholders()
 
   const clearFieldError = (field: keyof SignupFieldErrors) => {
     setFieldErrors((prev) => {
@@ -126,27 +129,36 @@ export function SignUpModal() {
         ) : (
           <>
             <DialogHeader>
-              <DialogTitle className="text-xl font-bold text-[#1a365d]">Create Your Free Account</DialogTitle>
+              <DialogTitle className="text-xl font-bold text-[#1a365d]">Join SaferU Free</DialogTitle>
               <DialogDescription>
-                Become a member and get weekly access to What&apos;s New plus our full content library.
+                Weekly What&apos;s New content and our full safety library — free for public safety agencies.
               </DialogDescription>
             </DialogHeader>
+
+            <ul className="space-y-1.5 rounded-lg bg-primary/5 p-3 text-sm text-muted-foreground">
+              {FREE_MEMBER_BENEFITS.slice(0, 3).map((benefit) => (
+                <li key={benefit} className="flex items-start gap-2">
+                  <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-green-600" />
+                  {benefit}
+                </li>
+              ))}
+            </ul>
 
             <form onSubmit={handleSubmit} noValidate className="space-y-4 mt-2">
               <FormErrorBanner message={fieldErrors.form} />
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label htmlFor="modal-firstName">First Name</Label>
-                  <Input id="modal-firstName" placeholder="First Name" />
+                  <Input id="modal-firstName" {...inputProps("firstName", "John")} />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="modal-lastName">Last Name</Label>
-                  <Input id="modal-lastName" placeholder="Last Name" />
+                  <Input id="modal-lastName" {...inputProps("lastName", "Smith")} />
                 </div>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="modal-agency">Agency Name</Label>
-                <Input id="modal-agency" placeholder="Agency Name" />
+                <Input id="modal-agency" {...inputProps("agency", "Metro Police Department")} />
               </div>
               <DepartmentTypeFields
                 idPrefix="modal-"
@@ -158,17 +170,19 @@ export function SignUpModal() {
                 departmentOtherError={fieldErrors.departmentOther}
                 onClearDepartmentTypeError={() => clearFieldError("departmentType")}
                 onClearDepartmentOtherError={() => clearFieldError("departmentOther")}
+                onDepartmentOtherFocus={() => hide("departmentOther")}
               />
               <div className="space-y-1.5">
-                <Label htmlFor="modal-email">Email</Label>
+                <Label htmlFor="modal-email">Work Email</Label>
                 <Input
                   id="modal-email"
                   type="email"
-                  placeholder="you@agency.gov"
                   autoComplete="email"
                   aria-invalid={Boolean(fieldErrors.email)}
-                  className={fieldErrors.email ? invalidFieldClass : undefined}
-                  onChange={() => clearFieldError("email")}
+                  {...inputProps("email", "you@agency.gov", {
+                    onChange: () => clearFieldError("email"),
+                    className: fieldErrors.email ? invalidFieldClass : undefined,
+                  })}
                 />
                 <FieldError message={fieldErrors.email} />
               </div>
@@ -176,11 +190,18 @@ export function SignUpModal() {
                 <Label htmlFor="modal-password">Password (min 8 characters)</Label>
                 <PasswordInput
                   id="modal-password"
-                  placeholder="Create a password"
                   autoComplete="new-password"
                   aria-invalid={Boolean(fieldErrors.password)}
-                  className={fieldErrors.password ? invalidFieldClass : undefined}
-                  onChange={() => clearFieldError("password")}
+                  placeholder={inputProps("password", "Create a password").placeholder}
+                  onFocus={() => hide("password")}
+                  onChange={() => {
+                    hide("password")
+                    clearFieldError("password")
+                  }}
+                  className={cn(
+                    SIGNUP_PLACEHOLDER_CLASS,
+                    fieldErrors.password ? invalidFieldClass : undefined
+                  )}
                 />
                 <FieldError message={fieldErrors.password} />
               </div>
@@ -189,7 +210,7 @@ export function SignUpModal() {
                 className="w-full bg-[#f2b233] text-[#1a365d] hover:bg-[#f2b233]/90 font-semibold"
                 disabled={loading}
               >
-                {loading ? "Creating…" : "Create Free Account"}
+                {loading ? "Creating your account…" : "Create My Free Account"}
               </Button>
               <p className="text-center text-sm text-muted-foreground">
                 Already have an account?{" "}

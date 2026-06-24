@@ -36,14 +36,6 @@ const benefits = [
 export function Benefits() {
   return (
     <section className="relative bg-gradient-to-b from-[#dae6f0] to-[#c5d8eb] py-16">
-      {/* Subtle background */}
-      <div className="absolute inset-0 opacity-20" style={{
-        backgroundImage: "url('/images/hero-background.jpg')",
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-      }} />
-      <div className="absolute inset-0 bg-gradient-to-b from-[#dae6f0]/85 to-[#c5d8eb]/90" />
-      
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-3xl text-center">
           <h2 className="text-3xl font-bold tracking-tight text-[#1a365d] sm:text-4xl">

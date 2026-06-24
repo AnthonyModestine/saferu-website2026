@@ -45,9 +45,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Image not found" }, { status: 502 })
     }
 
-    const contentType = upstream.headers.get("content-type") ?? "image/jpeg"
-    if (!contentType.startsWith("image/")) {
-      return NextResponse.json({ error: "Not an image" }, { status: 400 })
+    const contentType = upstream.headers.get("content-type") ?? "application/octet-stream"
+    const isImage = contentType.startsWith("image/")
+    const isVideo = contentType === "video/mp4" || contentType.startsWith("video/mp4")
+    if (!isImage && !isVideo) {
+      return NextResponse.json({ error: "Not an allowed media type" }, { status: 400 })
     }
 
     const buffer = await upstream.arrayBuffer()

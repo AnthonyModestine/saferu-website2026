@@ -19,14 +19,8 @@ import {
 import { cn } from "@/lib/utils"
 import { Check } from "lucide-react"
 import { DepartmentTypeFields } from "@/components/department-type-fields"
-
-const benefits = [
-  "Access to What's New — updated every week",
-  "Full content library for your agency",
-  "Crime prevention templates",
-  "Fire safety resources",
-  "Weather preparedness guides",
-]
+import { FREE_MEMBER_BENEFITS, SIGNUP_PLACEHOLDER_CLASS } from "@/lib/signup-form-copy"
+import { useSignupPlaceholders } from "@/hooks/use-signup-placeholders"
 
 export default function SignUpPage() {
   const [success, setSuccess] = useState(false)
@@ -34,6 +28,7 @@ export default function SignUpPage() {
   const [loading, setLoading] = useState(false)
   const [departmentType, setDepartmentType] = useState("")
   const [departmentOther, setDepartmentOther] = useState("")
+  const { inputProps, hide } = useSignupPlaceholders()
 
   const clearFieldError = (field: keyof SignupFieldErrors) => {
     setFieldErrors((prev) => {
@@ -111,7 +106,7 @@ export default function SignUpPage() {
               <Check className="h-7 w-7 text-green-600" />
             </div>
             <h2 className="mt-4 text-xl font-semibold text-[#1a365d]">You&apos;re a member</h2>
-            <p className="mt-2 text-muted-foreground">Start exploring What&apos;s New and our free content.</p>
+            <p className="mt-2 text-muted-foreground">Start exploring What&apos;s New and our free content library.</p>
             <Button asChild className="mt-6 bg-[#1470AF] text-white hover:bg-[#1470AF]/90">
               <Link href="/">Go to SaferU</Link>
             </Button>
@@ -123,8 +118,8 @@ export default function SignUpPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-[#f0f4f8] to-[#dae6f0] px-4 py-12">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
+      <Card className="w-full max-w-lg shadow-lg border-[#1470AF]/10">
+        <CardHeader className="text-center pb-4">
           <Link href="/" className="mx-auto mb-4 flex items-center justify-center">
             <Image
               src="/images/saferu-logo.png"
@@ -135,20 +130,29 @@ export default function SignUpPage() {
               style={{ filter: "brightness(0.4) contrast(1.2)" }}
             />
           </Link>
-          <CardTitle className="text-2xl font-bold text-[#1a365d]">Create Your Free Account</CardTitle>
-          <CardDescription>Become a member and get weekly access to What&apos;s New — plus our full library of ready-to-share safety content.</CardDescription>
+          <CardTitle className="mt-4 text-left text-xl font-bold leading-snug text-[#1a365d] sm:text-2xl">
+            Join SaferU and get instant access to ready-to-share social media content designed
+            specifically for public safety professionals.
+          </CardTitle>
+          <CardDescription className="text-left text-base leading-relaxed text-muted-foreground pt-3">
+            Save time, stay consistent, and keep your community informed with professionally
+            designed graphics, captions, and weekly content updates.
+          </CardDescription>
+          <ul className="mt-5 space-y-2.5 text-left">
+            {FREE_MEMBER_BENEFITS.map((benefit) => (
+              <li key={benefit} className="flex items-start gap-2.5 text-sm text-muted-foreground">
+                <Check className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
+                <span>{benefit}</span>
+              </li>
+            ))}
+          </ul>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="rounded-lg bg-primary/5 p-4 space-y-2">
-            <p className="text-sm font-medium text-foreground">As a free member you get:</p>
-            <ul className="space-y-1">
-              {benefits.map((benefit) => (
-                <li key={benefit} className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Check className="h-4 w-4 text-green-600" />
-                  {benefit}
-                </li>
-              ))}
-            </ul>
+        <CardContent className="space-y-4 border-t pt-6">
+          <div className="text-center">
+            <h2 className="text-xl font-bold text-[#1a365d]">Create Your Free Account</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Join today and start posting in minutes.
+            </p>
           </div>
 
           <form onSubmit={handleSubmit} noValidate className="space-y-4">
@@ -156,28 +160,16 @@ export default function SignUpPage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="firstName">First Name</Label>
-                <Input
-                  id="firstName"
-                  placeholder="First Name"
-                  className="placeholder:text-muted-foreground/60"
-                />
+                <Input id="firstName" {...inputProps("firstName", "John")} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="lastName">Last Name</Label>
-                <Input
-                  id="lastName"
-                  placeholder="Last Name"
-                  className="placeholder:text-muted-foreground/60"
-                />
+                <Input id="lastName" {...inputProps("lastName", "Smith")} />
               </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="agency">Agency Name</Label>
-              <Input
-                id="agency"
-                placeholder="Agency Name"
-                className="placeholder:text-muted-foreground/60"
-              />
+              <Input id="agency" {...inputProps("agency", "Metro Police Department")} />
             </div>
             <DepartmentTypeFields
               departmentType={departmentType}
@@ -188,20 +180,19 @@ export default function SignUpPage() {
               departmentOtherError={fieldErrors.departmentOther}
               onClearDepartmentTypeError={() => clearFieldError("departmentType")}
               onClearDepartmentOtherError={() => clearFieldError("departmentOther")}
+              onDepartmentOtherFocus={() => hide("departmentOther")}
             />
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">Work Email</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="you@agency.gov"
                 autoComplete="email"
                 aria-invalid={Boolean(fieldErrors.email)}
-                className={cn(
-                  "placeholder:text-muted-foreground/60",
-                  fieldErrors.email && invalidFieldClass
-                )}
-                onChange={() => clearFieldError("email")}
+                {...inputProps("email", "you@agency.gov", {
+                  onChange: () => clearFieldError("email"),
+                  className: fieldErrors.email ? invalidFieldClass : undefined,
+                })}
               />
               <FieldError message={fieldErrors.email} />
             </div>
@@ -209,23 +200,27 @@ export default function SignUpPage() {
               <Label htmlFor="password">Password (min 8 characters)</Label>
               <PasswordInput
                 id="password"
-                placeholder="Create a password"
                 autoComplete="new-password"
                 aria-invalid={Boolean(fieldErrors.password)}
+                placeholder={inputProps("password", "Create a password").placeholder}
+                onFocus={() => hide("password")}
+                onChange={() => {
+                  hide("password")
+                  clearFieldError("password")
+                }}
                 className={cn(
-                  "placeholder:text-muted-foreground/60",
+                  SIGNUP_PLACEHOLDER_CLASS,
                   fieldErrors.password && invalidFieldClass
                 )}
-                onChange={() => clearFieldError("password")}
               />
               <FieldError message={fieldErrors.password} />
             </div>
             <Button
               type="submit"
-              className="w-full bg-[#f2b233] text-[#1a365d] hover:bg-[#f2b233]/90 font-semibold"
+              className="w-full bg-[#f2b233] text-[#1a365d] hover:bg-[#e5a52e] font-bold text-base py-6 shadow-md"
               disabled={loading}
             >
-              {loading ? "Creating…" : "Create Free Account"}
+              {loading ? "Creating your account…" : "Create Your Free Account"}
             </Button>
           </form>
           <div className="text-center text-sm text-muted-foreground">
@@ -235,9 +230,9 @@ export default function SignUpPage() {
             </Link>
           </div>
           <p className="text-xs text-center text-muted-foreground">
-            Want access to the Press Center?{" "}
+            Need press releases & video requests?{" "}
             <Link href="/pio-tool/subscribe" className="text-primary hover:underline">
-              View subscription plans
+              Explore Press Center
             </Link>
           </p>
         </CardContent>

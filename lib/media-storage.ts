@@ -1,5 +1,5 @@
 /**
- * Server-only image storage.
+ * Server-only media storage (images + MP4 videos).
  * Uses Vercel Blob in production (BLOB_READ_WRITE_TOKEN or BLOB_STORE_ID + OIDC on Vercel).
  * Local dev without Blob env falls back to public/images/posts.
  */
@@ -10,36 +10,56 @@ import { put, list, del } from "@vercel/blob"
 
 const UPLOAD_DIR = "public/images/posts"
 const BLOB_PREFIX = "posts/"
+const MEDIA_FILE_PATTERN = /\.(jpe?g|png|webp|gif|mp4)$/i
+
 export const MAX_IMAGE_SIZE = 10 * 1024 * 1024 // 10MB
+export const MAX_VIDEO_SIZE = 100 * 1024 * 1024 // 100MB
 export const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"]
+export const ALLOWED_VIDEO_TYPES = ["video/mp4"]
 
 export interface StoredImage {
   name: string
   url: string
   size: number
   uploadedAt: string
+  kind: "image" | "video"
 }
 
 export function isBlobStorageConfigured(): boolean {
   return Boolean(process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID)
 }
 
-function sanitizeFilename(originalName: string): string {
-  const ext = path.extname(originalName) || ".jpg"
+function sanitizeFilename(originalName: string, fallbackExt = ".jpg"): string {
+  let ext = path.extname(originalName)
+  if (!ext) ext = fallbackExt
   const base = path.basename(originalName, ext).replace(/[^a-z0-9-_]/gi, "-").slice(0, 40)
   return `${base}-${Date.now()}${ext.toLowerCase()}`
 }
 
+function mediaKindFromName(name: string): "image" | "video" {
+  return /\.mp4$/i.test(name) ? "video" : "image"
+}
+
 export async function storeImage(file: File): Promise<StoredImage> {
-  const filename = sanitizeFilename(file.name)
+  return storeMediaFile(file)
+}
+
+export async function storeMediaFile(file: File): Promise<StoredImage> {
+  const fallbackExt =
+    file.type === "video/mp4" || file.name.toLowerCase().endsWith(".mp4") ? ".mp4" : ".jpg"
+  const filename = sanitizeFilename(file.name, fallbackExt)
   const bytes = await file.arrayBuffer()
   const buffer = Buffer.from(bytes)
   const uploadedAt = new Date().toISOString()
+  const kind = mediaKindFromName(filename)
+  const contentType =
+    file.type ||
+    (kind === "video" ? "video/mp4" : "application/octet-stream")
 
   if (isBlobStorageConfigured()) {
     const blob = await put(`${BLOB_PREFIX}${filename}`, buffer, {
       access: "public",
-      contentType: file.type || "application/octet-stream",
+      contentType,
       addRandomSuffix: false,
     })
     return {
@@ -47,12 +67,13 @@ export async function storeImage(file: File): Promise<StoredImage> {
       url: blob.url,
       size: file.size,
       uploadedAt,
+      kind,
     }
   }
 
   if (process.env.VERCEL) {
     throw new Error(
-      "Image storage is not linked to this site. In Vercel: open SaferU-Images → Projects tab → Connect to Project (your website). Then redeploy."
+      "Media storage is not linked to this site. In Vercel: open SaferU-Images → Projects tab → Connect to Project (your website). Then redeploy."
     )
   }
 
@@ -66,6 +87,7 @@ export async function storeImage(file: File): Promise<StoredImage> {
     url: `/images/posts/${filename}`,
     size: file.size,
     uploadedAt,
+    kind,
   }
 }
 
@@ -73,12 +95,17 @@ export async function listImages(): Promise<StoredImage[]> {
   if (isBlobStorageConfigured()) {
     const { blobs } = await list({ prefix: BLOB_PREFIX })
     return blobs
-      .map((blob) => ({
-        name: blob.pathname.replace(BLOB_PREFIX, ""),
-        url: blob.url,
-        size: blob.size,
-        uploadedAt: blob.uploadedAt.toISOString(),
-      }))
+      .filter((blob) => MEDIA_FILE_PATTERN.test(blob.pathname))
+      .map((blob) => {
+        const name = blob.pathname.replace(BLOB_PREFIX, "")
+        return {
+          name,
+          url: blob.url,
+          size: blob.size,
+          uploadedAt: blob.uploadedAt.toISOString(),
+          kind: mediaKindFromName(name),
+        }
+      })
       .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())
   }
 
@@ -87,7 +114,7 @@ export async function listImages(): Promise<StoredImage[]> {
     const files = await readdir(dir)
     const items = await Promise.all(
       files
-        .filter((f) => /\.(jpe?g|png|webp|gif)$/i.test(f))
+        .filter((f) => MEDIA_FILE_PATTERN.test(f))
         .map(async (f) => {
           const info = await stat(path.join(dir, f))
           return {
@@ -95,6 +122,7 @@ export async function listImages(): Promise<StoredImage[]> {
             url: `/images/posts/${f}`,
             size: info.size,
             uploadedAt: info.mtime.toISOString(),
+            kind: mediaKindFromName(f),
           }
         })
     )

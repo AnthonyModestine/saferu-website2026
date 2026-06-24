@@ -35,6 +35,7 @@ import type { GenerationActionType } from "@/lib/pio-analytics"
 import { GenerationFeedback } from "@/components/pio/generation-feedback"
 import { PIOPreviewGate } from "@/components/pio-preview-gate"
 import { GenerationLimitModal } from "@/components/generation-limit-modal"
+import { VideoRequestGuidelinesNote } from "@/components/pio/video-request-guidelines-note"
 import { downloadPressReleasePDF } from "@/lib/pdf-export"
 import { addPioHistoryItem } from "@/lib/pio-history-store"
 import Image from "next/image"
@@ -787,6 +788,7 @@ export default function NewPressReleasePage() {
                     <p className="text-sm text-muted-foreground mt-0.5">
                       Ongoing investigations often need doorbell or security camera footage. Add details below.
                     </p>
+                    <VideoRequestGuidelinesNote className="mt-3" />
                   </div>
                   <div className="space-y-2">
                     <Label>Timeframe for footage</Label>
@@ -1096,7 +1098,8 @@ export default function NewPressReleasePage() {
 
                 {/* Video Request */}
                 {includesVideoRequest && (
-                  <TabsContent value="community-request" className="mt-4">
+                  <TabsContent value="community-request" className="mt-4 space-y-3">
+                    <VideoRequestGuidelinesNote />
                     {generatedCommunityRequest ? (
                       <>
                         <div className="rounded-lg border border-border bg-card p-6">

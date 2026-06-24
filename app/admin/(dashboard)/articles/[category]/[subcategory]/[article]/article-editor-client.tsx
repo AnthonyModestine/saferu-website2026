@@ -4,6 +4,8 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
+import { PostMediaPreview } from "@/components/post-media-preview"
+import { isVideoMediaUrl } from "@/lib/media-url"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -147,7 +149,7 @@ export default function ArticleEditorClient({
       if (res.ok && data.url) {
         setNewPost((prev) => ({ ...prev, image: data.url }))
       } else {
-        setUploadError(data.error || "Upload failed. Try a smaller image or paste a URL.")
+        setUploadError(data.error || "Upload failed. Try a smaller file or paste a URL.")
       }
     } catch {
       setUploadError("Upload failed. Check your connection and try again.")
@@ -477,18 +479,27 @@ export default function ArticleEditorClient({
                 />
               </div>
               <div className="space-y-2">
-                <Label>Post Image</Label>
+                <Label>Post graphic or video</Label>
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-                  <div className="flex h-32 w-48 shrink-0 items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50">
+                  <div className="relative flex h-32 w-48 shrink-0 items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-gray-300 bg-gray-50">
                     {newPost.image ? (
-                      <Image
-                        src={newPost.image || "/placeholder.svg"}
-                        alt="Preview"
-                        width={192}
-                        height={128}
-                        className="h-full w-full object-cover rounded-lg"
-                        unoptimized={newPost.image.startsWith("/images/") || newPost.image.startsWith("http")}
-                      />
+                      isVideoMediaUrl(newPost.image) ? (
+                        <PostMediaPreview
+                          src={newPost.image}
+                          alt="Preview"
+                          cover={false}
+                          className="rounded-lg"
+                        />
+                      ) : (
+                        <Image
+                          src={newPost.image || "/placeholder.svg"}
+                          alt="Preview"
+                          width={192}
+                          height={128}
+                          className="h-full w-full object-cover rounded-lg"
+                          unoptimized={newPost.image.startsWith("/images/") || newPost.image.startsWith("http")}
+                        />
+                      )
                     ) : (
                       <div className="text-center">
                         <ImageIcon className="mx-auto h-8 w-8 text-gray-400" />
@@ -500,10 +511,10 @@ export default function ArticleEditorClient({
                     <div className="flex flex-wrap items-center gap-2">
                       <Label className="cursor-pointer rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm font-medium hover:bg-gray-100">
                         <Upload className="mr-2 inline h-4 w-4" />
-                        Upload from computer
+                        Upload image or MP4
                         <input
                           type="file"
-                          accept="image/jpeg,image/png,image/webp,image/gif"
+                          accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,.mp4"
                           className="sr-only"
                           onChange={handleImageUpload}
                           disabled={uploadingImage}
@@ -517,12 +528,12 @@ export default function ArticleEditorClient({
                       <p className="text-sm text-red-600">{uploadError}</p>
                     )}
                     <Input
-                      placeholder="/images/posts/your-image.jpg or paste URL"
+                      placeholder="/images/posts/your-file.jpg or video.mp4"
                       value={newPost.image}
                       onChange={(e) => setNewPost({ ...newPost, image: e.target.value })}
                     />
                     <p className="text-xs text-gray-500">
-                      Upload a file (JPG, PNG, WebP, GIF, max 10MB) or paste an image URL
+                      Upload JPG, PNG, WebP, GIF (max 10MB) or MP4 video (max 100MB), or paste a URL
                     </p>
                   </div>
                 </div>
@@ -565,15 +576,15 @@ export default function ArticleEditorClient({
       <Dialog open={!!editingPostId} onOpenChange={(open) => !open && setEditingPostId(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Set graphic for post</DialogTitle>
+            <DialogTitle>Set graphic or video for post</DialogTitle>
             <DialogDescription>
-              Enter the image URL for this template post. It will be used on the public site. Use /images/posts/... for files in public, or a full URL.
+              Enter the image or MP4 video URL for this post. Use /images/posts/... for uploaded files, or a full URL.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <Label>Image URL</Label>
+            <Label>Media URL</Label>
             <Input
-              placeholder="/images/posts/your-image.jpg"
+              placeholder="/images/posts/your-file.jpg or .mp4"
               value={editImageUrl}
               onChange={(e) => setEditImageUrl(e.target.value)}
             />
@@ -606,7 +617,9 @@ export default function ArticleEditorClient({
       <div className="grid gap-6 md:grid-cols-2">
         {article.posts.map((post, index) => {
           const message = post.message || post.captions.facebook
-          const displayImage = getPostImage(post) || `/images/posts/placeholder-${(index % 4) + 1}.jpg`
+          const postMedia = getPostImage(post)
+          const displayImage = postMedia || `/images/posts/placeholder-${(index % 4) + 1}.jpg`
+          const isPlaceholder = !postMedia
           return (
             <div
               key={post.id}
@@ -617,13 +630,17 @@ export default function ArticleEditorClient({
             >
               <Card className="overflow-hidden">
                 <div className="relative aspect-video bg-gray-100">
-                  <Image
-                    src={displayImage}
-                    alt={post.title}
-                    fill
-                    className="object-cover"
-                    unoptimized={displayImage.startsWith("/images/")}
-                  />
+                  {isPlaceholder ? (
+                    <Image
+                      src={displayImage}
+                      alt={post.title}
+                      fill
+                      className="object-cover"
+                      unoptimized={displayImage.startsWith("/images/")}
+                    />
+                  ) : (
+                    <PostMediaPreview src={displayImage} alt={post.title} />
+                  )}
                   <div className="absolute left-2 top-2 z-10 flex items-center gap-1">
                     <div
                       className="flex cursor-grab active:cursor-grabbing touch-none items-center justify-center rounded bg-white/90 p-1.5 text-gray-500 shadow hover:bg-white hover:text-gray-700"

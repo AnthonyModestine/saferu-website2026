@@ -23,13 +23,16 @@ import {
   FolderOpen,
   Loader2,
   X,
+  Film,
 } from "lucide-react"
+import { isVideoMediaUrl } from "@/lib/media-url"
 
 interface MediaItem {
   name: string
   url: string
   size: number
   uploadedAt: string
+  kind?: "image" | "video"
 }
 
 function formatBytes(bytes: number) {
@@ -140,7 +143,7 @@ export default function MediaLibraryPage() {
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Media Library</h1>
-          <p className="mt-1 text-gray-500">Upload and manage images for your posts</p>
+          <p className="mt-1 text-gray-500">Upload and manage images and MP4 videos for your posts</p>
         </div>
 
         <Dialog open={isUploadOpen} onOpenChange={(open) => {
@@ -150,14 +153,14 @@ export default function MediaLibraryPage() {
           <DialogTrigger asChild>
             <Button className="bg-[#1470AF] text-white hover:bg-[#1470AF]/90">
               <Upload className="mr-2 h-4 w-4" />
-              Upload Images
+              Upload Media
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Upload Images</DialogTitle>
+              <DialogTitle>Upload media</DialogTitle>
               <DialogDescription>
-                PNG, JPG, WebP, or GIF — max 10MB each. Recommended: 1920×1080 (16:9).
+                Images: PNG, JPG, WebP, or GIF (max 10MB). Videos: MP4 (max 100MB). Recommended: 1920×1080 (16:9).
               </DialogDescription>
             </DialogHeader>
 
@@ -171,11 +174,11 @@ export default function MediaLibraryPage() {
                 <p className="text-sm text-gray-600">
                   <span className="font-semibold">Click to select files</span> or drag and drop
                 </p>
-                <p className="text-xs text-gray-400 mt-1">PNG, JPG, WebP, GIF — max 5MB</p>
+                <p className="text-xs text-gray-400 mt-1">Images up to 10MB · MP4 up to 100MB</p>
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,.mp4"
                   multiple
                   className="hidden"
                   onChange={handleFileChange}
@@ -227,7 +230,7 @@ export default function MediaLibraryPage() {
       <div className="relative mb-6">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
         <Input
-          placeholder="Search images…"
+          placeholder="Search media…"
           className="pl-10 bg-white"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
@@ -237,9 +240,9 @@ export default function MediaLibraryPage() {
       {/* Grid */}
       <Card>
         <CardHeader>
-          <CardTitle>Images</CardTitle>
+          <CardTitle>Media library</CardTitle>
           <CardDescription>
-            {loading ? "Loading…" : `${filtered.length} image${filtered.length !== 1 ? "s" : ""}`}
+            {loading ? "Loading…" : `${filtered.length} file${filtered.length !== 1 ? "s" : ""}`}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -251,27 +254,39 @@ export default function MediaLibraryPage() {
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <FolderOpen className="mb-4 h-12 w-12 text-gray-300" />
               <h3 className="text-lg font-medium text-gray-900">
-                {searchQuery ? "No images match that search" : "No images uploaded yet"}
+                {searchQuery ? "No media matches that search" : "No media uploaded yet"}
               </h3>
               <p className="mt-1 text-gray-500">
-                {searchQuery ? "Try a different search term" : "Click Upload Images to add your first image"}
+                {searchQuery ? "Try a different search term" : "Click Upload Media to add your first file"}
               </p>
             </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-              {filtered.map((item) => (
+              {filtered.map((item) => {
+                const isVideo = item.kind === "video" || isVideoMediaUrl(item.url)
+                return (
                 <div
                   key={item.name}
                   className="group relative overflow-hidden rounded-lg border border-gray-200 bg-gray-50"
                 >
                   <div className="aspect-video relative bg-muted">
-                    <Image
-                      src={item.url}
-                      alt={item.name}
-                      fill
-                      className="object-cover"
-                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none" }}
-                    />
+                    {isVideo ? (
+                      <video
+                        src={item.url}
+                        className="absolute inset-0 h-full w-full object-cover bg-black"
+                        controls
+                        playsInline
+                        preload="metadata"
+                      />
+                    ) : (
+                      <Image
+                        src={item.url}
+                        alt={item.name}
+                        fill
+                        className="object-cover"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = "none" }}
+                      />
+                    )}
                     <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
                       <Button
                         size="icon"
@@ -295,14 +310,18 @@ export default function MediaLibraryPage() {
                     </div>
                   </div>
                   <div className="p-3">
-                    <p className="truncate text-sm font-medium text-gray-900">{item.name}</p>
+                    <p className="truncate text-sm font-medium text-gray-900 flex items-center gap-1.5">
+                      {isVideo && <Film className="h-3.5 w-3.5 shrink-0 text-gray-500" />}
+                      {item.name}
+                    </p>
                     <div className="mt-1 flex items-center justify-between text-xs text-gray-500">
                       <span>{formatBytes(item.size)}</span>
                       <span>{formatDate(item.uploadedAt)}</span>
                     </div>
                   </div>
                 </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </CardContent>
@@ -311,13 +330,14 @@ export default function MediaLibraryPage() {
       {/* Instructions */}
       <Card className="mt-6">
         <CardHeader>
-          <CardTitle>How to Use Images</CardTitle>
+          <CardTitle>How to use media</CardTitle>
         </CardHeader>
         <CardContent>
           <ol className="list-inside list-decimal space-y-2 text-sm text-gray-600">
-            <li>Upload your image using the button above</li>
-            <li>Hover over any image and click the copy icon to get its URL</li>
-            <li>Paste the URL into the image field when creating or editing a post</li>
+            <li>Upload an image or MP4 video using the button above</li>
+            <li>Hover over any file and click the copy icon to get its URL</li>
+            <li>Paste the URL into the media field when creating or editing a post</li>
+            <li>Visitors can play videos on the article page and download them with one click</li>
             <li>Recommended size: 1920×1080 (16:9 ratio) for best display</li>
           </ol>
         </CardContent>

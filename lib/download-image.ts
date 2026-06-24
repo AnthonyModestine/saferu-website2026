@@ -1,11 +1,11 @@
-/** Trigger a file download for an image URL (works with cross-origin Blob/CDN URLs). */
+/** Trigger a file download for a post image or MP4 video URL. */
 
-function toAbsoluteUrl(imageSrc: string): string {
-  if (imageSrc.startsWith("http://") || imageSrc.startsWith("https://")) {
-    return imageSrc
+function toAbsoluteUrl(mediaSrc: string): string {
+  if (mediaSrc.startsWith("http://") || mediaSrc.startsWith("https://")) {
+    return mediaSrc
   }
-  if (typeof window === "undefined") return imageSrc
-  return new URL(imageSrc, window.location.origin).href
+  if (typeof window === "undefined") return mediaSrc
+  return new URL(mediaSrc, window.location.origin).href
 }
 
 function isSameOrigin(url: string): boolean {
@@ -19,14 +19,16 @@ function isSameOrigin(url: string): boolean {
 
 function safeFilename(name: string): string {
   const cleaned = name.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "")
-  return cleaned.slice(0, 120) || "image"
+  return cleaned.slice(0, 120) || "download"
 }
 
 function extensionFromUrl(url: string): string | null {
   try {
     const pathname = new URL(url).pathname
-    const match = pathname.match(/\.(jpe?g|png|webp|gif)$/i)
-    return match ? match[1]!.toLowerCase().replace("jpeg", "jpg") : null
+    const match = pathname.match(/\.(jpe?g|png|webp|gif|mp4|m4v)$/i)
+    if (!match) return null
+    const ext = match[1]!.toLowerCase()
+    return ext === "jpeg" ? "jpg" : ext
   } catch {
     return null
   }
@@ -34,16 +36,17 @@ function extensionFromUrl(url: string): string | null {
 
 function extensionFromMime(mime: string | null): string {
   if (!mime) return "jpg"
+  if (mime.includes("mp4")) return "mp4"
   if (mime.includes("png")) return "png"
   if (mime.includes("webp")) return "webp"
   if (mime.includes("gif")) return "gif"
   return "jpg"
 }
 
-function ensureExtension(baseName: string, imageUrl: string, mime?: string | null): string {
+function ensureExtension(baseName: string, mediaUrl: string, mime?: string | null): string {
   const base = safeFilename(baseName)
-  if (/\.(jpe?g|png|webp|gif)$/i.test(base)) return base
-  const ext = extensionFromUrl(imageUrl) ?? extensionFromMime(mime ?? null)
+  if (/\.(jpe?g|png|webp|gif|mp4|m4v)$/i.test(base)) return base
+  const ext = extensionFromUrl(mediaUrl) ?? extensionFromMime(mime ?? null)
   return `${base}.${ext}`
 }
 
@@ -59,11 +62,11 @@ function saveBlob(blob: Blob, filename: string): void {
   URL.revokeObjectURL(objectUrl)
 }
 
-export async function downloadImageFile(
-  imageSrc: string,
+export async function downloadMediaFile(
+  mediaSrc: string,
   baseFilename: string
 ): Promise<void> {
-  const absoluteUrl = toAbsoluteUrl(imageSrc)
+  const absoluteUrl = toAbsoluteUrl(mediaSrc)
   let filename = ensureExtension(baseFilename, absoluteUrl)
 
   if (isSameOrigin(absoluteUrl)) {
@@ -84,9 +87,12 @@ export async function downloadImageFile(
   )
   if (!proxyRes.ok) {
     const data = (await proxyRes.json().catch(() => ({}))) as { error?: string }
-    throw new Error(data.error || "Could not download image")
+    throw new Error(data.error || "Could not download file")
   }
   const blob = await proxyRes.blob()
   filename = ensureExtension(baseFilename, absoluteUrl, blob.type || proxyRes.headers.get("content-type"))
   saveBlob(blob, filename)
 }
+
+/** @deprecated Use downloadMediaFile */
+export const downloadImageFile = downloadMediaFile

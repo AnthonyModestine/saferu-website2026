@@ -46,6 +46,29 @@ function applyDeletedArticles(categoryId: string, merged: Category, add: CmsAddi
   }
 }
 
+function applyDeletedSubcategories(categoryId: string, merged: Category, add: CmsAdditions): void {
+  const deleted = add.deletedSubcategories ?? []
+  if (deleted.length === 0) return
+  merged.subcategories = merged.subcategories.filter(
+    (sub) =>
+      !deleted.some((d) => d.categoryId === categoryId && d.subcategoryId === sub.id)
+  )
+}
+
+function applySubcategoryOverrides(categoryId: string, merged: Category, add: CmsAdditions): void {
+  const overrides = add.subcategoryOverrides ?? []
+  if (overrides.length === 0) return
+  for (const sub of merged.subcategories) {
+    const patch = overrides.find(
+      (o) => o.categoryId === categoryId && o.subcategoryId === sub.id
+    )
+    if (!patch) continue
+    if (patch.title !== undefined) sub.title = patch.title
+    if (patch.description !== undefined) sub.description = patch.description
+    if (patch.icon !== undefined) sub.icon = patch.icon
+  }
+}
+
 function applyDeletedPosts(categoryId: string, merged: Category, add: CmsAdditions): void {
   const deleted = add.deletedPosts ?? []
   if (deleted.length === 0) return
@@ -158,8 +181,10 @@ export function getCategoryById(
     })
   }
 
+  applyDeletedSubcategories(categoryId, merged, add)
   applyDeletedArticles(categoryId, merged, add)
   applyDeletedPosts(categoryId, merged, add)
+  applySubcategoryOverrides(categoryId, merged, add)
 
   // Apply order overrides
   const subOrder = getSubcategoryOrder(categoryId)

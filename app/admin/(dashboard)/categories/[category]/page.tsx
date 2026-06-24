@@ -12,7 +12,8 @@ import {
   Star,
   CloudLightning,
   AlertTriangle,
-  Users
+  Users,
+  FolderOpen,
 } from "lucide-react"
 import { getCategoryById } from "@/lib/content-merged"
 import { SubcategoryListOrder } from "@/components/admin/subcategory-list-order"

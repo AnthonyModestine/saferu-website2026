@@ -17,6 +17,8 @@ const EMPTY: CmsAdditions = {
   posts: [],
   deletedPosts: [],
   deletedArticles: [],
+  subcategoryOverrides: [],
+  deletedSubcategories: [],
 }
 
 let fileLoadPromise: Promise<void> | null = null
@@ -40,6 +42,8 @@ function parseCmsData(raw: unknown): CmsAdditions {
     posts: Array.isArray(data.posts) ? data.posts : [],
     deletedPosts: Array.isArray(data.deletedPosts) ? data.deletedPosts : [],
     deletedArticles: Array.isArray(data.deletedArticles) ? data.deletedArticles : [],
+    subcategoryOverrides: Array.isArray(data.subcategoryOverrides) ? data.subcategoryOverrides : [],
+    deletedSubcategories: Array.isArray(data.deletedSubcategories) ? data.deletedSubcategories : [],
   }
 }
 
