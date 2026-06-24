@@ -10,7 +10,7 @@ import {
 
 const VIDEO_CONTENT_TYPES = ["video/mp4", "application/octet-stream"]
 const BLOB_SETUP_MESSAGE =
-  "Video upload is not configured. Add BLOB_READ_WRITE_TOKEN to saferu-backend in Vercel, then redeploy."
+  "Large video upload will use presigned storage upload."
 
 export async function POST(request: Request) {
   const denied = await unauthorizedIfNotAdmin()
@@ -18,7 +18,7 @@ export async function POST(request: Request) {
 
   const readWriteToken = process.env.BLOB_READ_WRITE_TOKEN?.trim()
   if (!isClientBlobUploadAvailable() || !readWriteToken) {
-    return NextResponse.json({ error: BLOB_SETUP_MESSAGE }, { status: 503 })
+    return NextResponse.json({ error: BLOB_SETUP_MESSAGE, usePresigned: true }, { status: 503 })
   }
 
   try {

@@ -21,18 +21,8 @@ export interface UploadProgress {
   status?: "preparing" | "uploading"
 }
 
-const BLOB_SETUP_MESSAGE =
-  "Video upload is not configured. In Vercel, connect SaferU-Images to saferu-backend, then redeploy."
-
-const PREPARE_TIMEOUT_MS = 30_000
 const UPLOAD_TIMEOUT_MS = 10 * 60 * 1000
-const MULTIPART_THRESHOLD = 20 * 1024 * 1024
-
-interface UploadCapabilities {
-  blobStorage: boolean
-  presignedUpload: boolean
-  readWriteToken: boolean
-}
+const MULTIPART_THRESHOLD_BYTES = 20 * 1024 * 1024
 
 function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -49,25 +39,17 @@ function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promi
   })
 }
 
-async function getCapabilities(): Promise<UploadCapabilities> {
-  const res = await withTimeout(
-    fetch("/api/upload/capabilities", { credentials: "same-origin" }),
-    PREPARE_TIMEOUT_MS,
-    "Timed out checking upload configuration."
-  )
-  if (!res.ok) {
-    return { blobStorage: false, presignedUpload: false, readWriteToken: false }
-  }
-  const data = (await res.json()) as Partial<UploadCapabilities & { clientUpload?: boolean }>
-  const blobStorage = Boolean(data.blobStorage ?? data.clientUpload)
-  return {
-    blobStorage,
-    presignedUpload: Boolean(data.presignedUpload ?? blobStorage),
-    readWriteToken: Boolean(data.readWriteToken),
-  }
+function resultFromPathname(pathname: string, url: string): UploadMediaResult {
+  const name = pathname.replace(/^posts\//, "")
+  return { url, name, kind: mediaKindFromFilename(name) }
 }
 
-async function uploadViaServer(file: File): Promise<UploadMediaResult> {
+async function uploadViaServer(
+  file: File,
+  onProgress?: (progress: UploadProgress) => void
+): Promise<UploadMediaResult> {
+  onProgress?.({ loaded: 0, total: file.size, percentage: 15, status: "uploading" })
+
   const form = new FormData()
   form.append("file", file)
   const res = await withTimeout(
@@ -81,9 +63,19 @@ async function uploadViaServer(file: File): Promise<UploadMediaResult> {
     kind?: string
     error?: string
   }
-  if (!res.ok || !data.url) {
-    throw new Error(data.error ?? `Upload failed (${res.status})`)
+
+  if (res.status === 413) {
+    throw new PayloadTooLargeError()
   }
+  if (!res.ok || !data.url) {
+    const err = data.error ?? `Upload failed (${res.status})`
+    if (isPayloadTooLargeMessage(err)) {
+      throw new PayloadTooLargeError()
+    }
+    throw new Error(err)
+  }
+
+  onProgress?.({ loaded: file.size, total: file.size, percentage: 100, status: "uploading" })
   return {
     url: data.url,
     name: data.name ?? file.name,
@@ -91,102 +83,110 @@ async function uploadViaServer(file: File): Promise<UploadMediaResult> {
   }
 }
 
-async function uploadViaReadWriteToken(
-  file: File,
-  pathname: string,
-  multipart: boolean,
-  contentType: string,
-  onProgress?: (progress: UploadProgress) => void
-) {
-  const tokenRes = await withTimeout(
-    fetch("/api/upload/client-token", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pathname, multipart }),
-    }),
-    PREPARE_TIMEOUT_MS,
-    "Timed out preparing upload."
+class PayloadTooLargeError extends Error {
+  constructor() {
+    super("PAYLOAD_TOO_LARGE")
+    this.name = "PayloadTooLargeError"
+  }
+}
+
+function isPayloadTooLargeMessage(message: string): boolean {
+  const lower = message.toLowerCase()
+  return (
+    lower.includes("413") ||
+    lower.includes("too large") ||
+    lower.includes("entity too large") ||
+    lower.includes("body exceeded")
   )
-  const tokenData = (await tokenRes.json().catch(() => ({}))) as {
+}
+
+function isPayloadTooLarge(error: unknown): boolean {
+  return error instanceof PayloadTooLargeError || (
+    error instanceof Error && isPayloadTooLargeMessage(error.message)
+  )
+}
+
+async function fetchClientToken(
+  pathname: string,
+  multipart: boolean
+): Promise<{ clientToken?: string; error?: string; usePresigned?: boolean }> {
+  const res = await fetch("/api/upload/client-token", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pathname, multipart }),
+  })
+  const data = (await res.json().catch(() => ({}))) as {
     clientToken?: string
     error?: string
   }
-  if (!tokenRes.ok || !tokenData.clientToken) {
-    throw new Error(tokenData.error ?? BLOB_SETUP_MESSAGE)
+
+  if (res.ok && data.clientToken) {
+    return { clientToken: data.clientToken }
   }
 
-  return withTimeout(
-    put(pathname, file, {
-      access: "public",
-      token: tokenData.clientToken,
-      multipart,
-      contentType,
-      onUploadProgress: (p) => onProgress?.({ ...p, status: "uploading" }),
-    }),
-    UPLOAD_TIMEOUT_MS,
-    "Upload timed out."
-  )
+  return {
+    error: data.error ?? `Could not prepare upload (${res.status})`,
+    usePresigned: res.status === 503,
+  }
 }
 
-async function uploadViaPresignedSdk(
+async function uploadLargeVideo(
   file: File,
-  pathname: string,
-  multipart: boolean,
-  contentType: string,
-  onProgress?: (progress: UploadProgress) => void
-) {
-  return withTimeout(
-    uploadPresigned(pathname, file, {
-      access: "public",
-      handleUploadUrl: "/api/upload/presigned",
-      multipart,
-      contentType,
-      onUploadProgress: (p) => onProgress?.({ ...p, status: "uploading" }),
-    }),
-    UPLOAD_TIMEOUT_MS,
-    "Upload timed out."
-  )
-}
-
-async function uploadViaBlobClient(
-  file: File,
-  caps: UploadCapabilities,
   onProgress?: (progress: UploadProgress) => void
 ): Promise<UploadMediaResult> {
-  const isVideo = isVideoFile(file)
-  const pathname = buildMediaPathname(file.name, isVideo)
-  const multipart = file.size > MULTIPART_THRESHOLD
-  const contentType = file.type || (isVideo ? "video/mp4" : "application/octet-stream")
+  const pathname = buildMediaPathname(file.name, true)
+  const contentType = file.type || "video/mp4"
+  const multipart = file.size > MULTIPART_THRESHOLD_BYTES
 
-  onProgress?.({ loaded: 0, total: file.size, percentage: 2, status: "preparing" })
+  onProgress?.({ loaded: 0, total: file.size, percentage: 5, status: "preparing" })
 
-  let blob
-  const errors: string[] = []
+  const tokenPrep = await fetchClientToken(pathname, multipart)
+  let lastError: unknown
 
-  if (caps.readWriteToken) {
+  if (tokenPrep.clientToken) {
     try {
-      blob = await uploadViaReadWriteToken(file, pathname, multipart, contentType, onProgress)
+      const blob = await withTimeout(
+        put(pathname, file, {
+          access: "public",
+          token: tokenPrep.clientToken,
+          contentType,
+          multipart,
+          onUploadProgress: (p) => onProgress?.({ ...p, status: "uploading" }),
+        }),
+        UPLOAD_TIMEOUT_MS,
+        "Upload timed out. Try again on a faster connection."
+      )
+      onProgress?.({ loaded: file.size, total: file.size, percentage: 100, status: "uploading" })
+      return resultFromPathname(pathname, blob.url)
     } catch (err) {
-      errors.push(err instanceof Error ? err.message : "read-write upload failed")
+      lastError = err
     }
   }
 
-  if (!blob && caps.presignedUpload) {
-    try {
-      blob = await uploadViaPresignedSdk(file, pathname, multipart, contentType, onProgress)
-    } catch (err) {
-      errors.push(err instanceof Error ? err.message : "presigned upload failed")
-    }
+  // OIDC presigned upload — works with BLOB_STORE_ID (no read-write token required)
+  try {
+    const blob = await withTimeout(
+      uploadPresigned(pathname, file, {
+        access: "public",
+        handleUploadUrl: "/api/upload/presigned",
+        contentType,
+        multipart,
+        onUploadProgress: (p) => onProgress?.({ ...p, status: "uploading" }),
+      }),
+      UPLOAD_TIMEOUT_MS,
+      "Upload timed out. Try again on a faster connection."
+    )
+    onProgress?.({ loaded: file.size, total: file.size, percentage: 100, status: "uploading" })
+    return resultFromPathname(pathname, blob.url)
+  } catch (presignedErr) {
+    const parts: string[] = []
+    if (tokenPrep.error) parts.push(tokenPrep.error)
+    if (lastError instanceof Error && lastError.message) parts.push(lastError.message)
+    if (presignedErr instanceof Error && presignedErr.message) parts.push(presignedErr.message)
+    const detail = [...new Set(parts.filter(Boolean))].join(" — ")
+    throw new Error(detail || "Video upload failed. Try again or contact support.")
   }
-
-  if (!blob) {
-    throw new Error(errors[0] ?? BLOB_SETUP_MESSAGE)
-  }
-
-  const name = pathname.replace(/^posts\//, "")
-  onProgress?.({ loaded: file.size, total: file.size, percentage: 100, status: "uploading" })
-  return { url: blob.url, name, kind: mediaKindFromFilename(name) }
 }
 
 /** Upload an image or MP4 from the admin UI. */
@@ -195,31 +195,16 @@ export async function uploadAdminMediaFile(
   onProgress?: (progress: UploadProgress) => void
 ): Promise<UploadMediaResult> {
   const isVideo = isVideoFile(file)
-  const caps = await getCapabilities()
 
-  if (isVideo && !caps.presignedUpload && !caps.readWriteToken) {
-    throw new Error(BLOB_SETUP_MESSAGE)
-  }
-
-  // Small videos (≤4MB): server-side OIDC put avoids browser→Blob CORS issues
-  if (isVideo && file.size <= SERVER_UPLOAD_MAX_BYTES) {
-    onProgress?.({ loaded: 0, total: file.size, percentage: 10, status: "uploading" })
+  if (!isVideo || file.size <= SERVER_UPLOAD_MAX_BYTES) {
     try {
-      const result = await uploadViaServer(file)
-      onProgress?.({ loaded: file.size, total: file.size, percentage: 100, status: "uploading" })
-      return result
+      return await uploadViaServer(file, onProgress)
     } catch (err) {
-      const message = err instanceof Error ? err.message : ""
-      if (!message.includes("too large") && !message.includes("413")) {
+      if (!isVideo || !isPayloadTooLarge(err)) {
         throw err
       }
     }
   }
 
-  if (isVideo || file.size > SERVER_UPLOAD_MAX_BYTES) {
-    if (!caps.presignedUpload && !caps.readWriteToken) throw new Error(BLOB_SETUP_MESSAGE)
-    return uploadViaBlobClient(file, caps, onProgress)
-  }
-
-  return uploadViaServer(file)
+  return uploadLargeVideo(file, onProgress)
 }

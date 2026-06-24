@@ -25,7 +25,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     const jsonResponse = await handleUploadPresigned({
       body,
       request,
-      getSignedToken: async (pathname) => {
+      getSignedToken: async (pathname, _clientPayload, _multipart) => {
         const isAdmin = await checkAdminSession()
         if (!isAdmin) {
           throw new Error("Unauthorized")
@@ -43,7 +43,13 @@ export async function POST(request: Request): Promise<NextResponse> {
           validUntil: Date.now() + 60 * 60 * 1000,
         })
 
-        return { token }
+        return {
+          token,
+          urlOptions: {
+            allowOverwrite: true,
+            addRandomSuffix: false,
+          },
+        }
       },
     })
 

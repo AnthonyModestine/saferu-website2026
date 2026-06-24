@@ -3,21 +3,22 @@ import { NextResponse } from "next/server"
 import { checkAdminSession } from "@/lib/admin-auth"
 import {
   ALLOWED_IMAGE_TYPES,
-  ALLOWED_VIDEO_TYPES,
   isClientBlobUploadAvailable,
   MAX_IMAGE_SIZE,
   MAX_VIDEO_SIZE,
 } from "@/lib/media-storage"
 
+const VIDEO_CONTENT_TYPES = ["video/mp4", "application/octet-stream"]
+
 const BLOB_SETUP_MESSAGE =
-  "Video upload is not configured. In Vercel: Storage → your Blob store → Connect to saferu-backend (Production + Preview), then redeploy so BLOB_READ_WRITE_TOKEN is added."
+  "Add BLOB_READ_WRITE_TOKEN to saferu-backend in Vercel (copy from saferu-website2026), then redeploy."
 
 export async function POST(request: Request): Promise<NextResponse> {
   const body = (await request.json()) as HandleUploadBody
 
   try {
     const readWriteToken = process.env.BLOB_READ_WRITE_TOKEN?.trim()
-    if (!isClientBlobUploadAvailable()) {
+    if (!isClientBlobUploadAvailable() || !readWriteToken) {
       return NextResponse.json({ error: BLOB_SETUP_MESSAGE }, { status: 503 })
     }
 
@@ -25,7 +26,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       body,
       request,
       token: readWriteToken,
-      onBeforeGenerateToken: async (pathname) => {
+      onBeforeGenerateToken: async (pathname, _clientPayload, _multipart) => {
         const isAdmin = await checkAdminSession()
         if (!isAdmin) {
           throw new Error("Unauthorized")
@@ -37,9 +38,10 @@ export async function POST(request: Request): Promise<NextResponse> {
         }
 
         return {
-          allowedContentTypes: isVideo ? ALLOWED_VIDEO_TYPES : ALLOWED_IMAGE_TYPES,
+          allowedContentTypes: isVideo ? VIDEO_CONTENT_TYPES : [...ALLOWED_IMAGE_TYPES],
           maximumSizeInBytes: isVideo ? MAX_VIDEO_SIZE : MAX_IMAGE_SIZE,
           addRandomSuffix: false,
+          allowOverwrite: true,
         }
       },
     })

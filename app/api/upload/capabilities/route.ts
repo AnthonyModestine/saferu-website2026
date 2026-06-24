@@ -13,5 +13,6 @@ export async function GET() {
     blobStorage: isBlobStorageConfigured(),
     presignedUpload: isPresignedBlobUploadAvailable(),
     readWriteToken: isClientBlobUploadAvailable(),
+    largeVideoRequiresToken: !isClientBlobUploadAvailable(),
   })
 }
