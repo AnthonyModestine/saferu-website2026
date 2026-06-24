@@ -59,6 +59,7 @@ export async function prepareBlobDirectUpload(params: {
     access: "public",
     contentType,
     allowOverwrite: true,
+    addRandomSuffix: false,
   })
 
   const storeId =
