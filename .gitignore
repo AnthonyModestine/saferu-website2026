@@ -37,3 +37,5 @@ data/password-reset-tokens.json
 data/tickets.json
 data/disabled-members.json
 data/content-analytics.json
+data/media-upload-sessions/
+data/media-upload-sessions/

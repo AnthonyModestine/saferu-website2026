@@ -1,10 +1,7 @@
 "use client"
 
-import { upload, uploadPresigned } from "@vercel/blob/client"
 import {
-  buildMediaPathname,
   isVideoFile,
-  mediaKindFromFilename,
   SERVER_UPLOAD_MAX_BYTES,
 } from "@/lib/media-filename"
 
@@ -21,6 +18,7 @@ export interface UploadProgress {
   status?: "preparing" | "uploading"
 }
 
+const CHUNK_SIZE = 3 * 1024 * 1024
 const UPLOAD_TIMEOUT_MS = 10 * 60 * 1000
 
 function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
@@ -58,15 +56,8 @@ async function uploadViaServer(
     error?: string
   }
 
-  if (res.status === 413) {
-    throw new PayloadTooLargeError()
-  }
   if (!res.ok || !data.url) {
-    const err = data.error ?? `Upload failed (${res.status})`
-    if (isPayloadTooLargeMessage(err)) {
-      throw new PayloadTooLargeError()
-    }
-    throw new Error(err)
+    throw new Error(data.error ?? `Upload failed (${res.status})`)
   }
 
   onProgress?.({ loaded: file.size, total: file.size, percentage: 100, status: "uploading" })
@@ -77,92 +68,86 @@ async function uploadViaServer(
   }
 }
 
-class PayloadTooLargeError extends Error {
-  constructor() {
-    super("PAYLOAD_TOO_LARGE")
-    this.name = "PayloadTooLargeError"
-  }
-}
-
-function isPayloadTooLargeMessage(message: string): boolean {
-  const lower = message.toLowerCase()
-  return (
-    lower.includes("413") ||
-    lower.includes("too large") ||
-    lower.includes("entity too large") ||
-    lower.includes("body exceeded")
-  )
-}
-
-function isPayloadTooLarge(error: unknown): boolean {
-  return (
-    error instanceof PayloadTooLargeError ||
-    (error instanceof Error && isPayloadTooLargeMessage(error.message))
-  )
-}
-
-function resultFromPathname(pathname: string, url: string): UploadMediaResult {
-  const name = pathname.replace(/^posts\//, "")
-  return { url, name, kind: mediaKindFromFilename(name) }
-}
-
-async function uploadLargeVideo(
+/** Large MP4: chunked upload through our API (each chunk < 4 MB), server writes to Blob. */
+async function uploadLargeVideoChunked(
   file: File,
   onProgress?: (progress: UploadProgress) => void
 ): Promise<UploadMediaResult> {
-  const pathname = buildMediaPathname(file.name, true)
-  const contentType = file.type || "video/mp4"
-  const multipart = file.size > 20 * 1024 * 1024
+  onProgress?.({ loaded: 0, total: file.size, percentage: 2, status: "preparing" })
 
-  onProgress?.({ loaded: 0, total: file.size, percentage: 3, status: "preparing" })
-
-  const uploadOptions = {
-    access: "public" as const,
-    contentType,
-    multipart,
-    onUploadProgress: (p: { loaded: number; total: number; percentage: number }) => {
-      onProgress?.({
-        ...p,
-        percentage: Math.max(5, p.percentage),
-        status: "uploading",
-      })
-    },
+  const initRes = await withTimeout(
+    fetch("/api/upload/video/init", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        filename: file.name,
+        size: file.size,
+      }),
+    }),
+    60_000,
+    "Could not start video upload."
+  )
+  const initData = (await initRes.json().catch(() => ({}))) as {
+    uploadId?: string
+    totalParts?: number
+    error?: string
+  }
+  if (!initRes.ok || !initData.uploadId || !initData.totalParts) {
+    throw new Error(initData.error ?? `Could not start upload (${initRes.status})`)
   }
 
-  let lastError: unknown
+  const { uploadId, totalParts } = initData
+  let uploaded = 0
 
-  try {
-    const blob = await withTimeout(
-      uploadPresigned(pathname, file, {
-        ...uploadOptions,
-        handleUploadUrl: "/api/upload/presigned",
+  for (let partIndex = 0; partIndex < totalParts; partIndex++) {
+    const start = partIndex * CHUNK_SIZE
+    const end = Math.min(start + CHUNK_SIZE, file.size)
+    const chunk = file.slice(start, end)
+
+    const form = new FormData()
+    form.append("uploadId", uploadId)
+    form.append("partIndex", String(partIndex))
+    form.append("chunk", chunk, `part-${partIndex}`)
+
+    const partRes = await withTimeout(
+      fetch("/api/upload/video/part", {
+        method: "POST",
+        credentials: "same-origin",
+        body: form,
       }),
       UPLOAD_TIMEOUT_MS,
-      "Upload timed out. Try again on a faster connection."
+      `Upload timed out on part ${partIndex + 1} of ${totalParts}.`
     )
-    onProgress?.({ loaded: file.size, total: file.size, percentage: 100, status: "uploading" })
-    return resultFromPathname(pathname, blob.url)
-  } catch (err) {
-    lastError = err
+    const partData = (await partRes.json().catch(() => ({}))) as { error?: string }
+    if (!partRes.ok) {
+      throw new Error(partData.error ?? `Chunk ${partIndex + 1} failed (${partRes.status})`)
+    }
+
+    uploaded += chunk.size
+    const percentage = Math.max(5, Math.round((uploaded / file.size) * 95))
+    onProgress?.({ loaded: uploaded, total: file.size, percentage, status: "uploading" })
   }
 
-  try {
-    const blob = await withTimeout(
-      upload(pathname, file, {
-        ...uploadOptions,
-        handleUploadUrl: "/api/upload/blob",
-      }),
-      UPLOAD_TIMEOUT_MS,
-      "Upload timed out. Try again on a faster connection."
-    )
-    onProgress?.({ loaded: file.size, total: file.size, percentage: 100, status: "uploading" })
-    return resultFromPathname(pathname, blob.url)
-  } catch (err) {
-    const parts: string[] = []
-    if (lastError instanceof Error && lastError.message) parts.push(lastError.message)
-    if (err instanceof Error && err.message) parts.push(err.message)
-    throw new Error(parts.join(" — ") || "Video upload failed")
+  onProgress?.({ loaded: file.size, total: file.size, percentage: 97, status: "uploading" })
+
+  const completeRes = await withTimeout(
+    fetch("/api/upload/video/complete", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uploadId }),
+    }),
+    UPLOAD_TIMEOUT_MS,
+    "Finalizing upload timed out."
+  )
+  const result = (await completeRes.json().catch(() => ({}))) as UploadMediaResult & { error?: string }
+  if (!completeRes.ok || !result.url) {
+    throw new Error(result.error ?? `Could not finalize upload (${completeRes.status})`)
   }
+
+  onProgress?.({ loaded: file.size, total: file.size, percentage: 100, status: "uploading" })
+  return { url: result.url, name: result.name, kind: "video" }
 }
 
 /** Upload an image or MP4 from the admin UI. */
@@ -172,15 +157,9 @@ export async function uploadAdminMediaFile(
 ): Promise<UploadMediaResult> {
   const isVideo = isVideoFile(file)
 
-  if (!isVideo || file.size <= SERVER_UPLOAD_MAX_BYTES) {
-    try {
-      return await uploadViaServer(file, onProgress)
-    } catch (err) {
-      if (!isVideo || !isPayloadTooLarge(err)) {
-        throw err
-      }
-    }
+  if (isVideo && file.size > SERVER_UPLOAD_MAX_BYTES) {
+    return uploadLargeVideoChunked(file, onProgress)
   }
 
-  return uploadLargeVideo(file, onProgress)
+  return uploadViaServer(file, onProgress)
 }
