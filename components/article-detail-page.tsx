@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { track } from "@/lib/track"
@@ -8,13 +8,13 @@ import { copyTextToClipboard } from "@/lib/copy-to-clipboard"
 import { downloadMediaFile } from "@/lib/download-image"
 import { isVideoMediaUrl } from "@/lib/media-url"
 import { getPostMessage } from "@/lib/post-message"
-import type { ImageOverrides } from "@/lib/content-overrides"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { ChevronRight, ArrowLeft, Download, ExternalLink, ShieldCheck, Flame, Star, CloudLightning, AlertTriangle, Users, Shield } from "lucide-react"
 import { PostMessageBlock } from "@/components/post-message-block"
 import { PostMediaPreview, PostMediaPlaceholder } from "@/components/post-media-preview"
+import { PostMediaLightbox } from "@/components/post-media-lightbox"
 import type { Article, Subcategory, Category } from "@/lib/data/content-library"
 import type { LucideIcon } from "lucide-react"
 
@@ -91,14 +91,7 @@ export function ArticleDetailPage({
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [copyErrorId, setCopyErrorId] = useState<string | null>(null)
   const [downloadingPostId, setDownloadingPostId] = useState<string | null>(null)
-  const [imageOverrides, setImageOverrides] = useState<ImageOverrides>({})
-
-  useEffect(() => {
-    fetch("/api/content/overrides")
-      .then((r) => r.ok ? r.json() : {})
-      .then(setImageOverrides)
-      .catch(() => {})
-  }, [])
+  const [lightbox, setLightbox] = useState<{ src: string; alt: string } | null>(null)
 
   const copyToClipboard = async (text: string, id: string, postTitle?: string) => {
     setCopyErrorId(null)
@@ -168,8 +161,7 @@ export function ArticleDetailPage({
             <div className="grid gap-8 md:grid-cols-2">
               {article.posts.map((post) => {
                 const message = getPostMessage(post)
-                const overrideUrl = imageOverrides[category.id]?.[subcategory.id]?.[article.id]?.[post.id]
-                const imageSrc = overrideUrl ?? post.image ?? null
+                const imageSrc = post.image ?? null
                 const isVideo = isVideoMediaUrl(imageSrc)
                 
                 return (
@@ -177,7 +169,18 @@ export function ArticleDetailPage({
                     {/* Graphic or video — 16:9 */}
                     <div className="relative aspect-video bg-muted overflow-hidden">
                       {imageSrc ? (
-                        <PostMediaPreview src={imageSrc} alt={post.title} />
+                        isVideo ? (
+                          <PostMediaPreview src={imageSrc} alt={post.title} />
+                        ) : (
+                          <button
+                            type="button"
+                            className="absolute inset-0 w-full h-full cursor-zoom-in focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1470AF] focus-visible:ring-offset-2"
+                            onClick={() => setLightbox({ src: imageSrc, alt: post.title })}
+                            aria-label={`View larger image: ${post.title}`}
+                          >
+                            <PostMediaPreview src={imageSrc} alt={post.title} />
+                          </button>
+                        )
                       ) : null}
                       <PostMediaPlaceholder
                         label="No graphic"
@@ -258,6 +261,14 @@ export function ArticleDetailPage({
         </section>
       </main>
       <Footer />
+      {lightbox ? (
+        <PostMediaLightbox
+          src={lightbox.src}
+          alt={lightbox.alt}
+          open={!!lightbox}
+          onClose={() => setLightbox(null)}
+        />
+      ) : null}
     </div>
   )
 }

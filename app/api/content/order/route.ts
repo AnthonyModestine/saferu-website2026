@@ -4,12 +4,15 @@ import {
   setArticleOrder,
   setPostOrder,
 } from "@/lib/content-order"
+import { loadContentMeta, persistContentMeta } from "@/lib/content-meta-persist"
 import { unauthorizedIfNotAdmin } from "@/lib/require-admin-api"
+import { revalidateContentPages } from "@/lib/revalidate-content"
 
 export async function POST(request: NextRequest) {
   const denied = await unauthorizedIfNotAdmin()
   if (denied) return denied
   try {
+    await loadContentMeta()
     const body = await request.json()
     const { type, categoryId, subcategoryId, articleId, orderedIds } = body as {
       type: "subcategories" | "articles" | "posts"
@@ -26,6 +29,7 @@ export async function POST(request: NextRequest) {
     }
     if (type === "subcategories") {
       setSubcategoryOrder(categoryId, orderedIds)
+      await persistContentMeta()
       return NextResponse.json({ ok: true })
     }
     if (type === "articles") {
@@ -33,6 +37,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "subcategoryId required for articles" }, { status: 400 })
       }
       setArticleOrder(categoryId, subcategoryId, orderedIds)
+      await persistContentMeta()
+      revalidateContentPages(categoryId, subcategoryId)
       return NextResponse.json({ ok: true })
     }
     if (type === "posts") {
@@ -43,6 +49,8 @@ export async function POST(request: NextRequest) {
         )
       }
       setPostOrder(categoryId, subcategoryId, articleId, orderedIds)
+      await persistContentMeta()
+      revalidateContentPages(categoryId, subcategoryId)
       return NextResponse.json({ ok: true })
     }
     return NextResponse.json({ error: "Invalid type" }, { status: 400 })

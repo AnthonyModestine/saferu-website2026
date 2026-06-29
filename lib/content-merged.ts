@@ -18,6 +18,7 @@ import {
   getPostOrder,
   sortByOrder,
 } from "@/lib/content-order"
+import { getPostImageOverride, getPostMessageOverride } from "@/lib/content-overrides"
 import { isArticlePublished } from "@/lib/content-visibility"
 
 function deepCloneCategory(cat: Category): Category {
@@ -83,6 +84,38 @@ function applyDeletedPosts(categoryId: string, merged: Category, add: CmsAdditio
               d.articleId === art.id &&
               d.postId === p.id
           )
+      )
+    }
+  }
+}
+
+function applyPostFieldOverrides(
+  categoryId: string,
+  subcategoryId: string,
+  articleId: string,
+  post: SocialPost
+): SocialPost {
+  const image = getPostImageOverride(categoryId, subcategoryId, articleId, post.id)
+  const message = getPostMessageOverride(categoryId, subcategoryId, articleId, post.id)
+  if (!image && !message) return post
+  const next = { ...post }
+  if (image) next.image = image
+  if (message) {
+    next.message = message
+    next.captions = {
+      facebook: message,
+      instagram: message,
+      twitter: message,
+    }
+  }
+  return next
+}
+
+function applyAllPostOverrides(categoryId: string, merged: Category): void {
+  for (const sub of merged.subcategories) {
+    for (const art of sub.articles) {
+      art.posts = art.posts.map((p) =>
+        applyPostFieldOverrides(categoryId, sub.id, art.id, p)
       )
     }
   }
@@ -203,6 +236,8 @@ export function getCategoryById(
       }
     }
   }
+
+  applyAllPostOverrides(categoryId, merged)
 
   // Hide unpublished articles from public (admin passes includeUnpublished: true)
   if (!options?.includeUnpublished) {

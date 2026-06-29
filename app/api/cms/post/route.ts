@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
-import { addPost, generateId, removePost } from "@/lib/cms-additions"
+import { addPost, generateId, removePost, updatePost, isCmsPost } from "@/lib/cms-additions"
 import { loadCmsAdditions, persistAdditions } from "@/lib/cms-additions-persist"
+import { setPostMessageOverride, clearPostMessageOverride } from "@/lib/content-overrides"
+import { loadContentMeta, persistContentMeta } from "@/lib/content-meta-persist"
 import { revalidateContentPages } from "@/lib/revalidate-content"
 import { unauthorizedIfNotAdmin } from "@/lib/require-admin-api"
 
@@ -40,11 +42,64 @@ export async function POST(request: NextRequest) {
       },
     })
     await persistAdditions()
+    revalidateContentPages(categoryId, subcategoryId)
     return NextResponse.json({ ok: true })
   } catch (err) {
     console.error("[cms/post] POST error:", err)
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Invalid request" },
+      { status: 500 }
+    )
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  const denied = await unauthorizedIfNotAdmin()
+  if (denied) return denied
+  try {
+    const body = await request.json()
+    const { categoryId, subcategoryId, articleId, postId, title, image, message } = body as {
+      categoryId: string
+      subcategoryId: string
+      articleId: string
+      postId: string
+      title?: string
+      image?: string
+      message?: string
+    }
+    if (!categoryId || !subcategoryId || !articleId || !postId) {
+      return NextResponse.json({ error: "Missing required ids" }, { status: 400 })
+    }
+
+    await Promise.all([loadCmsAdditions(), loadContentMeta()])
+
+    if (isCmsPost(categoryId, subcategoryId, articleId, postId)) {
+      const ok = updatePost(categoryId, subcategoryId, articleId, postId, {
+        title,
+        image,
+        message,
+      })
+      if (!ok) {
+        return NextResponse.json({ error: "Post not found" }, { status: 404 })
+      }
+      await persistAdditions()
+    } else {
+      if (message !== undefined) {
+        if (message.trim()) {
+          setPostMessageOverride(categoryId, subcategoryId, articleId, postId, message.trim())
+        } else {
+          clearPostMessageOverride(categoryId, subcategoryId, articleId, postId)
+        }
+      }
+      await persistContentMeta()
+    }
+
+    revalidateContentPages(categoryId, subcategoryId)
+    return NextResponse.json({ ok: true })
+  } catch (err) {
+    console.error("[cms/post] PATCH error:", err)
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Failed to update post" },
       { status: 500 }
     )
   }

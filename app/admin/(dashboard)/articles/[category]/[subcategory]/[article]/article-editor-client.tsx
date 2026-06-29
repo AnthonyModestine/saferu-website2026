@@ -37,11 +37,14 @@ import {
   Copy,
   Upload,
   GripVertical,
+  FolderOpen,
+  MessageSquare,
 } from "lucide-react"
-import type { ImageOverrides } from "@/lib/content-overrides"
+import type { ImageOverrides, MessageOverrides } from "@/lib/content-overrides"
 import type { Article, Category, Subcategory } from "@/lib/data/content-library"
 import { Checkbox } from "@/components/ui/checkbox"
 import { BulkActionBar } from "@/components/admin/bulk-action-bar"
+import { MediaPickerDialog } from "@/components/admin/media-picker-dialog"
 import { setArticleVisibility } from "@/lib/admin-visibility-client"
 import { uploadAdminMediaFile } from "@/lib/upload-media-client"
 
@@ -70,8 +73,13 @@ export default function ArticleEditorClient({
   const [isAddPostOpen, setIsAddPostOpen] = useState(false)
   const [newPost, setNewPost] = useState({ title: "", image: "", message: "" })
   const [imageOverrides, setImageOverrides] = useState<ImageOverrides>({})
+  const [messageOverrides, setMessageOverrides] = useState<MessageOverrides>({})
   const [editingPostId, setEditingPostId] = useState<string | null>(null)
   const [editImageUrl, setEditImageUrl] = useState("")
+  const [editingMessagePostId, setEditingMessagePostId] = useState<string | null>(null)
+  const [editMessageText, setEditMessageText] = useState("")
+  const [savingMessage, setSavingMessage] = useState(false)
+  const [mediaPickerTarget, setMediaPickerTarget] = useState<"new" | "edit" | null>(null)
   const [saving, setSaving] = useState(false)
   const [savingPost, setSavingPost] = useState(false)
   const [uploadingImage, setUploadingImage] = useState(false)
@@ -91,12 +99,21 @@ export default function ArticleEditorClient({
   useEffect(() => {
     fetch("/api/content/overrides")
       .then((r) => (r.ok ? r.json() : {}))
-      .then(setImageOverrides)
+      .then((data: { images?: ImageOverrides; messages?: MessageOverrides }) => {
+        setImageOverrides(data.images ?? {})
+        setMessageOverrides(data.messages ?? {})
+      })
       .catch(() => {})
   }, [])
 
   const getPostImage = (post: { id: string; image?: string }) =>
     imageOverrides[categoryId]?.[subcategoryId]?.[articleId]?.[post.id] ?? post.image ?? ""
+
+  const getPostMessageText = (post: { id: string; message?: string; captions?: { facebook?: string } }) =>
+    messageOverrides[categoryId]?.[subcategoryId]?.[articleId]?.[post.id] ??
+    post.message ??
+    post.captions?.facebook ??
+    ""
 
   const handleSaveImageOverride = async () => {
     if (!editingPostId) return
@@ -153,6 +170,84 @@ export default function ArticleEditorClient({
     }
   }
 
+  const handleEditImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadingImage(true)
+    setUploadError(null)
+    try {
+      const data = await uploadAdminMediaFile(file)
+      setEditImageUrl(data.url)
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Upload failed.")
+    } finally {
+      setUploadingImage(false)
+      e.target.value = ""
+    }
+  }
+
+  const handleMediaLibrarySelect = (url: string) => {
+    if (mediaPickerTarget === "new") {
+      setNewPost((prev) => ({ ...prev, image: url }))
+    } else if (mediaPickerTarget === "edit") {
+      setEditImageUrl(url)
+    }
+    setMediaPickerTarget(null)
+  }
+
+  const handleSaveMessage = async () => {
+    if (!editingMessagePostId) return
+    setSavingMessage(true)
+    try {
+      const res = await fetch("/api/cms/post", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          categoryId,
+          subcategoryId,
+          articleId,
+          postId: editingMessagePostId,
+          message: editMessageText.trim(),
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        const msg = editMessageText.trim()
+        setMessageOverrides((prev) => {
+          const next = JSON.parse(JSON.stringify(prev))
+          if (!next[categoryId]) next[categoryId] = {}
+          if (!next[categoryId][subcategoryId]) next[categoryId][subcategoryId] = {}
+          if (!next[categoryId][subcategoryId][articleId]) next[categoryId][subcategoryId][articleId] = {}
+          if (msg) {
+            next[categoryId][subcategoryId][articleId][editingMessagePostId] = msg
+          } else {
+            delete next[categoryId]?.[subcategoryId]?.[articleId]?.[editingMessagePostId]
+          }
+          return next
+        })
+        setArticle((prev) => ({
+          ...prev,
+          posts: prev.posts.map((p) =>
+            p.id === editingMessagePostId
+              ? {
+                  ...p,
+                  message: msg,
+                  captions: { facebook: msg, instagram: msg, twitter: msg },
+                }
+              : p
+          ),
+        }))
+        setEditingMessagePostId(null)
+        setEditMessageText("")
+        router.refresh()
+      } else {
+        window.alert((data as { error?: string }).error || "Failed to save message")
+      }
+    } finally {
+      setSavingMessage(false)
+    }
+  }
+
   const setVisibility = async (publish: boolean) => {
     setVisibilitySaving(true)
     try {
@@ -175,6 +270,11 @@ export default function ArticleEditorClient({
   }
 
   const applyPostOrder = async (newOrder: string[]) => {
+    const reordered = newOrder
+      .map((id) => article.posts.find((p) => p.id === id))
+      .filter(Boolean) as typeof article.posts
+    setArticle((prev) => ({ ...prev, posts: reordered }))
+
     const res = await fetch("/api/content/order", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -188,6 +288,7 @@ export default function ArticleEditorClient({
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {
+      setArticle(initialArticle)
       window.alert((data as { error?: string }).error || "Failed to reorder posts")
       return
     }
@@ -505,7 +606,7 @@ export default function ArticleEditorClient({
                     <div className="flex flex-wrap items-center gap-2">
                       <Label className="cursor-pointer rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm font-medium hover:bg-gray-100">
                         <Upload className="mr-2 inline h-4 w-4" />
-                        Upload image or MP4
+                        Upload from computer
                         <input
                           type="file"
                           accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,.mp4"
@@ -514,6 +615,16 @@ export default function ArticleEditorClient({
                           disabled={uploadingImage}
                         />
                       </Label>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => setMediaPickerTarget("new")}
+                      >
+                        <FolderOpen className="h-4 w-4" />
+                        Media library
+                      </Button>
                       {uploadingImage && (
                         <span className="text-sm text-gray-500">Uploading…</span>
                       )}
@@ -577,6 +688,29 @@ export default function ArticleEditorClient({
           </DialogHeader>
           <div className="space-y-4 py-4">
             <Label>Media URL</Label>
+            <div className="flex flex-wrap items-center gap-2 mb-2">
+              <Label className="cursor-pointer rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm font-medium hover:bg-gray-100">
+                <Upload className="mr-2 inline h-4 w-4" />
+                Upload from computer
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,.mp4"
+                  className="sr-only"
+                  onChange={handleEditImageUpload}
+                  disabled={uploadingImage}
+                />
+              </Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={() => setMediaPickerTarget("edit")}
+              >
+                <FolderOpen className="h-4 w-4" />
+                Media library
+              </Button>
+            </div>
             <Input
               placeholder="/images/posts/your-file.jpg or .mp4"
               value={editImageUrl}
@@ -591,6 +725,40 @@ export default function ArticleEditorClient({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Edit message dialog */}
+      <Dialog open={!!editingMessagePostId} onOpenChange={(open) => !open && setEditingMessagePostId(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit post message</DialogTitle>
+            <DialogDescription>
+              Update the message users will copy and share on social platforms.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <Label htmlFor="edit-message">Message</Label>
+            <Textarea
+              id="edit-message"
+              rows={8}
+              value={editMessageText}
+              onChange={(e) => setEditMessageText(e.target.value)}
+              placeholder="Write the message that will be shared..."
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingMessagePostId(null)}>Cancel</Button>
+            <Button onClick={handleSaveMessage} disabled={savingMessage}>
+              {savingMessage ? "Saving…" : "Save message"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <MediaPickerDialog
+        open={mediaPickerTarget !== null}
+        onOpenChange={(open) => !open && setMediaPickerTarget(null)}
+        onSelect={handleMediaLibrarySelect}
+      />
 
       {/* Posts */}
       {article.posts.length > 0 && (
@@ -610,7 +778,7 @@ export default function ArticleEditorClient({
 
       <div className="grid gap-6 md:grid-cols-2">
         {article.posts.map((post, index) => {
-          const message = post.message || post.captions.facebook
+          const message = getPostMessageText(post)
           const postMedia = getPostImage(post)
           const displayImage = postMedia || `/images/posts/placeholder-${(index % 4) + 1}.jpg`
           const isPlaceholder = !postMedia
@@ -686,8 +854,21 @@ export default function ArticleEditorClient({
                       setEditingPostId(post.id)
                       setEditImageUrl(getPostImage(post))
                     }}
+                    aria-label="Edit graphic"
                   >
                     <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="secondary"
+                    className="h-8 w-8"
+                    onClick={() => {
+                      setEditingMessagePostId(post.id)
+                      setEditMessageText(getPostMessageText(post))
+                    }}
+                    aria-label="Edit message"
+                  >
+                    <MessageSquare className="h-4 w-4" />
                   </Button>
                   <Button
                     size="icon"

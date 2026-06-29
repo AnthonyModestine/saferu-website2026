@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { Analytics } from '@vercel/analytics/next'
 import { TrackPageView } from "@/components/track-page-view"
 import { loadCmsAdditions } from "@/lib/cms-additions-persist"
+import { loadContentMeta } from "@/lib/content-meta-persist"
 import { loadVisibility } from "@/lib/content-visibility-persist"
 import './globals.css'
 
@@ -36,7 +37,7 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  await Promise.all([loadCmsAdditions(), loadVisibility()])
+  await Promise.all([loadCmsAdditions(), loadContentMeta(), loadVisibility()])
   return (
     <html lang="en">
       <body className={`font-sans antialiased`}>

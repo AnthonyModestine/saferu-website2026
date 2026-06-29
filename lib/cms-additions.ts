@@ -264,6 +264,50 @@ export function addPost(post: CmsPost): void {
   additions.posts.push(post)
 }
 
+export function isCmsPost(
+  categoryId: string,
+  subcategoryId: string,
+  articleId: string,
+  postId: string
+): boolean {
+  return additions.posts.some(
+    (p) =>
+      p.categoryId === categoryId &&
+      p.subcategoryId === subcategoryId &&
+      p.articleId === articleId &&
+      p.id === postId
+  )
+}
+
+export function updatePost(
+  categoryId: string,
+  subcategoryId: string,
+  articleId: string,
+  postId: string,
+  patch: { title?: string; image?: string; message?: string }
+): boolean {
+  const post = additions.posts.find(
+    (p) =>
+      p.categoryId === categoryId &&
+      p.subcategoryId === subcategoryId &&
+      p.articleId === articleId &&
+      p.id === postId
+  )
+  if (!post) return false
+  if (patch.title !== undefined) post.title = patch.title.trim()
+  if (patch.image !== undefined) post.image = patch.image.trim() || undefined
+  if (patch.message !== undefined) {
+    const msg = patch.message.trim()
+    post.message = msg
+    post.captions = {
+      facebook: msg,
+      instagram: msg,
+      twitter: msg,
+    }
+  }
+  return true
+}
+
 export function removePost(
   categoryId: string,
   subcategoryId: string,

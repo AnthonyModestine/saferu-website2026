@@ -1,15 +1,18 @@
 /**
- * Image overrides per post: categoryId -> subcategoryId -> articleId -> postId -> imageUrl
- * Allows admin to set/change graphics for template posts without editing code.
- * In production, persist to a database; here we use in-memory (resets on restart).
+ * Image and message overrides per post.
+ * Allows admin to change graphics and copy for template posts without editing code.
  */
 
-export type ImageOverrides = Record<string, Record<string, Record<string, Record<string, string>>>>
+import { getContentMeta } from "@/lib/content-meta-store"
 
-let overrides: ImageOverrides = {}
+export type { ImageOverrides, MessageOverrides } from "@/lib/content-meta-store"
 
 export function getImageOverrides(): ImageOverrides {
-  return { ...overrides }
+  return { ...getContentMeta().imageOverrides }
+}
+
+export function getMessageOverrides(): MessageOverrides {
+  return { ...getContentMeta().messageOverrides }
 }
 
 export function getPostImageOverride(
@@ -18,7 +21,16 @@ export function getPostImageOverride(
   articleId: string,
   postId: string
 ): string | undefined {
-  return overrides[categoryId]?.[subcategoryId]?.[articleId]?.[postId]
+  return getContentMeta().imageOverrides[categoryId]?.[subcategoryId]?.[articleId]?.[postId]
+}
+
+export function getPostMessageOverride(
+  categoryId: string,
+  subcategoryId: string,
+  articleId: string,
+  postId: string
+): string | undefined {
+  return getContentMeta().messageOverrides[categoryId]?.[subcategoryId]?.[articleId]?.[postId]
 }
 
 export function setPostImageOverride(
@@ -28,10 +40,13 @@ export function setPostImageOverride(
   postId: string,
   imageUrl: string
 ): void {
-  if (!overrides[categoryId]) overrides[categoryId] = {}
-  if (!overrides[categoryId][subcategoryId]) overrides[categoryId][subcategoryId] = {}
-  if (!overrides[categoryId][subcategoryId][articleId]) overrides[categoryId][subcategoryId][articleId] = {}
-  overrides[categoryId][subcategoryId][articleId][postId] = imageUrl
+  const meta = getContentMeta()
+  if (!meta.imageOverrides[categoryId]) meta.imageOverrides[categoryId] = {}
+  if (!meta.imageOverrides[categoryId][subcategoryId]) meta.imageOverrides[categoryId][subcategoryId] = {}
+  if (!meta.imageOverrides[categoryId][subcategoryId][articleId]) {
+    meta.imageOverrides[categoryId][subcategoryId][articleId] = {}
+  }
+  meta.imageOverrides[categoryId][subcategoryId][articleId][postId] = imageUrl
 }
 
 export function clearPostImageOverride(
@@ -40,7 +55,32 @@ export function clearPostImageOverride(
   articleId: string,
   postId: string
 ): void {
-  if (overrides[categoryId]?.[subcategoryId]?.[articleId]) {
-    delete overrides[categoryId][subcategoryId][articleId][postId]
+  const bucket = getContentMeta().imageOverrides[categoryId]?.[subcategoryId]?.[articleId]
+  if (bucket) delete bucket[postId]
+}
+
+export function setPostMessageOverride(
+  categoryId: string,
+  subcategoryId: string,
+  articleId: string,
+  postId: string,
+  message: string
+): void {
+  const meta = getContentMeta()
+  if (!meta.messageOverrides[categoryId]) meta.messageOverrides[categoryId] = {}
+  if (!meta.messageOverrides[categoryId][subcategoryId]) meta.messageOverrides[categoryId][subcategoryId] = {}
+  if (!meta.messageOverrides[categoryId][subcategoryId][articleId]) {
+    meta.messageOverrides[categoryId][subcategoryId][articleId] = {}
   }
+  meta.messageOverrides[categoryId][subcategoryId][articleId][postId] = message
+}
+
+export function clearPostMessageOverride(
+  categoryId: string,
+  subcategoryId: string,
+  articleId: string,
+  postId: string
+): void {
+  const bucket = getContentMeta().messageOverrides[categoryId]?.[subcategoryId]?.[articleId]
+  if (bucket) delete bucket[postId]
 }

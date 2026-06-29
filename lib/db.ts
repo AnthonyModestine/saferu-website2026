@@ -205,6 +205,13 @@ export async function ensureSchema(): Promise<void> {
   await db`CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_expires ON password_reset_tokens (expires_at)`
 
   await db`
+    CREATE TABLE IF NOT EXISTS content_meta (
+      id TEXT PRIMARY KEY,
+      data JSONB NOT NULL DEFAULT '{}'
+    )
+  `
+
+  await db`
     CREATE TABLE IF NOT EXISTS media_upload_sessions (
       id TEXT PRIMARY KEY,
       pathname TEXT NOT NULL,
