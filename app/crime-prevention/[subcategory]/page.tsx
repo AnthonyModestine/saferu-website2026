@@ -1,35 +1,23 @@
-import { ArticlesPage } from "@/components/articles-page"
-import { getCategoryById, getSubcategoryById } from "@/lib/content-merged"
-import { notFound } from "next/navigation"
+import {
+  renderCategorySlugPage,
+  getCategorySlugMetadata,
+} from "@/lib/category-public-pages"
+
+export const dynamic = "force-dynamic"
 
 interface Props {
   params: Promise<{ subcategory: string }>
 }
 
+const CATEGORY_ID = "crime-prevention"
+const CATEGORY_LABEL = "Crime Prevention"
+
 export async function generateMetadata({ params }: Props) {
-  const { subcategory: subcategoryId } = await params
-  const subcategory = getSubcategoryById("crime-prevention", subcategoryId)
-  
-  return {
-    title: subcategory ? `${subcategory.title} - Crime Prevention - SaferU` : "Crime Prevention - SaferU",
-    description: subcategory?.description || "Crime prevention tips and resources.",
-  }
+  const { subcategory } = await params
+  return getCategorySlugMetadata(CATEGORY_ID, subcategory, CATEGORY_LABEL)
 }
 
-export default async function SubcategoryPage({ params }: Props) {
-  const { subcategory: subcategoryId } = await params
-  const category = getCategoryById("crime-prevention")
-  const subcategory = getSubcategoryById("crime-prevention", subcategoryId)
-
-  if (!category || !subcategory) {
-    notFound()
-  }
-
-  return (
-    <ArticlesPage
-      category={category}
-      subcategory={subcategory}
-      iconColor="text-primary"
-    />
-  )
+export default async function CrimePreventionSlugPage({ params }: Props) {
+  const { subcategory } = await params
+  return renderCategorySlugPage(CATEGORY_ID, subcategory)
 }

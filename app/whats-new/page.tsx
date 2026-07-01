@@ -1,12 +1,16 @@
-import { getCategoryById } from "@/lib/content-merged"
+import { unstable_noStore as noStore } from "next/cache"
+import { getCategoryById, getFlatCategoryArticleEntries } from "@/lib/content-merged"
+import { ensureContentLoaded } from "@/lib/ensure-content-loaded"
 import { WhatsNewClient } from "./whats-new-client"
 
-const WHATS_NEW_SUBCATEGORY_ID = "latest"
+export const dynamic = "force-dynamic"
 
-export default function WhatsNewPage() {
+export default async function WhatsNewPage() {
+  noStore()
+  await ensureContentLoaded()
+
   const category = getCategoryById("whats-new")
-  const subcategory = category?.subcategories.find((s) => s.id === WHATS_NEW_SUBCATEGORY_ID)
-  const articles = subcategory?.articles ?? []
+  const articles = getFlatCategoryArticleEntries("whats-new").map((entry) => entry.article)
 
   if (!category) {
     return null

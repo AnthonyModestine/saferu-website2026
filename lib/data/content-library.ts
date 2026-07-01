@@ -128,24 +128,10 @@ export const contentLibrary: Category[] = [
     description: "Stay safe during severe weather events and seasonal conditions.",
     subcategories: [
       {
-        id: "severe-storms",
-        title: "Severe Storms",
-        description: "Tornado, thunderstorm, and high wind safety",
+        id: "articles",
+        title: "Weather Preparedness",
+        description: "Heat, storms, winter weather, and seasonal safety topics",
         icon: "CloudLightning",
-        articles: [],
-      },
-      {
-        id: "extreme-heat",
-        title: "Extreme Heat",
-        description: "Beat the heat and stay safe during heat waves",
-        icon: "Thermometer",
-        articles: [],
-      },
-      {
-        id: "winter-weather",
-        title: "Winter Weather",
-        description: "Snow, ice, and cold weather safety",
-        icon: "Snowflake",
         articles: [],
       },
     ],

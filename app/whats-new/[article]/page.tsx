@@ -1,10 +1,8 @@
 import { ArticleDetailPage } from "@/components/article-detail-page"
-import { getCategoryById, getArticleById } from "@/lib/content-merged"
-import { loadCmsAdditions } from "@/lib/cms-additions-persist"
-import { loadVisibility } from "@/lib/content-visibility-persist"
+import { getCategoryById, findArticleInCategory } from "@/lib/content-merged"
+import { ensureContentLoaded } from "@/lib/ensure-content-loaded"
 import { notFound } from "next/navigation"
-
-const WHATS_NEW_SUBCATEGORY_ID = "latest"
+import { unstable_noStore as noStore } from "next/cache"
 
 export const dynamic = "force-dynamic"
 
@@ -13,30 +11,31 @@ interface Props {
 }
 
 export async function generateMetadata({ params }: Props) {
+  await ensureContentLoaded()
   const { article: articleId } = await params
-  const article = getArticleById("whats-new", WHATS_NEW_SUBCATEGORY_ID, articleId)
+  const found = findArticleInCategory("whats-new", articleId)
   return {
-    title: article ? `${article.title} - What's New - SaferU` : "What's New - SaferU",
-    description: article?.description || "Latest safety content and updates.",
+    title: found ? `${found.article.title} - What's New - SaferU` : "What's New - SaferU",
+    description: found?.article.description || "Latest safety content and updates.",
   }
 }
 
 export default async function WhatsNewArticlePage({ params }: Props) {
-  await Promise.all([loadCmsAdditions(), loadVisibility()])
+  noStore()
+  await ensureContentLoaded()
   const { article: articleId } = await params
   const category = getCategoryById("whats-new")
-  const subcategory = category?.subcategories.find((s) => s.id === WHATS_NEW_SUBCATEGORY_ID)
-  const article = getArticleById("whats-new", WHATS_NEW_SUBCATEGORY_ID, articleId)
+  const found = findArticleInCategory("whats-new", articleId)
 
-  if (!category || !subcategory || !article) {
+  if (!category || !found) {
     notFound()
   }
 
   return (
     <ArticleDetailPage
       category={category}
-      subcategory={subcategory}
-      article={article}
+      subcategory={found.subcategory}
+      article={found.article}
       iconColor="text-[#f2b233]"
       isWhatsNew
     />

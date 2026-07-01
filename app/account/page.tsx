@@ -27,6 +27,11 @@ export default function AccountPage() {
   const [deletePassword, setDeletePassword] = useState("")
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [genUsage, setGenUsage] = useState<{
+    used: number
+    quota: number
+    packs: number
+  } | null>(null)
 
   useEffect(() => {
     fetch("/api/auth/session")
@@ -38,6 +43,16 @@ export default function AccountPage() {
       .catch(() => router.replace("/sign-in?returnUrl=/account"))
       .finally(() => setLoading(false))
   }, [router])
+
+  useEffect(() => {
+    if (!member?.paid) return
+    fetch("/api/pio/generations")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.used !== undefined) setGenUsage(data)
+      })
+      .catch(() => {})
+  }, [member?.paid])
 
   const handleManageBilling = async () => {
     setPortalMessage(null)
@@ -261,6 +276,16 @@ export default function AccountPage() {
               </Button>
               {portalMessage && (
                 <p className="mt-3 text-sm text-amber-700 bg-amber-50 rounded-lg p-3">{portalMessage}</p>
+              )}
+              {member?.paid && genUsage && (
+                <div className="mt-4 rounded-lg border border-border bg-muted/30 p-4 text-sm text-muted-foreground space-y-1">
+                  <p className="font-medium text-foreground">Press Center — AI generations this month</p>
+                  <p>
+                    {genUsage.used} of {genUsage.quota} included generations used
+                    {genUsage.packs > 0 ? ` · ${genUsage.packs} extra from packs` : ""}
+                  </p>
+                  <p className="text-xs">Included generations reset at the start of each calendar month.</p>
+                </div>
               )}
               <p className="mt-3 text-sm text-muted-foreground">
                 You’ll be taken to our secure billing page. If you don’t have a subscription yet, you can{" "}

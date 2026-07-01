@@ -45,8 +45,10 @@ import type { Article, Category, Subcategory } from "@/lib/data/content-library"
 import { Checkbox } from "@/components/ui/checkbox"
 import { BulkActionBar } from "@/components/admin/bulk-action-bar"
 import { MediaPickerDialog } from "@/components/admin/media-picker-dialog"
+import { PostSortableGrid } from "@/components/admin/post-sortable-grid"
 import { setArticleVisibility } from "@/lib/admin-visibility-client"
 import { uploadAdminMediaFile } from "@/lib/upload-media-client"
+import { getArticlePublicPath } from "@/lib/category-layout"
 
 type ArticleEditorClientProps = {
   category: Category
@@ -84,7 +86,6 @@ export default function ArticleEditorClient({
   const [savingPost, setSavingPost] = useState(false)
   const [uploadingImage, setUploadingImage] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
-  const [dragOverPostIndex, setDragOverPostIndex] = useState<number | null>(null)
   const [selectedPostIds, setSelectedPostIds] = useState<Set<string>>(new Set())
   const [bulkDeletingPosts, setBulkDeletingPosts] = useState(false)
   const [visibilitySaving, setVisibilitySaving] = useState(false)
@@ -261,19 +262,17 @@ export default function ArticleEditorClient({
     }
   }
 
-  const reorderPosts = (fromIndex: number, toIndex: number): string[] => {
-    if (fromIndex === toIndex) return article.posts.map((p) => p.id)
-    const ids = [...article.posts.map((p) => p.id)]
-    const [removed] = ids.splice(fromIndex, 1)
-    ids.splice(toIndex, 0, removed)
-    return ids
+  const reorderPosts = (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex) return article.posts
+    const next = [...article.posts]
+    const [removed] = next.splice(fromIndex, 1)
+    next.splice(toIndex, 0, removed)
+    return next
   }
 
-  const applyPostOrder = async (newOrder: string[]) => {
-    const reordered = newOrder
-      .map((id) => article.posts.find((p) => p.id === id))
-      .filter(Boolean) as typeof article.posts
-    setArticle((prev) => ({ ...prev, posts: reordered }))
+  const persistPostOrder = async (reorderedPosts: typeof article.posts) => {
+    const previousPosts = article.posts
+    setArticle((prev) => ({ ...prev, posts: reorderedPosts }))
 
     const res = await fetch("/api/content/order", {
       method: "POST",
@@ -283,39 +282,20 @@ export default function ArticleEditorClient({
         categoryId,
         subcategoryId,
         articleId,
-        orderedIds: newOrder,
+        orderedIds: reorderedPosts.map((p) => p.id),
       }),
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {
-      setArticle(initialArticle)
+      setArticle((prev) => ({ ...prev, posts: previousPosts }))
       window.alert((data as { error?: string }).error || "Failed to reorder posts")
-      return
     }
-    router.refresh()
   }
 
   const movePost = async (index: number, direction: "up" | "down") => {
     const newIndex = direction === "up" ? index - 1 : index + 1
     if (newIndex < 0 || newIndex >= article.posts.length) return
-    await applyPostOrder(reorderPosts(index, newIndex))
-  }
-
-  const handlePostDragStart = (e: React.DragEvent, index: number) => {
-    e.dataTransfer.setData("text/plain", String(index))
-    e.dataTransfer.effectAllowed = "move"
-  }
-  const handlePostDragOver = (e: React.DragEvent, index: number) => {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = "move"
-    setDragOverPostIndex(index)
-  }
-  const handlePostDrop = async (e: React.DragEvent, toIndex: number) => {
-    e.preventDefault()
-    setDragOverPostIndex(null)
-    const fromIndex = parseInt(e.dataTransfer.getData("text/plain"), 10)
-    if (Number.isNaN(fromIndex) || fromIndex === toIndex) return
-    await applyPostOrder(reorderPosts(fromIndex, toIndex))
+    await persistPostOrder(reorderPosts(index, newIndex))
   }
 
   const handleDeleteArticle = async () => {
@@ -495,9 +475,7 @@ export default function ArticleEditorClient({
               <Link2 className="h-3.5 w-3.5 text-gray-400" />
               <span className="text-xs text-gray-500 font-mono">
                 www.saferu.com
-                {categoryId === "whats-new"
-                  ? `/whats-new/${articleId}`
-                  : `/${categoryId}/${subcategoryId}/${articleId}`}
+                {getArticlePublicPath(categoryId, subcategoryId, articleId).slice(1)}
               </span>
               <Button
                 type="button"
@@ -506,7 +484,7 @@ export default function ArticleEditorClient({
                 className="h-6 px-2 text-xs"
                 onClick={() => {
                   const url = typeof window !== "undefined"
-                    ? `${window.location.origin}${categoryId === "whats-new" ? `/whats-new/${articleId}` : `/${categoryId}/${subcategoryId}/${articleId}`}`
+                    ? `${window.location.origin}${getArticlePublicPath(categoryId, subcategoryId, articleId)}`
                     : ""
                   navigator.clipboard.writeText(url)
                 }}
@@ -777,19 +755,16 @@ export default function ArticleEditorClient({
       />
 
       <div className="grid gap-6 md:grid-cols-2">
-        {article.posts.map((post, index) => {
+      <PostSortableGrid
+        items={article.posts}
+        onReorder={persistPostOrder}
+        className="contents"
+        renderItem={(post, index, dragHandle) => {
           const message = getPostMessageText(post)
           const postMedia = getPostImage(post)
           const displayImage = postMedia || `/images/posts/placeholder-${(index % 4) + 1}.jpg`
           const isPlaceholder = !postMedia
           return (
-            <div
-              key={post.id}
-              className={`rounded-2xl transition-colors ${dragOverPostIndex === index ? "ring-2 ring-[#1470AF] ring-offset-2" : ""}`}
-              onDragOver={(e) => handlePostDragOver(e, index)}
-              onDragLeave={() => setDragOverPostIndex(null)}
-              onDrop={(e) => handlePostDrop(e, index)}
-            >
               <Card className="overflow-hidden">
                 <div className="relative aspect-video bg-gray-100">
                   {isPlaceholder ? (
@@ -805,9 +780,9 @@ export default function ArticleEditorClient({
                   )}
                   <div className="absolute left-2 top-2 z-10 flex items-center gap-1">
                     <div
+                      ref={dragHandle.setHandleRef}
+                      {...dragHandle.handleProps}
                       className="flex cursor-grab active:cursor-grabbing touch-none items-center justify-center rounded bg-white/90 p-1.5 text-gray-500 shadow hover:bg-white hover:text-gray-700"
-                      draggable
-                      onDragStart={(e) => handlePostDragStart(e, index)}
                       title="Drag to reorder"
                     >
                       <GripVertical className="h-4 w-4" />
@@ -893,9 +868,9 @@ export default function ArticleEditorClient({
                 </div>
               </CardContent>
               </Card>
-            </div>
           )
-        })}
+        }}
+      />
 
         {/* Add Post Card */}
         <Card 

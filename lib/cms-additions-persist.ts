@@ -99,11 +99,13 @@ async function fileSave(data: CmsAdditions): Promise<void> {
  * Load additions into memory.
  * With Postgres: always reads fresh from DB (no stale serverless cache).
  * Without Postgres: loads from file once per process.
+ * Concurrent callers within the same request share one in-flight load.
  */
-export async function loadCmsAdditions(): Promise<void> {
+let inFlightLoad: Promise<void> | null = null
+
+async function loadFromSource(): Promise<void> {
   if (isDatabaseConfigured()) {
-    const data = await dbLoad()
-    setAdditions(data)
+    setAdditions(await dbLoad())
     return
   }
 
@@ -113,13 +115,21 @@ export async function loadCmsAdditions(): Promise<void> {
   await fileLoadPromise
 }
 
-/** Force a fresh load from DB/file. */
-export async function reloadCmsAdditions(): Promise<void> {
-  if (isDatabaseConfigured()) {
-    const data = await dbLoad()
-    setAdditions(data)
+export async function loadCmsAdditions(): Promise<void> {
+  if (inFlightLoad) {
+    await inFlightLoad
     return
   }
+
+  inFlightLoad = loadFromSource().finally(() => {
+    inFlightLoad = null
+  })
+  await inFlightLoad
+}
+
+/** Force a fresh load from DB/file. */
+export async function reloadCmsAdditions(): Promise<void> {
+  inFlightLoad = null
   fileLoadPromise = null
   await loadCmsAdditions()
 }

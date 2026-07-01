@@ -6,6 +6,7 @@ import { readFile, writeFile, mkdir } from "fs/promises"
 import path from "path"
 import { ensureSchema, getSql, isDatabaseConfigured } from "@/lib/db"
 import type { DateRange } from "@/lib/pio-analytics"
+import { isFlatCategory } from "@/lib/category-layout"
 
 const DATA_DIR = path.join(process.cwd(), "data")
 const STORE_PATH = path.join(DATA_DIR, "content-analytics.json")
@@ -142,7 +143,7 @@ async function writeStore(events: ContentEvent[]): Promise<void> {
   await writeFile(STORE_PATH, JSON.stringify(events, null, 2), "utf-8")
 }
 
-/** Parse article path like /crime-prevention/home/burglary-prevention */
+/** Parse article path like /crime-prevention/home/burglary-prevention or /weather-preparedness/heat-safety */
 export function parseContentPath(pathname: string): {
   categoryId?: string
   subcategoryId?: string
@@ -152,6 +153,9 @@ export function parseContentPath(pathname: string): {
   if (segments.length < 2) return {}
   if (segments[0] === "whats-new" && segments[1]) {
     return { categoryId: "whats-new", articleId: segments[1] }
+  }
+  if (segments.length === 2 && isFlatCategory(segments[0])) {
+    return { categoryId: segments[0], articleId: segments[1] }
   }
   if (segments.length >= 3) {
     return {

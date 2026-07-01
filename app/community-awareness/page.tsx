@@ -1,23 +1,12 @@
-import { SubcategoryPage } from "@/components/subcategory-page"
-import { getCategoryById } from "@/lib/content-merged"
-import { notFound } from "next/navigation"
+import { renderCategoryIndexPage } from "@/lib/category-public-pages"
+
+export const dynamic = "force-dynamic"
 
 export const metadata = {
   title: "Community Awareness - SaferU",
   description: "Build stronger, safer neighborhoods through awareness and engagement.",
 }
 
-export default function CommunityAwarenessPage() {
-  const category = getCategoryById("community-awareness")
-  
-  if (!category) {
-    notFound()
-  }
-
-  return (
-    <SubcategoryPage
-      category={category}
-      iconColor="text-[#4a9d6b]"
-    />
-  )
+export default async function CommunityAwarenessPage() {
+  return renderCategoryIndexPage("community-awareness")
 }

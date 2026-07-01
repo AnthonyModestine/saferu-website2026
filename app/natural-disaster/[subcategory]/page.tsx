@@ -1,35 +1,23 @@
-import { ArticlesPage } from "@/components/articles-page"
-import { getCategoryById, getSubcategoryById } from "@/lib/content-merged"
-import { notFound } from "next/navigation"
+import {
+  renderCategorySlugPage,
+  getCategorySlugMetadata,
+} from "@/lib/category-public-pages"
+
+export const dynamic = "force-dynamic"
 
 interface Props {
   params: Promise<{ subcategory: string }>
 }
 
-export async function generateMetadata({ params }: Props) {
-  const { subcategory: subcategoryId } = await params
-  const subcategory = getSubcategoryById("natural-disaster", subcategoryId)
+const CATEGORY_ID = "natural-disaster"
+const CATEGORY_LABEL = "Natural Disaster"
 
-  return {
-    title: subcategory ? `${subcategory.title} - Natural Disaster - SaferU` : "Natural Disaster - SaferU",
-    description: subcategory?.description || "Natural disaster preparedness tips and resources.",
-  }
+export async function generateMetadata({ params }: Props) {
+  const { subcategory } = await params
+  return getCategorySlugMetadata(CATEGORY_ID, subcategory, CATEGORY_LABEL)
 }
 
-export default async function NaturalDisasterSubcategoryPage({ params }: Props) {
-  const { subcategory: subcategoryId } = await params
-  const category = getCategoryById("natural-disaster")
-  const subcategory = getSubcategoryById("natural-disaster", subcategoryId)
-
-  if (!category || !subcategory) {
-    notFound()
-  }
-
-  return (
-    <ArticlesPage
-      category={category}
-      subcategory={subcategory}
-      iconColor="text-[#c44d4d]"
-    />
-  )
+export default async function NaturalDisasterSlugPage({ params }: Props) {
+  const { subcategory } = await params
+  return renderCategorySlugPage(CATEGORY_ID, subcategory)
 }

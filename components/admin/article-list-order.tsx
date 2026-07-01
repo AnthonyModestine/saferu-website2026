@@ -21,21 +21,30 @@ interface Props {
   categoryId: string
   subcategoryId: string
   articles: Article[]
+  /** Per-article subcategory for flat categories (articles may live in different buckets). */
+  articleSubcategoryIds?: Record<string, string>
   /** articleId -> true if published (live), false if draft. If omitted, all shown as published. */
   publishedByArticleId?: Record<string, boolean>
 }
 
-export function ArticleListOrder({ categoryId, subcategoryId, articles, publishedByArticleId }: Props) {
+export function ArticleListOrder({
+  categoryId,
+  subcategoryId,
+  articles,
+  articleSubcategoryIds,
+  publishedByArticleId,
+}: Props) {
   const router = useRouter()
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
   const [visibilityArticleId, setVisibilityArticleId] = useState<string | null>(null)
   const ids = articles.map((a) => a.id)
   const isPublished = (articleId: string) => publishedByArticleId?.[articleId] !== false
+  const subForArticle = (articleId: string) => articleSubcategoryIds?.[articleId] ?? subcategoryId
 
   const setVisibility = async (articleId: string, published: boolean) => {
     setVisibilityArticleId(articleId)
     try {
-      await setArticleVisibility(categoryId, subcategoryId, articleId, published)
+      await setArticleVisibility(categoryId, subForArticle(articleId), articleId, published)
       router.refresh()
     } catch (err) {
       window.alert(err instanceof Error ? err.message : "Failed to update article visibility")
@@ -126,7 +135,7 @@ export function ArticleListOrder({ categoryId, subcategoryId, articles, publishe
               </Button>
             </div>
             <Link
-              href={`/admin/articles/${categoryId}/${subcategoryId}/${article.id}`}
+              href={`/admin/articles/${categoryId}/${subForArticle(article.id)}/${article.id}`}
               className="flex flex-1 items-center gap-4 min-w-0"
             >
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gray-100">

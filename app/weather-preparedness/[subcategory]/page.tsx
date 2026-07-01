@@ -1,35 +1,23 @@
-import { ArticlesPage } from "@/components/articles-page"
-import { getCategoryById, getSubcategoryById } from "@/lib/content-merged"
-import { notFound } from "next/navigation"
+import {
+  renderCategorySlugPage,
+  getCategorySlugMetadata,
+} from "@/lib/category-public-pages"
+
+export const dynamic = "force-dynamic"
 
 interface Props {
   params: Promise<{ subcategory: string }>
 }
 
-export async function generateMetadata({ params }: Props) {
-  const { subcategory: subcategoryId } = await params
-  const subcategory = getSubcategoryById("weather-preparedness", subcategoryId)
+const CATEGORY_ID = "weather-preparedness"
+const CATEGORY_LABEL = "Weather Preparedness"
 
-  return {
-    title: subcategory ? `${subcategory.title} - Weather Preparedness - SaferU` : "Weather Preparedness - SaferU",
-    description: subcategory?.description || "Weather preparedness tips and resources.",
-  }
+export async function generateMetadata({ params }: Props) {
+  const { subcategory } = await params
+  return getCategorySlugMetadata(CATEGORY_ID, subcategory, CATEGORY_LABEL)
 }
 
-export default async function WeatherSubcategoryPage({ params }: Props) {
-  const { subcategory: subcategoryId } = await params
-  const category = getCategoryById("weather-preparedness")
-  const subcategory = getSubcategoryById("weather-preparedness", subcategoryId)
-
-  if (!category || !subcategory) {
-    notFound()
-  }
-
-  return (
-    <ArticlesPage
-      category={category}
-      subcategory={subcategory}
-      iconColor="text-[#5b7a9d]"
-    />
-  )
+export default async function WeatherPreparednessSlugPage({ params }: Props) {
+  const { subcategory } = await params
+  return renderCategorySlugPage(CATEGORY_ID, subcategory)
 }

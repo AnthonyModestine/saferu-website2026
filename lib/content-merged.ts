@@ -20,6 +20,7 @@ import {
 } from "@/lib/content-order"
 import { getPostImageOverride, getPostMessageOverride } from "@/lib/content-overrides"
 import { isArticlePublished } from "@/lib/content-visibility"
+import { isFlatCategory, getDefaultSubcategoryId } from "@/lib/category-layout"
 
 function deepCloneCategory(cat: Category): Category {
   return JSON.parse(JSON.stringify(cat))
@@ -287,6 +288,69 @@ export function getArticleById(
 ): Article | undefined {
   const subcategory = getSubcategoryById(categoryId, subcategoryId, options)
   return subcategory?.articles.find((a) => a.id === articleId)
+}
+
+/** Find an article anywhere in a category (used for flat-layout URLs). */
+export function findArticleInCategory(
+  categoryId: string,
+  articleId: string,
+  options?: GetCategoryOptions
+): { article: Article; subcategory: Subcategory } | undefined {
+  const category = getCategoryById(categoryId, options)
+  if (!category) return undefined
+  for (const sub of category.subcategories) {
+    const article = sub.articles.find((a) => a.id === articleId)
+    if (article) return { article, subcategory: sub }
+  }
+  return undefined
+}
+
+/** All articles for a flat-layout category, merged across subcategory buckets. */
+export function getFlatCategoryArticleEntries(
+  categoryId: string,
+  options?: GetCategoryOptions
+): { article: Article; subcategoryId: string }[] {
+  if (!isFlatCategory(categoryId)) return []
+  const category = getCategoryById(categoryId, options)
+  if (!category) return []
+
+  const defaultSubId = getDefaultSubcategoryId(categoryId)
+  const seen = new Set<string>()
+  const entries: { article: Article; subcategoryId: string }[] = []
+
+  const pushFromSub = (sub: Subcategory) => {
+    for (const art of sub.articles) {
+      if (!seen.has(art.id)) {
+        seen.add(art.id)
+        entries.push({ article: art, subcategoryId: sub.id })
+      }
+    }
+  }
+
+  const defaultSub = defaultSubId
+    ? category.subcategories.find((s) => s.id === defaultSubId)
+    : undefined
+  if (defaultSub) pushFromSub(defaultSub)
+  for (const sub of category.subcategories) {
+    if (sub.id !== defaultSubId) pushFromSub(sub)
+  }
+
+  const artOrder = defaultSubId ? getArticleOrder(categoryId, defaultSubId) : []
+  if (artOrder.length > 0) {
+    const ordered = sortByOrder(
+      entries.map((e) => ({ id: e.article.id, entry: e })),
+      artOrder
+    )
+    return ordered.map((o) => o.entry)
+  }
+  return entries
+}
+
+export function getFlatCategoryArticles(
+  categoryId: string,
+  options?: GetCategoryOptions
+): Article[] {
+  return getFlatCategoryArticleEntries(categoryId, options).map((e) => e.article)
 }
 
 export function getAllCategories(options?: GetCategoryOptions): Category[] {

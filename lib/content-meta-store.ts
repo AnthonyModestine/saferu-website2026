@@ -5,12 +5,16 @@
 export type ImageOverrides = Record<string, Record<string, Record<string, Record<string, string>>>>
 export type MessageOverrides = ImageOverrides
 
+export type CategoryLayoutMode = "flat" | "nested"
+
 export interface ContentMeta {
   subcategoryOrder: Record<string, string[]>
   articleOrder: Record<string, Record<string, string[]>>
   postOrder: Record<string, Record<string, Record<string, string[]>>>
   imageOverrides: ImageOverrides
   messageOverrides: MessageOverrides
+  /** Per-category: flat = articles on category page; nested = subcategories required */
+  categoryLayout: Record<string, CategoryLayoutMode>
 }
 
 const EMPTY_META: ContentMeta = {
@@ -19,6 +23,7 @@ const EMPTY_META: ContentMeta = {
   postOrder: {},
   imageOverrides: {},
   messageOverrides: {},
+  categoryLayout: {},
 }
 
 let meta: ContentMeta = { ...EMPTY_META }
@@ -32,6 +37,7 @@ function parseMeta(raw: unknown): ContentMeta {
     postOrder: data.postOrder ?? {},
     imageOverrides: data.imageOverrides ?? {},
     messageOverrides: data.messageOverrides ?? {},
+    categoryLayout: data.categoryLayout ?? {},
   }
 }
 

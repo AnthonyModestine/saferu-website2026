@@ -11,9 +11,12 @@ import {
   CloudLightning,
   AlertTriangle,
   Users,
+  FileText,
+  Settings2,
 } from "lucide-react"
 import { getAllCategories } from "@/lib/content-merged"
 import { ensureContentLoaded } from "@/lib/ensure-content-loaded"
+import { isFlatCategory } from "@/lib/category-layout"
 
 export const dynamic = "force-dynamic"
 
@@ -52,6 +55,7 @@ export default async function CategoriesPage() {
         {mainCategories.map((category) => {
           const Icon = categoryIcons[category.id] || FolderOpen
           const bgColor = categoryColors[category.id] || "bg-gray-500"
+          const flatLayout = isFlatCategory(category.id)
           const totalArticles = category.subcategories.reduce(
             (acc, sub) => acc + sub.articles.length,
             0
@@ -67,7 +71,10 @@ export default async function CategoriesPage() {
             <Card key={category.id}>
               <CardHeader className="border-b">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
+                  <Link
+                    href={`/admin/categories/${category.id}`}
+                    className="flex items-center gap-4 transition-opacity hover:opacity-80"
+                  >
                     <div
                       className={`flex h-12 w-12 items-center justify-center rounded-xl ${bgColor}`}
                     >
@@ -77,8 +84,11 @@ export default async function CategoriesPage() {
                       <CardTitle className="text-xl">{category.title}</CardTitle>
                       <CardDescription>{category.description}</CardDescription>
                     </div>
-                  </div>
+                  </Link>
                   <div className="flex items-center gap-3">
+                    <Badge variant="outline">
+                      {flatLayout ? "Articles only" : "Subcategories"}
+                    </Badge>
                     <Badge variant="secondary">{totalArticles} articles</Badge>
                     <Badge variant="secondary">{totalPosts} posts</Badge>
                     {category.id === "whats-new" && (
@@ -88,7 +98,44 @@ export default async function CategoriesPage() {
                 </div>
               </CardHeader>
               <CardContent className="p-0">
+                {flatLayout ? (
+                  <Link
+                    href={`/admin/categories/${category.id}`}
+                    className="flex items-center justify-between px-6 py-4 transition-colors hover:bg-gray-50"
+                  >
+                    <div className="flex items-center gap-3">
+                      <FileText className="h-5 w-5 text-gray-400" />
+                      <div>
+                        <p className="font-medium text-gray-900">Articles</p>
+                        <p className="text-sm text-gray-500">
+                          Manage articles directly in {category.title}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <span className="text-sm text-gray-500">
+                        {totalArticles} articles, {totalPosts} posts
+                      </span>
+                      <ChevronRight className="h-5 w-5 text-gray-400" />
+                    </div>
+                  </Link>
+                ) : (
                 <div className="divide-y">
+                  <Link
+                    href={`/admin/categories/${category.id}`}
+                    className="flex items-center justify-between px-6 py-4 transition-colors hover:bg-gray-50"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Settings2 className="h-5 w-5 text-gray-400" />
+                      <div>
+                        <p className="font-medium text-gray-900">Category settings</p>
+                        <p className="text-sm text-gray-500">
+                          Structure, subcategories, and layout
+                        </p>
+                      </div>
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-gray-400" />
+                  </Link>
                   {category.subcategories.map((subcategory) => {
                     const subArticleCount = subcategory.articles.length
                     const subPostCount = subcategory.articles.reduce(
@@ -119,6 +166,7 @@ export default async function CategoriesPage() {
                     )
                   })}
                 </div>
+                )}
               </CardContent>
             </Card>
           )

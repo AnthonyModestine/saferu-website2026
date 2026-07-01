@@ -1,7 +1,8 @@
-import { loadCmsAdditions } from "@/lib/cms-additions-persist"
-import { loadVisibility } from "@/lib/content-visibility-persist"
+import { ensureContentLoaded } from "@/lib/ensure-content-loaded"
+
+export const dynamic = "force-dynamic"
 
 export default async function WhatsNewLayout({ children }: { children: React.ReactNode }) {
-  await Promise.all([loadCmsAdditions(), loadVisibility()])
+  await ensureContentLoaded()
   return children
 }

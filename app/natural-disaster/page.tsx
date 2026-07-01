@@ -1,23 +1,12 @@
-import { SubcategoryPage } from "@/components/subcategory-page"
-import { getCategoryById } from "@/lib/content-merged"
-import { notFound } from "next/navigation"
+import { renderCategoryIndexPage } from "@/lib/category-public-pages"
+
+export const dynamic = "force-dynamic"
 
 export const metadata = {
   title: "Natural Disaster - SaferU",
   description: "Prepare for and respond to natural disasters in your area.",
 }
 
-export default function NaturalDisasterPage() {
-  const category = getCategoryById("natural-disaster")
-  
-  if (!category) {
-    notFound()
-  }
-
-  return (
-    <SubcategoryPage
-      category={category}
-      iconColor="text-[#c44d4d]"
-    />
-  )
+export default async function NaturalDisasterPage() {
+  return renderCategoryIndexPage("natural-disaster")
 }

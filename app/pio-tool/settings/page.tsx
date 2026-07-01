@@ -2,7 +2,7 @@
 
 import React from "react"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -23,6 +23,22 @@ export default function AgencySettingsPage() {
   const { isSubscribed, isLoading: subLoading } = useSubscription()
   const isLoading = sessionLoading || subLoading
   const locked = !isSubscribed
+  const [genUsage, setGenUsage] = useState<{
+    used: number
+    quota: number
+    packs: number
+    remaining: number
+  } | null>(null)
+
+  useEffect(() => {
+    if (!isSubscribed) return
+    fetch("/api/pio/generations")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.remaining !== undefined) setGenUsage(data)
+      })
+      .catch(() => {})
+  }, [isSubscribed])
 
   const handleSave = () => {
     setSaved(true)
@@ -277,6 +293,16 @@ export default function AgencySettingsPage() {
           <p className="text-sm text-muted-foreground">
             Use the Stripe Customer Portal to update payment methods, view invoices, or cancel your subscription.
           </p>
+          {isSubscribed && genUsage && (
+            <div className="rounded-lg border border-border bg-muted/30 p-4 text-sm text-muted-foreground space-y-1">
+              <p className="font-medium text-foreground">AI generations this month</p>
+              <p>
+                {genUsage.used} of {genUsage.quota} included generations used
+                {genUsage.packs > 0 ? ` · ${genUsage.packs} extra from packs` : ""}
+              </p>
+              <p className="text-xs">Included generations reset at the start of each calendar month.</p>
+            </div>
+          )}
           <Button
             variant="outline"
             className="bg-transparent"

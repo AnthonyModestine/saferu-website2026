@@ -16,6 +16,7 @@ import { PostMessageBlock } from "@/components/post-message-block"
 import { PostMediaPreview, PostMediaPlaceholder } from "@/components/post-media-preview"
 import { PostMediaLightbox } from "@/components/post-media-lightbox"
 import type { Article, Subcategory, Category } from "@/lib/data/content-library"
+import { isFlatCategory, getCategoryPublicPath } from "@/lib/category-layout"
 import type { LucideIcon } from "lucide-react"
 
 const categoryIconMap: Record<string, LucideIcon> = {
@@ -34,6 +35,8 @@ interface ArticleDetailPageProps {
   iconColor: string
   /** When true (What's New), breadcrumb and back link skip subcategory and go to /whats-new */
   isWhatsNew?: boolean
+  /** When true, breadcrumb and back link skip subcategory (flat category layout) */
+  flatArticles?: boolean
 }
 
 const platforms = [
@@ -85,9 +88,12 @@ export function ArticleDetailPage({
   article, 
   iconColor,
   isWhatsNew = false,
+  flatArticles = false,
 }: ArticleDetailPageProps) {
   const pathname = usePathname()
   const CategoryIcon = categoryIconMap[category.id] || Shield
+  const skipSubcategoryNav = isWhatsNew || flatArticles || isFlatCategory(category.id)
+  const categoryHomeHref = isWhatsNew ? "/whats-new" : getCategoryPublicPath(category.id)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [copyErrorId, setCopyErrorId] = useState<string | null>(null)
   const [downloadingPostId, setDownloadingPostId] = useState<string | null>(null)
@@ -120,10 +126,10 @@ export function ArticleDetailPage({
           <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
             {/* Breadcrumb — What's New: no subcategory in path */}
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4 flex-wrap">
-              <Link href={isWhatsNew ? "/whats-new" : `/${category.id}`} className="hover:text-foreground transition-colors">
+              <Link href={categoryHomeHref} className="hover:text-foreground transition-colors">
                 {category.title}
               </Link>
-              {!isWhatsNew && (
+              {!skipSubcategoryNav && (
                 <>
                   <ChevronRight className="h-4 w-4" />
                   <Link href={`/${category.id}/${subcategory.id}`} className="hover:text-foreground transition-colors">
@@ -146,9 +152,9 @@ export function ArticleDetailPage({
                 </div>
               </div>
               <Button variant="outline" size="sm" asChild className="bg-transparent">
-                <Link href={isWhatsNew ? "/whats-new" : `/${category.id}/${subcategory.id}`}>
+                <Link href={skipSubcategoryNav ? categoryHomeHref : `/${category.id}/${subcategory.id}`}>
                   <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to {isWhatsNew ? category.title : subcategory.title}
+                  Back to {skipSubcategoryNav ? category.title : subcategory.title}
                 </Link>
               </Button>
             </div>

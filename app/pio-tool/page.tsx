@@ -28,9 +28,6 @@ import { pressCenterSignInUrl, pressCenterSignUpUrl } from "@/lib/press-center-r
 const MONTHLY_PRODUCT = "pio-tool-monthly"
 
 interface GenerationStatus {
-  used: number
-  quota: number
-  packs: number
   remaining: number
 }
 
@@ -155,28 +152,6 @@ export default function PIODashboardPage() {
               Draft messaging for crimes, fires, traffic accidents, and public-safety incidents — press releases, social posts, and video requests.
             </p>
           </div>
-
-          {genStatus && (
-            <div className="rounded-xl border border-border bg-card p-5 space-y-3">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-foreground">Generations this month</p>
-                <p className="text-sm font-semibold text-foreground">
-                  {genStatus.used} / {genStatus.quota} used
-                  {genStatus.packs > 0 && (
-                    <span className="ml-2 text-[#1470AF]">+{genStatus.packs} extra</span>
-                  )}
-                </p>
-              </div>
-              <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-                <div
-                  className={`h-2 rounded-full transition-all ${
-                    genStatus.used >= genStatus.quota ? "bg-red-500" : "bg-[#1470AF]"
-                  }`}
-                  style={{ width: `${Math.min(100, (genStatus.used / genStatus.quota) * 100)}%` }}
-                />
-              </div>
-            </div>
-          )}
 
           {isOutOfGenerations && (
             <Card className="border-[#f2b233]/40 bg-[#f2b233]/5">
