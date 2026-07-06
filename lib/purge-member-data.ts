@@ -9,6 +9,7 @@ import path from "path"
 import { ensureSchema, getSql, isDatabaseConfigured } from "@/lib/db"
 import { setMemberDisabled } from "@/lib/disabled-members"
 import { clearMemberSessionsForUser } from "@/lib/member-session"
+import { purgeMemberFeedback } from "@/lib/member-feedback-store"
 import { stripe } from "@/lib/stripe"
 
 const DATA_DIR = path.join(process.cwd(), "data")
@@ -35,6 +36,7 @@ export async function purgeAllMemberData(params: {
     purgePasswordResetTokens(email),
     purgeGenerationAnalytics(email, memberId),
     purgeContentAnalytics(email),
+    purgeMemberFeedback(email),
     setMemberDisabled(email, false),
     memberId ? clearMemberSessionsForUser(memberId) : Promise.resolve(),
     params.removeStripe ? purgeStripeByEmail(email) : Promise.resolve(),

@@ -195,6 +195,25 @@ export async function ensureSchema(): Promise<void> {
   await db`CREATE INDEX IF NOT EXISTS idx_content_events_session ON content_events (session_id)`
 
   await db`
+    CREATE TABLE IF NOT EXISTS member_feedback (
+      id TEXT PRIMARY KEY,
+      member_id TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
+      member_name TEXT,
+      agency TEXT,
+      department_type TEXT,
+      department_other TEXT,
+      helpfulness_rating INT NOT NULL,
+      helped_with JSONB,
+      helped_with_other TEXT,
+      testimonial TEXT,
+      improvement_feedback TEXT,
+      created_at BIGINT NOT NULL
+    )
+  `
+  await db`CREATE INDEX IF NOT EXISTS idx_member_feedback_created ON member_feedback (created_at)`
+
+  await db`
     CREATE TABLE IF NOT EXISTS password_reset_tokens (
       token TEXT PRIMARY KEY,
       email TEXT NOT NULL,

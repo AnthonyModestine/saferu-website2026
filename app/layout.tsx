@@ -2,6 +2,7 @@ import React from "react"
 import type { Metadata } from 'next'
 import { Analytics } from '@vercel/analytics/next'
 import { TrackPageView } from "@/components/track-page-view"
+import { MemberFeedbackPrompt } from "@/components/member-feedback-prompt"
 import { loadCmsAdditions } from "@/lib/cms-additions-persist"
 import { loadContentMeta } from "@/lib/content-meta-persist"
 import { loadVisibility } from "@/lib/content-visibility-persist"
@@ -43,6 +44,7 @@ export default async function RootLayout({
       <body className={`font-sans antialiased`}>
         <TrackPageView />
         {children}
+        <MemberFeedbackPrompt />
         <Analytics />
       </body>
     </html>

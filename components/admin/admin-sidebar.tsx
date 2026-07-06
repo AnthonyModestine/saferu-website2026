@@ -18,6 +18,7 @@ import {
   ExternalLink,
   CreditCard,
   MessageSquare,
+  MessageSquareQuote,
   Menu,
   Mail,
 } from "lucide-react"
@@ -36,6 +37,7 @@ const navigation = [
   { name: "Members", href: "/admin/members", icon: Users },
   { name: "Email", href: "/admin/email", icon: Mail },
   { name: "Tickets", href: "/admin/tickets", icon: MessageSquare },
+  { name: "Member feedback", href: "/admin/member-feedback", icon: MessageSquareQuote },
   { name: "Categories", href: "/admin/categories", icon: FolderTree },
   { name: "Articles", href: "/admin/articles", icon: FileText },
   { name: "Posts", href: "/admin/posts", icon: Images },
