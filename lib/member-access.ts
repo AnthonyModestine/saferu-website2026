@@ -1,9 +1,16 @@
 "use server"
 
 import { stripe } from "@/lib/stripe"
+import { LOCAL_PREVIEW_MEMBER } from "@/lib/local-preview"
+import { isLocalPreviewServer } from "@/lib/local-preview-server"
 
 /** Returns true if this email has an active Stripe subscription or a successful charge (PIO / paid access). */
 export async function getIsPaidByEmail(email: string): Promise<boolean> {
+  if (await isLocalPreviewServer()) {
+    const normalizedPreview = email?.trim()?.toLowerCase()
+    if (!normalizedPreview || normalizedPreview === LOCAL_PREVIEW_MEMBER.email) return true
+  }
+
   const normalized = email?.trim()?.toLowerCase()
   if (!normalized || !stripe) return false
   try {

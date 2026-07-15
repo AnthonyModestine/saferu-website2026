@@ -1,3 +1,4 @@
+export const PRESS_CENTER_PATH = "/pio-tool"
 export const PRESS_CENTER_CHECKOUT_PATH = "/pio-tool/subscribe?checkout=1"
 
 export function pressCenterSignUpUrl(): string {
@@ -5,5 +6,5 @@ export function pressCenterSignUpUrl(): string {
 }
 
 export function pressCenterSignInUrl(): string {
-  return `/sign-in?returnUrl=${encodeURIComponent(PRESS_CENTER_CHECKOUT_PATH)}`
+  return `/sign-in?returnUrl=${encodeURIComponent(PRESS_CENTER_PATH)}`
 }

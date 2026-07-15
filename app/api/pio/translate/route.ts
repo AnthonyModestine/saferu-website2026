@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     const text = cap(body.text)
     if (!text) {
       return NextResponse.json(
-        { error: "Nothing to translate. Generate a Facebook post first." },
+        { error: "Nothing to translate. Generate a message first." },
         { status: 400 }
       )
     }

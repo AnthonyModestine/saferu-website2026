@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Save, Upload, Building2, X, CreditCard, ExternalLink } from "lucide-react"
-import { useAgency } from "@/lib/agency-context"
+import { useAgency, DEMO_AGENCY_LOGO_URL } from "@/lib/agency-context"
+import { isLocalHostname } from "@/lib/local-preview"
 import { useSubscription } from "@/lib/use-subscription"
 import { useMemberSession } from "@/lib/use-member-session"
 import Image from "next/image"
@@ -142,6 +143,21 @@ export default function AgencySettingsPage() {
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="serviceZips">Service ZIP codes</Label>
+            <Input
+              id="serviceZips"
+              placeholder="e.g. 19067, 19047, 18940"
+              className="placeholder:text-muted-foreground/60"
+              value={settings.serviceZips}
+              onChange={(e) => updateSettings({ serviceZips: e.target.value })}
+            />
+            <p className="text-xs text-muted-foreground">
+              Used for Local Ideas (weather, holidays, and what’s happening near you). Add every ZIP you
+              serve so results match your coverage area — not just a shared city or county name.
+            </p>
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="boilerplate">Default Boilerplate Paragraph</Label>
             <Textarea
               id="boilerplate"
@@ -209,6 +225,13 @@ export default function AgencySettingsPage() {
               <p className="text-xs text-muted-foreground">
                 PNG or JPG, max 2MB. Recommended size: 200x200px
               </p>
+              {typeof window !== "undefined" &&
+                isLocalHostname(window.location.hostname) &&
+                settings.logoUrl === DEMO_AGENCY_LOGO_URL && (
+                  <p className="text-xs text-[#2563EB]">
+                    Demo badge loaded for localhost testing. Upload your own logo to replace it.
+                  </p>
+                )}
             </div>
           </div>
         </CardContent>

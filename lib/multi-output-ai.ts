@@ -22,6 +22,46 @@ export interface MultiOutputResult {
   communityRequest: string | null
 }
 
+/** Which outputs the user asked to generate. */
+export type MultiOutputSelection = {
+  pressRelease: boolean
+  facebook: boolean
+  twitter: boolean
+  talkingPoints: boolean
+  videoRequest: boolean
+}
+
+/** Default for the create UI: press release only until the user opts in. */
+export const DEFAULT_MULTI_OUTPUT_SELECTION: MultiOutputSelection = {
+  pressRelease: true,
+  facebook: false,
+  twitter: false,
+  talkingPoints: false,
+  videoRequest: false,
+}
+
+export function parseMultiOutputSelection(raw: unknown): MultiOutputSelection | null {
+  if (!raw || typeof raw !== "object") return null
+  const o = raw as Record<string, unknown>
+  return {
+    pressRelease: Boolean(o.pressRelease),
+    facebook: Boolean(o.facebook),
+    twitter: Boolean(o.twitter),
+    talkingPoints: Boolean(o.talkingPoints),
+    videoRequest: Boolean(o.videoRequest),
+  }
+}
+
+export function selectionHasAny(sel: MultiOutputSelection): boolean {
+  return (
+    sel.pressRelease ||
+    sel.facebook ||
+    sel.twitter ||
+    sel.talkingPoints ||
+    sel.videoRequest
+  )
+}
+
 export type AncillaryPayload = PressReleasePayload
 
 async function generateAncillaryOutputs(
@@ -83,7 +123,12 @@ async function generateAncillaryOutputs(
           },
         }
       } catch {
-        console.error("[multi-output-ai] Invalid ancillary JSON (attempt", attempt + 1, "):", raw.slice(0, 300))
+        console.error(
+          "[multi-output-ai] Invalid ancillary JSON (attempt",
+          attempt + 1,
+          "):",
+          raw.slice(0, 300)
+        )
         lastError = "invalid_json"
       }
     }
@@ -106,29 +151,59 @@ export function payloadWantsVideoRequest(payload: AncillaryPayload): boolean {
 }
 
 export async function generateMultiOutput(
-  payload: AncillaryPayload
+  payload: AncillaryPayload,
+  selection: MultiOutputSelection = {
+    pressRelease: true,
+    facebook: true,
+    twitter: true,
+    talkingPoints: true,
+    videoRequest: true,
+  }
 ): Promise<AiResult<MultiOutputResult>> {
-  const wantsVideo = payloadWantsVideoRequest(payload)
+  if (!selectionHasAny(selection)) {
+    return {
+      ok: false,
+      reason: "invalid_json",
+      detail: "Select at least one output to generate.",
+    }
+  }
+
+  const needsPress =
+    selection.pressRelease ||
+    selection.facebook ||
+    selection.twitter ||
+    selection.talkingPoints
+  const wantsVideo = selection.videoRequest
   const normalizedPayload: AncillaryPayload = {
     ...payload,
-    requestFootage: wantsVideo,
+    requestFootage: wantsVideo ? true : Boolean(payload.requestFootage),
   }
 
-  const pressReleaseResult = await generatePressReleaseWithAI(normalizedPayload)
-  if (!pressReleaseResult.ok) {
-    return pressReleaseResult
+  let pressRelease = ""
+  if (needsPress) {
+    const pressReleaseResult = await generatePressReleaseWithAI(normalizedPayload)
+    if (!pressReleaseResult.ok) {
+      return pressReleaseResult
+    }
+    pressRelease = pressReleaseResult.data
   }
 
-  const ancillaryResult = await generateAncillaryOutputs(
-    normalizedPayload,
-    pressReleaseResult.data
-  )
-  if (!ancillaryResult.ok) {
-    console.error(
-      "[multi-output-ai] Ancillary outputs failed:",
-      ancillaryResult.reason,
-      ancillaryResult.detail ?? ""
-    )
+  let facebook = ""
+  let twitter = ""
+  let talkingPoints = ""
+  if (selection.facebook || selection.twitter || selection.talkingPoints) {
+    const ancillaryResult = await generateAncillaryOutputs(normalizedPayload, pressRelease)
+    if (!ancillaryResult.ok) {
+      console.error(
+        "[multi-output-ai] Ancillary outputs failed:",
+        ancillaryResult.reason,
+        ancillaryResult.detail ?? ""
+      )
+    } else {
+      if (selection.facebook) facebook = ancillaryResult.data.facebook
+      if (selection.twitter) twitter = ancillaryResult.data.twitter
+      if (selection.talkingPoints) talkingPoints = ancillaryResult.data.talkingPoints
+    }
   }
 
   let communityRequest: string | null = null
@@ -150,10 +225,10 @@ export async function generateMultiOutput(
   return {
     ok: true,
     data: {
-      pressRelease: pressReleaseResult.data,
-      facebook: ancillaryResult.ok ? ancillaryResult.data.facebook : "",
-      twitter: ancillaryResult.ok ? ancillaryResult.data.twitter : "",
-      talkingPoints: ancillaryResult.ok ? ancillaryResult.data.talkingPoints : "",
+      pressRelease: selection.pressRelease ? pressRelease : "",
+      facebook,
+      twitter,
+      talkingPoints,
       communityRequest,
     },
   }

@@ -1,5 +1,6 @@
 /**
- * Translate Facebook post to U.S. Spanish. Does not consume generation quota.
+ * Translate public-safety copy to U.S. Spanish. Does not consume generation quota.
+ * Opt-in only — callers must request translation explicitly (never auto-run on generate).
  */
 
 import type { AiResult } from "./ai-result"
@@ -26,7 +27,7 @@ export async function translateToAmericanSpanish(text: string): Promise<AiResult
         { role: "system", content: TRANSLATE_SYSTEM_PROMPT },
         {
           role: "user",
-          content: `Translate this Facebook post to U.S. Spanish:\n\n${trimmed}`,
+          content: `Translate this public-safety message to U.S. Spanish:\n\n${trimmed}`,
         },
       ],
       max_tokens: 1200,

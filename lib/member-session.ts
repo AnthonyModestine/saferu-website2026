@@ -4,6 +4,8 @@ import { cookies } from "next/headers"
 import { readFile, writeFile, mkdir } from "fs/promises"
 import path from "path"
 import { ensureSchema, getSql, isDatabaseConfigured } from "@/lib/db"
+import { LOCAL_PREVIEW_MEMBER } from "@/lib/local-preview"
+import { isLocalPreviewServer } from "@/lib/local-preview-server"
 
 const DATA_DIR = path.join(process.cwd(), "data")
 const SESSIONS_FILE = path.join(DATA_DIR, "member-sessions.json")
@@ -94,27 +96,37 @@ export async function createMemberSession(params: {
 export async function getMemberSession(): Promise<MemberSessionData | null> {
   const cookieStore = await cookies()
   const cookie = cookieStore.get(COOKIE_NAME)
-  if (!cookie?.value) return null
-
   const now = Math.floor(Date.now() / 1000)
 
-  if (isDatabaseConfigured()) {
-    await ensureSchema()
-    const rows = await getSql()`
-      SELECT id, member_id, email, name, expires_at
-      FROM member_sessions
-      WHERE id = ${cookie.value}
-      LIMIT 1
-    `
-    const row = (rows as SessionRow[])[0]
-    if (!row || Number(row.expires_at) < now) return null
-    return rowToSession(row)
+  if (cookie?.value) {
+    if (isDatabaseConfigured()) {
+      await ensureSchema()
+      const rows = await getSql()`
+        SELECT id, member_id, email, name, expires_at
+        FROM member_sessions
+        WHERE id = ${cookie.value}
+        LIMIT 1
+      `
+      const row = (rows as SessionRow[])[0]
+      if (row && Number(row.expires_at) >= now) return rowToSession(row)
+    } else {
+      const store = await readSessions()
+      const data = store[cookie.value]
+      if (data && data.expiresAt >= now) return data
+    }
   }
 
-  const store = await readSessions()
-  const data = store[cookie.value]
-  if (!data || data.expiresAt < now) return null
-  return data
+  // Localhost Next.js alone: act as a logged-in subscribed PIO user for rebuilding UI.
+  if (await isLocalPreviewServer()) {
+    return {
+      memberId: LOCAL_PREVIEW_MEMBER.memberId,
+      email: LOCAL_PREVIEW_MEMBER.email,
+      name: LOCAL_PREVIEW_MEMBER.name,
+      expiresAt: now + 60 * 60 * 24 * 30,
+    }
+  }
+
+  return null
 }
 
 export async function clearMemberSession(): Promise<void> {

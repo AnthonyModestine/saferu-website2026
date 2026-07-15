@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="ring" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E8E8E8"/>
+      <stop offset="45%" stop-color="#B8B8B8"/>
+      <stop offset="55%" stop-color="#F0F0F0"/>
+      <stop offset="100%" stop-color="#9A9A9A"/>
+    </linearGradient>
+    <linearGradient id="field" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1e3a5f"/>
+      <stop offset="100%" stop-color="#0f1c3f"/>
+    </linearGradient>
+  </defs>
+  <circle cx="256" cy="256" r="248" fill="url(#ring)" stroke="#707070" stroke-width="4"/>
+  <circle cx="256" cy="256" r="220" fill="url(#field)" stroke="#C9A227" stroke-width="6"/>
+  <circle cx="256" cy="256" r="196" fill="none" stroke="#C9A227" stroke-width="2" opacity="0.6"/>
+  <path fill="#C9A227" d="M256 108l18 56h58l-47 34 18 56-47-34-47 34 18-56-47-34h58z"/>
+  <path fill="#C9A227" opacity="0.85" d="M256 148l12 37h38l-31 23 12 37-31-23-31 23 12-37-31-23h38z"/>
+  <text x="256" y="318" text-anchor="middle" fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700" letter-spacing="3">PUBLIC</text>
+  <text x="256" y="352" text-anchor="middle" fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700" letter-spacing="3">SAFETY</text>
+  <text x="256" y="392" text-anchor="middle" fill="#C9A227" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="600" letter-spacing="2">DEMO AGENCY</text>
+</svg>

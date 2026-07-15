@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server"
-import { generateMultiOutput } from "@/lib/multi-output-ai"
+import {
+  generateMultiOutput,
+  parseMultiOutputSelection,
+  selectionHasAny,
+  type MultiOutputSelection,
+} from "@/lib/multi-output-ai"
 import { getMemberSession } from "@/lib/member-session"
 import { getIsPaidByEmail } from "@/lib/member-access"
 import { isOnActiveTrial } from "@/lib/pio-trial"
@@ -109,7 +114,26 @@ export async function POST(request: Request) {
       onlineTipsUrl: body.onlineTipsUrl != null ? cap(body.onlineTipsUrl, 200) : undefined,
     }
 
-    const result = await generateMultiOutput(payload)
+    const parsedSelection = parseMultiOutputSelection(body.outputs)
+    // If client doesn't send outputs, keep legacy "generate everything" behavior
+    const selection: MultiOutputSelection = parsedSelection ?? {
+      pressRelease: true,
+      facebook: true,
+      twitter: true,
+      talkingPoints: true,
+      videoRequest:
+        payload.investigationOngoing ||
+        payload.requestFootage ||
+        Boolean(payload.footageTimeframe?.trim() || payload.whatToLookFor?.trim()),
+    }
+    if (!selectionHasAny(selection)) {
+      return NextResponse.json(
+        { error: "Select at least one message type to generate." },
+        { status: 400 }
+      )
+    }
+
+    const result = await generateMultiOutput(payload, selection)
     if (!result.ok) {
       console.error("[generate-all] AI failed:", result.reason, result.detail ?? "")
       return NextResponse.json(aiErrorPayload(result.reason, result.detail), { status: 503 })
@@ -123,10 +147,7 @@ export async function POST(request: Request) {
       )
     }
 
-    const includeVideoRequest =
-      payload.investigationOngoing ||
-      payload.requestFootage ||
-      Boolean(payload.footageTimeframe?.trim() || payload.whatToLookFor?.trim())
+    const includeVideoRequest = Boolean(selection.videoRequest && result.data.communityRequest)
 
     const { departmentType, departmentOther } = await resolveMemberDepartment(session.email, {
       departmentType: typeof body.departmentType === "string" ? body.departmentType : body.agencyType,

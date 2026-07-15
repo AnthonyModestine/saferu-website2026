@@ -2,8 +2,12 @@
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 import type { DepartmentType } from "@/lib/department-types"
+import { isLocalHostname } from "@/lib/local-preview"
 
 const STORAGE_KEY = "pio_agency_settings"
+
+/** Generic public-safety badge for localhost testing (Settings + weather graphics). */
+export const DEMO_AGENCY_LOGO_URL = "/images/demo-agency-badge.svg"
 
 interface AgencySettings {
   agencyName: string
@@ -11,6 +15,8 @@ interface AgencySettings {
   agencyTypeOther: string
   city: string
   state: string
+  /** Comma- or space-separated ZIPs the agency serves — used for Local Ideas. */
+  serviceZips: string
   boilerplate: string
   logoUrl: string | null
   contactName: string
@@ -30,6 +36,7 @@ const defaultSettings: AgencySettings = {
   agencyTypeOther: "",
   city: "",
   state: "",
+  serviceZips: "",
   boilerplate: "",
   logoUrl: null,
   contactName: "",
@@ -62,6 +69,20 @@ function sanitizeSettings(settings: AgencySettings): AgencySettings {
   return result
 }
 
+function withLocalTestingDefaults(settings: AgencySettings): AgencySettings {
+  if (typeof window === "undefined") return settings
+  if (!isLocalHostname(window.location.hostname)) return settings
+
+  let next = settings
+  if (!settings.logoUrl) {
+    next = { ...next, logoUrl: DEMO_AGENCY_LOGO_URL }
+  }
+  if (!settings.agencyName.trim()) {
+    next = { ...next, agencyName: "Demo Township Police Department" }
+  }
+  return next
+}
+
 function loadStored(): AgencySettings {
   if (typeof window === "undefined") return defaultSettings
   try {
@@ -71,15 +92,24 @@ function loadStored(): AgencySettings {
       const merged = { ...defaultSettings, ...parsed }
       if (!merged.agencyType) merged.agencyType = "other"
       if (typeof merged.agencyTypeOther !== "string") merged.agencyTypeOther = ""
+      if (typeof merged.serviceZips !== "string") merged.serviceZips = ""
       const sanitized = sanitizeSettings(merged)
-      // Persist the sanitized version so it's clean going forward
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized))
-      return sanitized
+      const withTesting = withLocalTestingDefaults(sanitized)
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(withTesting))
+      return withTesting
     }
   } catch {
     // ignore
   }
-  return defaultSettings
+  const withTesting = withLocalTestingDefaults(defaultSettings)
+  if (withTesting.logoUrl || withTesting.agencyName) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(withTesting))
+    } catch {
+      // ignore
+    }
+  }
+  return withTesting
 }
 
 function saveStored(settings: AgencySettings): void {

@@ -6,13 +6,13 @@ import { Info } from "lucide-react"
 export function VideoRequestGuidelinesNote({ className = "" }: { className?: string }) {
   return (
     <div
-      className={`flex gap-3 rounded-lg border border-[#1470AF]/20 bg-[#1470AF]/5 px-4 py-3 text-sm text-muted-foreground ${className}`}
+      className={`flex gap-3 rounded-xl border border-[#e2e8f5] bg-white px-4 py-3 text-sm text-[#667795] shadow-sm ${className}`}
     >
-      <Info className="mt-0.5 h-4 w-4 shrink-0 text-[#1470AF]" aria-hidden />
+      <Info className="mt-0.5 h-4 w-4 shrink-0 text-[#2563EB]" aria-hidden />
       <p>
-        Video requests in Press Center are drafted to follow{" "}
-        <span className="font-medium text-foreground">Neighbors by Ring community moderation guidelines</span>.
-        Review and edit before posting to Neighbors, social media, or your usual channels.
+        Video requests are drafted to follow{" "}
+        <span className="font-medium text-[#0f1c3f]">Neighbors by Ring community moderation guidelines</span>.
+        Review and edit before posting.
       </p>
     </div>
   )
