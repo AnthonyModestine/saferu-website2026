@@ -1,12 +1,14 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useEffect, useState } from "react"
 import Link from "next/link"
+import { usePathname, useRouter } from "next/navigation"
 import { PIOSidebar } from "@/components/pio/sidebar"
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { Menu } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AgencyProvider } from "@/lib/agency-context"
+import { useMemberSession } from "@/lib/use-member-session"
 
 export default function PIOToolLayout({
   children,
@@ -14,6 +16,18 @@ export default function PIOToolLayout({
   children: React.ReactNode
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const pathname = usePathname()
+  const router = useRouter()
+  const { member, isLoading } = useMemberSession()
+  const isDashboard = pathname === "/pio-tool" || pathname === "/pio-tool/"
+
+  useEffect(() => {
+    if (!isLoading && !member && !isDashboard) {
+      router.replace("/pio-tool?guest=1")
+    }
+  }, [isDashboard, isLoading, member, router])
+
+  if (!isLoading && !member && !isDashboard) return null
 
   return (
     <AgencyProvider>

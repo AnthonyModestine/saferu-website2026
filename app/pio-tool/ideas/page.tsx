@@ -3,22 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import {
-  ArrowLeft,
-  Loader2,
-  MapPin,
-  RefreshCw,
-  Sparkles,
-} from "lucide-react"
+import { ArrowLeft, Loader2, RefreshCw, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { OpportunityCard } from "@/components/pio/opportunity-card"
 import { useAgency } from "@/lib/agency-context"
 import { useMemberSession } from "@/lib/use-member-session"
 import { isLocalGuestPreviewClient } from "@/lib/local-preview"
 import { pressCenterSignInUrl } from "@/lib/press-center-routes"
-import { parseServiceZips } from "@/lib/local-ideas-ai"
 import { generatePostOpportunities, flattenOpportunities } from "@/lib/post-generator/engine"
 import { demoExternalOpportunities } from "@/lib/post-generator/external-scanner"
 import { rankAndGateExternalOpportunities } from "@/lib/post-generator/rank-opportunities"
@@ -34,6 +25,8 @@ import {
   saveHolidayShowcaseCache,
 } from "@/lib/pio-holiday-showcase-cache"
 import type { GeneratorResult, PostOpportunity } from "@/lib/post-generator/types"
+import { getPioHistoryItems } from "@/lib/pio-history-store"
+import { getPioEvents } from "@/lib/pio-events-store"
 import {
   cacheOpportunityResult,
   dismissOpportunity,
@@ -47,6 +40,9 @@ const EMPTY_RESULT: GeneratorResult = {
   urgent: [],
   recommendedToday: [],
   planAhead: [],
+  topRecommended: [],
+  couldPost: [],
+  uncertain: [],
   fromSaferU: [],
   emptyState: true,
   demo: true,
@@ -59,7 +55,12 @@ function resultFromCached(
 ): GeneratorResult {
   const current = opportunities.filter((opp) => opp.opportunitySource !== "saferu_curated")
   const curated = opportunities.filter((opp) => opp.opportunitySource === "saferu_curated")
-  const dailySet = current.slice(0, 4)
+  const topRecommended = current
+    .filter((opp) => (opp.recommendationTier || "top_recommended") === "top_recommended")
+    .slice(0, 6)
+  const couldPost = current.filter((opp) => opp.recommendationTier === "could_post").slice(0, 6)
+  const uncertain: PostOpportunity[] = []
+  const dailySet = [...topRecommended, ...couldPost]
   const saferuSet = curated.slice(0, 2)
   return {
     urgent: dailySet.filter((opp) => opp.priority === "urgent"),
@@ -71,30 +72,70 @@ function resultFromCached(
         (opp.priority === "plan_ahead" || opp.priority === "optional") &&
         opp.opportunitySource !== "saferu_curated"
     ),
+    topRecommended,
+    couldPost,
+    uncertain,
     fromSaferU: saferuSet,
-    emptyState: dailySet.length === 0 && saferuSet.length === 0,
+    emptyState:
+      topRecommended.length === 0 &&
+      couldPost.length === 0 &&
+      uncertain.length === 0 &&
+      saferuSet.length === 0,
     demo: false,
     generatedAt,
   }
 }
 
+function serviceAreaLabel(settings: {
+  serviceAreaType: "city" | "county" | "state"
+  city: string
+  county: string
+  state: string
+}): string {
+  const state = settings.state.trim()
+  const city = settings.city.trim()
+  const county = settings.county.trim()
+  if (settings.serviceAreaType === "state") return state || "statewide"
+  if (settings.serviceAreaType === "county") {
+    if (county && state) return `${county}, ${state}`
+    return county || state || "county-wide"
+  }
+  if (city && county && state) return `${city}, ${county}, ${state}`
+  if (city && state) return `${city}, ${state}`
+  if (city) return city
+  if (county) return county
+  if (state) return state
+  return "your coverage area"
+}
+
 export default function PostGeneratorPage() {
   const router = useRouter()
-  const { settings, updateSettings } = useAgency()
+  const { settings } = useAgency()
   const { member, isLoading: sessionLoading } = useMemberSession()
-  const guest = isLocalGuestPreviewClient() || (!sessionLoading && !member)
+  const [localGuestPreview, setLocalGuestPreview] = useState(false)
+  const guest = localGuestPreview || (!sessionLoading && !member)
 
-  const [state, setState] = useState(settings.state)
-  const [zips, setZips] = useState(settings.serviceZips)
   const [result, setResult] = useState<GeneratorResult>(EMPTY_RESULT)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [copiedId, setCopiedId] = useState<string | null>(null)
   const [isDemo, setIsDemo] = useState(false)
   const [generatingId, setGeneratingId] = useState<string | null>(null)
   const autoLoadedRef = useRef(false)
 
-  const agencyName = settings.agencyName || "Demo Township Police Department"
+  useEffect(() => {
+    setLocalGuestPreview(isLocalGuestPreviewClient())
+  }, [])
+
+  const agencyName = settings.agencyName || "Your Agency"
+  const locationReady = Boolean(
+    settings.agencyType &&
+      settings.state.trim() &&
+      (settings.serviceAreaType === "state" ||
+        (settings.serviceAreaType === "county" && settings.county.trim()) ||
+        (settings.serviceAreaType === "city" &&
+          settings.city.trim() &&
+          settings.county.trim()))
+  )
 
   async function hydrateOpportunityGraphics(opportunities: PostOpportunity[]) {
     await attachWeatherAlertGraphics(opportunities, {
@@ -108,8 +149,6 @@ export default function PostGeneratorPage() {
     const holiday = opportunities.find(isHolidayOpportunity)
     if (!holiday) return
 
-    // A holiday only appears when timely. Reuse its previously generated AI
-    // graphic across navigation; otherwise generate just this one holiday.
     const cached = await loadHolidayShowcaseCache(agencyName, settings.logoUrl)
     const cachedHoliday = cached?.opportunities.find((opp) => opp.id === holiday.id)
     if (cached?.aiReady && cachedHoliday?.graphicUrl?.startsWith("data:")) {
@@ -125,7 +164,7 @@ export default function PostGeneratorPage() {
         body: JSON.stringify({
           agencyName: settings.agencyName,
           city: settings.city,
-          state: settings.state || state,
+          state: settings.state,
           includeBackgrounds: true,
           holidays: holidayShowcaseApiPayload([holiday]),
         }),
@@ -151,79 +190,69 @@ export default function PostGeneratorPage() {
     }
   }
 
-  useEffect(() => {
-    setState(settings.state)
-    setZips(settings.serviceZips)
-  }, [settings.state, settings.serviceZips])
-
-  const runClientDemo = useCallback(
-    async (parsedZips: string[], stateVal: string) => {
-      const history = loadDailyOpportunityHistory()
-      const rankedDemo = rankAndGateExternalOpportunities(
-        demoExternalOpportunities(parsedZips),
-        {
-          agencyType: settings.agencyType,
-          todayIso: new Date().toISOString().slice(0, 10),
-          postedFingerprints: history.postedFingerprints,
-          recentTopicKeys: history.recentTopicKeys,
-          requireTrustedSource: false,
-        }
-      ).map(({ internalScores: _scores, ...rest }) => rest)
-      const demo = generatePostOpportunities({
-        agencyName: settings.agencyName || "Demo Township Police Department",
-        agencyType: settings.agencyType,
-        agencyTypeOther: settings.agencyTypeOther,
-        city: settings.city || "San Saba",
-        state: stateVal,
-        serviceZips: parsedZips,
-        dismissedIds: history.dismissedIds,
-        usedContentIds: history.usedContentIds,
-        postedFingerprints: history.postedFingerprints,
-        recentTopicKeys: history.recentTopicKeys,
-        externalOpportunities: rankedDemo,
-        dailyLimit: 4,
-      })
-      const flat = flattenOpportunities(demo)
-      for (const opportunity of flat) {
-        if (opportunity.curatedMessage) continue
-        opportunity.curatedMessage = [
-          `Community update: ${opportunity.title}.`,
-          ...(opportunity.verifiedFacts ?? []),
-          ...(opportunity.publicCallToAction ?? []),
-        ].join(" ")
-      }
-      await hydrateOpportunityGraphics(flat)
-      setResult({ ...demo })
-      cacheOpportunityResult(flat, demo.generatedAt)
-      setIsDemo(true)
-    },
-    [
-      settings.agencyName,
-      settings.agencyType,
-      settings.agencyTypeOther,
-      settings.city,
-      settings.logoUrl,
-      settings.state,
-      agencyName,
-      guest,
-      sessionLoading,
-      state,
-    ]
-  )
+  const runClientDemo = useCallback(async () => {
+    const history = loadDailyOpportunityHistory()
+    const stateVal = settings.state.trim() || "TX"
+    const rankedDemo = rankAndGateExternalOpportunities(demoExternalOpportunities([]), {
+      agencyType: settings.agencyType,
+      agencyName: settings.agencyName || "Demo Township Police Department",
+      city: settings.city || "San Saba",
+      county: settings.county,
+      todayIso: new Date().toISOString().slice(0, 10),
+      postedFingerprints: history.postedFingerprints,
+      recentTopicKeys: history.recentTopicKeys,
+      requireTrustedSource: false,
+    }).map(({ internalScores: _scores, ...rest }) => rest)
+    const demo = generatePostOpportunities({
+      agencyName: settings.agencyName || "Demo Township Police Department",
+      agencyType: settings.agencyType,
+      agencyTypeOther: settings.agencyTypeOther,
+      city: settings.city || "San Saba",
+      county: settings.county,
+      state: stateVal,
+      serviceZips: [],
+      dismissedIds: history.dismissedIds,
+      usedContentIds: history.usedContentIds,
+      postedFingerprints: history.postedFingerprints,
+      recentTopicKeys: history.recentTopicKeys,
+      externalOpportunities: rankedDemo,
+      dailyLimit: 12,
+    })
+    const flat = flattenOpportunities(demo)
+    for (const opportunity of flat) {
+      if (opportunity.curatedMessage) continue
+      opportunity.curatedMessage = [
+        `Community update: ${opportunity.title}.`,
+        ...(opportunity.verifiedFacts ?? []),
+        ...(opportunity.publicCallToAction ?? []),
+      ].join(" ")
+    }
+    await hydrateOpportunityGraphics(flat)
+    setResult({ ...demo })
+    cacheOpportunityResult(flat, demo.generatedAt)
+    setIsDemo(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    settings.agencyName,
+    settings.agencyType,
+    settings.agencyTypeOther,
+    settings.city,
+    settings.county,
+    settings.logoUrl,
+    settings.state,
+    agencyName,
+    guest,
+    sessionLoading,
+  ])
 
   useEffect(() => {
     if (!guest) return
-    const parsed = parseServiceZips(zips || "76877")
-    const stateVal = state || "TX"
-    if (parsed.length && stateVal) {
-      void runClientDemo(parsed, stateVal)
-    }
-  }, [guest, state, zips, runClientDemo])
+    void runClientDemo()
+  }, [guest, runClientDemo])
 
   useEffect(() => {
     if (sessionLoading || guest || autoLoadedRef.current) return
-    const parsedZips = parseServiceZips(zips)
-    if (!state.trim() || parsedZips.length === 0) return
+    if (!locationReady) return
 
     autoLoadedRef.current = true
     const history = loadDailyOpportunityHistory()
@@ -231,41 +260,68 @@ export default function PostGeneratorPage() {
       history.lastResult &&
       isResultFromToday(history.lastResult.generatedAt) &&
       history.lastResult.opportunities.length > 0 &&
-      history.lastResult.opportunities.length <= 6 &&
-      history.lastResult.opportunities
-        .filter((opp) => opp.opportunitySource !== "saferu_curated")
-        .every((opp) => !opp.id.startsWith("ext-"))
+      history.lastResult.opportunities.length <= 20 &&
+      history.lastResult.opportunities.every(
+        (opp) =>
+          opp.opportunitySource === "saferu_curated" ||
+          (!opp.id.startsWith("ext-") &&
+            Boolean(opp.surfacedReason) &&
+            Boolean(opp.curatedMessage))
+      )
     ) {
       void (async () => {
         const opportunities = [...history.lastResult!.opportunities]
         await hydrateOpportunityGraphics(opportunities)
-        setResult(
-          resultFromCached(opportunities, history.lastResult!.generatedAt)
-        )
+        setResult(resultFromCached(opportunities, history.lastResult!.generatedAt))
       })()
       return
     }
     void loadOpportunities()
-    // A valid configured location triggers one automatic briefing per day.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionLoading, guest, state, zips])
+  }, [sessionLoading, guest, locationReady])
 
   async function loadOpportunities() {
-    const parsedZips = parseServiceZips(zips)
-    if (!state.trim() || parsedZips.length === 0) {
-      setError("Enter your state and at least one 5-digit ZIP code.")
+    if (!locationReady) {
+      setError("Set your state and a city or county in Agency Settings first.")
       return
     }
 
-    updateSettings({ state: state.trim(), serviceZips: parsedZips.join(", ") })
     setLoading(true)
     setError(null)
 
     const history = loadDailyOpportunityHistory()
+    const recentCreatedContent = [
+      ...getPioHistoryItems().slice(0, 10).map((item) => ({
+        id: item.id,
+        kind: item.format === "Video Request" ? "video_request" : "press_release",
+        title: item.title,
+        content: item.content,
+        createdAt: item.date,
+      })),
+      ...getPioEvents()
+        .filter((event) => event.status === "generated" || event.posts.length > 0)
+        .slice(0, 8)
+        .map((event) => ({
+          id: event.id,
+          kind: "event_campaign" as const,
+          title: event.title,
+          content: [
+            event.description,
+            event.eventType,
+            event.audienceGoals,
+            ...event.posts.slice(0, 3).map((post) => post.message),
+          ]
+            .filter(Boolean)
+            .join("\n"),
+          createdAt: event.createdAt,
+          eventDate: event.eventDate,
+          agencyRole: event.hostingRole,
+        })),
+    ]
 
     if (guest) {
       try {
-        await runClientDemo(parsedZips, state.trim())
+        await runClientDemo()
       } catch (err) {
         console.error("Guest demo briefing failed:", err)
         setError("Something went wrong preparing your briefing. Try Generate again.")
@@ -283,14 +339,17 @@ export default function PostGeneratorPage() {
           agencyName: settings.agencyName,
           agencyType: settings.agencyType,
           agencyTypeOther: settings.agencyTypeOther,
+          serviceAreaType: settings.serviceAreaType,
           city: settings.city,
-          state: state.trim(),
-          serviceZips: parsedZips,
+          county: settings.county,
+          state: settings.state.trim(),
+          serviceZips: [],
           dismissedIds: history.dismissedIds,
           usedContentIds: history.usedContentIds,
           postedFingerprints: history.postedFingerprints,
           recentTopicKeys: history.recentTopicKeys,
           savedIds: history.savedIds,
+          recentCreatedContent,
         }),
       })
       let data: Record<string, unknown>
@@ -301,32 +360,30 @@ export default function PostGeneratorPage() {
         return
       }
       if (!res.ok) {
-        setError(
-          typeof data?.error === "string" ? data.error : "Could not load recommendations."
-        )
+        setError(String(data.error || "Could not generate recommendations."))
         return
       }
+
+      const opportunities = (data.opportunities as PostOpportunity[]) || []
+      await hydrateOpportunityGraphics(opportunities)
       const next: GeneratorResult = {
-        urgent: (data.urgent as GeneratorResult["urgent"]) ?? [],
-        recommendedToday:
-          (data.recommendedToday as GeneratorResult["recommendedToday"]) ?? [],
-        planAhead: (data.planAhead as GeneratorResult["planAhead"]) ?? [],
-        fromSaferU: (data.fromSaferU as GeneratorResult["fromSaferU"]) ?? [],
+        urgent: (data.urgent as PostOpportunity[]) || [],
+        recommendedToday: (data.recommendedToday as PostOpportunity[]) || [],
+        planAhead: (data.planAhead as PostOpportunity[]) || [],
+        topRecommended: (data.topRecommended as PostOpportunity[]) || [],
+        couldPost: (data.couldPost as PostOpportunity[]) || [],
+        uncertain: [],
+        fromSaferU: (data.fromSaferU as PostOpportunity[]) || [],
         emptyState: Boolean(data.emptyState),
         demo: Boolean(data.demo),
-        generatedAt:
-          typeof data.generatedAt === "string"
-            ? data.generatedAt
-            : new Date().toISOString(),
+        generatedAt: String(data.generatedAt || new Date().toISOString()),
       }
-      const flat = flattenOpportunities(next)
-      await hydrateOpportunityGraphics(flat)
-      setResult({ ...next })
-      cacheOpportunityResult(flat, next.generatedAt)
+      setResult(next)
+      cacheOpportunityResult(opportunities, next.generatedAt)
       setIsDemo(Boolean(data.demo))
     } catch (err) {
-      console.error("Post opportunity load failed:", err)
-      setError("Something went wrong preparing your briefing. Try Generate again.")
+      console.error("Load opportunities failed:", err)
+      setError("Something went wrong. Try Generate again.")
     } finally {
       setLoading(false)
     }
@@ -379,33 +436,29 @@ export default function PostGeneratorPage() {
       urgent: prev.urgent.filter((o) => o.id !== opp.id),
       recommendedToday: prev.recommendedToday.filter((o) => o.id !== opp.id),
       planAhead: prev.planAhead.filter((o) => o.id !== opp.id),
+      topRecommended: (prev.topRecommended ?? []).filter((o) => o.id !== opp.id),
+      couldPost: (prev.couldPost ?? []).filter((o) => o.id !== opp.id),
+      uncertain: (prev.uncertain ?? []).filter((o) => o.id !== opp.id),
       fromSaferU: prev.fromSaferU.filter((o) => o.id !== opp.id),
     }))
   }
 
   function handleSave(opp: PostOpportunity) {
+    // Local signal for now — marks this recommendation as useful for future learning.
     saveOpportunityForLater(opp)
   }
 
-  async function copyMessage(opp: PostOpportunity) {
-    const text = opp.curatedMessage || opp.curated?.message || ""
-    if (!text) return
-    await navigator.clipboard.writeText(text)
-    setCopiedId(opp.id)
-    setTimeout(() => setCopiedId(null), 1800)
-  }
+  const recommendations = [
+    ...(result.topRecommended ?? []),
+    ...(result.couldPost ?? []),
+    ...((result.topRecommended ?? []).length === 0 && (result.couldPost ?? []).length === 0
+      ? [...result.urgent, ...result.recommendedToday, ...result.planAhead]
+      : []),
+    ...result.fromSaferU,
+  ].filter((opp, index, all) => all.findIndex((item) => item.id === opp.id) === index)
 
-  const locationReady = Boolean(state.trim() && parseServiceZips(zips).length > 0)
-  const hasAny =
-    result.urgent.length > 0 ||
-    result.recommendedToday.length > 0 ||
-    result.planAhead.length > 0 ||
-    result.fromSaferU.length > 0
-  const recommendedPosts = [
-    ...result.urgent,
-    ...result.recommendedToday,
-    ...result.planAhead,
-  ]
+  const hasAny = recommendations.length > 0
+  const area = serviceAreaLabel(settings)
 
   return (
     <div className="mx-auto max-w-[960px] space-y-6 pb-10">
@@ -426,14 +479,19 @@ export default function PostGeneratorPage() {
               </h1>
             </div>
             <p className="mt-1.5 max-w-xl text-sm text-[#7a8ab0]">
-              Up to four high-value posts worth sharing today — filtered for your agency type,
-              local impact, and resident usefulness — plus matching SaferU safety graphics.
+              What to share with your community today
+              {locationReady ? (
+                <>
+                  {" "}
+                  ·{" "}
+                  <Link href="/pio-tool/settings" className="text-[#2563EB] hover:underline">
+                    {area}
+                  </Link>
+                </>
+              ) : null}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-[#EDE9FE] px-3 py-1.5 text-xs font-semibold text-[#6D28D9]">
-              Today&apos;s briefing · refreshes tomorrow
-            </span>
             <Button
               type="button"
               size="sm"
@@ -445,7 +503,7 @@ export default function PostGeneratorPage() {
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Generating…
+                  Searching…
                 </>
               ) : (
                 <>
@@ -458,50 +516,34 @@ export default function PostGeneratorPage() {
         </div>
       </div>
 
-      <section className="rounded-2xl border border-[#e2e8f5] bg-white p-5 shadow-sm">
-        <div className="mb-3 flex items-center gap-2">
-          <MapPin className="h-4 w-4 text-[#2563EB]" />
-          <h2 className="text-sm font-bold text-[#0f1c3f]">Your coverage area</h2>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="pg-state">State</Label>
-            <Input
-              id="pg-state"
-              placeholder="e.g. TX"
-              value={state}
-              onChange={(e) => setState(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="pg-zips">Service ZIP codes</Label>
-            <Input
-              id="pg-zips"
-              placeholder="e.g. 76877"
-              value={zips}
-              onChange={(e) => setZips(e.target.value)}
-            />
-          </div>
-        </div>
-        <p className="mt-3 text-xs text-[#7a8ab0]">
-          Edit state and ZIP, then click{" "}
-          <span className="font-semibold text-[#0f1c3f]">Generate</span> to test this area.
+      {!locationReady && (
+        <div className="rounded-2xl border border-[#e2e8f5] bg-white px-5 py-4 text-sm text-[#475569]">
+          Set your state and service area in{" "}
+          <Link href="/pio-tool/settings" className="font-semibold text-[#2563EB] hover:underline">
+            Agency Settings
+          </Link>{" "}
+          to get recommendations. City agencies need city + county (place names can repeat in a
+          state).
           {guest ? (
             <>
               {" "}
-              <Link href={pressCenterSignInUrl()} className="font-semibold text-[#2563EB] hover:underline">
+              <Link
+                href={pressCenterSignInUrl()}
+                className="font-semibold text-[#2563EB] hover:underline"
+              >
                 Sign in
               </Link>{" "}
-              for live NWS analysis.
+              for live analysis.
             </>
           ) : null}
-        </p>
-        {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
-      </section>
+        </div>
+      )}
+
+      {error && <p className="text-sm text-destructive">{error}</p>}
 
       {isDemo && hasAny && (
         <p className="text-xs font-medium text-[#7a8ab0]">
-          Sample daily briefing — sign in for live analysis tied to your area.
+          Sample briefing — sign in for live analysis tied to your area.
         </p>
       )}
 
@@ -509,122 +551,45 @@ export default function PostGeneratorPage() {
         <div className="rounded-3xl border border-dashed border-[#c7d2fe] bg-gradient-to-br from-[#EFF6FF] to-[#F5F3FF] px-6 py-12 text-center">
           <Sparkles className="mx-auto h-10 w-10 text-[#7C5CFC]" />
           <p className="mt-3 text-base font-semibold text-[#0f1c3f]">
-            {locationReady ? "Analyzing your area…" : "Add state + ZIP to get started"}
+            {locationReady
+              ? "Nothing strong enough to recommend right now"
+              : "Finish Agency Settings"}
           </p>
           <p className="mt-1 text-sm text-[#7a8ab0]">
             {locationReady
-              ? "Your daily recommendations are being prepared automatically."
-              : "We'll match seasonal conditions and SaferU curated content to your coverage area."}
+              ? "Try Generate again, or check Agency Settings if your service area looks incomplete."
+              : "Choose an agency type and service area, then generate."}
           </p>
         </div>
-      ) : (
-        <div className="space-y-8">
-          {recommendedPosts.length > 0 && (
-            <OpportunitySection
-              title="Recommended posts"
-              subtitle={`${recommendedPosts.length} recommendation${
-                recommendedPosts.length === 1 ? "" : "s"
-              } worth communicating today for this agency and service area${
-                recommendedPosts.length < 4
-                  ? " — weaker or less relevant items were filtered out"
-                  : ""
-              }.`}
-              opportunities={recommendedPosts}
-              {...cardHandlers()}
-            />
-          )}
-          {(result.fromSaferU.length > 0 || result.emptyState) && (
-            <OpportunitySection
-              title={
-                result.emptyState && result.fromSaferU.length > 0
-                  ? "SaferU safety graphics"
-                  : "SaferU safety graphics"
-              }
-              subtitle={
-                result.emptyState
-                  ? "No urgent communication opportunities were identified right now. Here are curated safety graphics your community may find useful."
-                  : "Pulled from SaferU curated content, like the What's New section."
-              }
-              opportunities={result.fromSaferU}
-              {...cardHandlers()}
-            />
-          )}
-          {recommendedPosts.length > 0 && result.fromSaferU.length === 0 && (
-            <div className="rounded-2xl border border-dashed border-[#cad5e8] bg-[#f8faff] px-5 py-4">
-              <h2 className="text-base font-semibold text-[#0f1c3f]">SaferU safety graphics</h2>
-              <p className="mt-1 text-sm text-[#7a8ab0]">
-                No curated graphic and message directly match today&apos;s verified events. Unrelated
-                content is not substituted.
-              </p>
-            </div>
-          )}
+      ) : hasAny ? (
+        <section>
+          <ul className="grid gap-4 md:grid-cols-2">
+            {recommendations.map((opp) => (
+              <li key={opp.id}>
+                <OpportunityCard
+                  opportunity={opp}
+                  onUse={handleUse}
+                  onGenerate={generatingId === opp.id ? undefined : (o) => void handleGenerate(o)}
+                  onSave={handleSave}
+                  onDismiss={handleDismiss}
+                />
+                {generatingId === opp.id && (
+                  <p className="mt-1 flex items-center gap-1 text-xs text-[#7a8ab0]">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Generating message…
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : loading ? (
+        <div className="rounded-3xl border border-dashed border-[#c7d2fe] bg-gradient-to-br from-[#EFF6FF] to-[#F5F3FF] px-6 py-12 text-center">
+          <Loader2 className="mx-auto h-10 w-10 animate-spin text-[#7C5CFC]" />
+          <p className="mt-3 text-base font-semibold text-[#0f1c3f]">Finding something useful…</p>
+          <p className="mt-1 text-sm text-[#7a8ab0]">This can take about a minute.</p>
         </div>
-      )}
-
+      ) : null}
     </div>
-  )
-
-  function cardHandlers() {
-    return {
-      onUse: handleUse,
-      onGenerate: (opp: PostOpportunity) => void handleGenerate(opp),
-      onSave: handleSave,
-      onDismiss: handleDismiss,
-      onCopy: copyMessage,
-      copiedId,
-      generatingId,
-    }
-  }
-}
-
-function OpportunitySection({
-  title,
-  subtitle,
-  opportunities,
-  onUse,
-  onGenerate,
-  onSave,
-  onDismiss,
-  onCopy,
-  copiedId,
-  generatingId,
-}: {
-  title: string
-  subtitle?: string
-  opportunities: PostOpportunity[]
-  onUse: (opp: PostOpportunity) => void
-  onGenerate: (opp: PostOpportunity) => void
-  onSave: (opp: PostOpportunity) => void
-  onDismiss: (opp: PostOpportunity) => void
-  onCopy: (opp: PostOpportunity) => void
-  copiedId: string | null
-  generatingId: string | null
-}) {
-  return (
-    <section>
-      <h2 className="text-lg font-bold text-[#0f1c3f]">{title}</h2>
-      {subtitle && <p className="mt-1 text-sm text-[#7a8ab0]">{subtitle}</p>}
-      <ul className="mt-3 grid gap-4 lg:grid-cols-2">
-        {opportunities.map((opp) => (
-          <li key={opp.id}>
-            <OpportunityCard
-              opportunity={opp}
-              onUse={onUse}
-              onGenerate={generatingId === opp.id ? undefined : onGenerate}
-              onSave={onSave}
-              onDismiss={onDismiss}
-              onCopy={onCopy}
-              copied={copiedId === opp.id}
-            />
-            {generatingId === opp.id && (
-              <p className="mt-1 flex items-center gap-1 text-xs text-[#7a8ab0]">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                Generating message…
-              </p>
-            )}
-          </li>
-        ))}
-      </ul>
-    </section>
   )
 }

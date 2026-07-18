@@ -140,7 +140,7 @@ export default function AboutPage() {
             </div>
 
             <div className="mt-10 grid gap-6 lg:grid-cols-12">
-              <div className="flex flex-col overflow-hidden rounded-2xl border border-[#E2E8F5] bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-xl lg:col-span-7">
+              <div className="flex flex-col overflow-hidden rounded-2xl border border-[#E2E8F5] bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-xl lg:col-span-6">
                 <div className="flex items-center gap-2.5 bg-gradient-to-r from-[#2563EB] to-[#4d84f5] px-7 py-3.5">
                   <FileText className="h-5 w-5 text-white" />
                   <p className="text-sm font-bold uppercase tracking-wide text-white">
@@ -167,7 +167,7 @@ export default function AboutPage() {
                     A focused workspace that turns incidents, events, and community updates into
                     professional communications quickly and confidently.
                   </p>
-                  <ul className="mt-5 grid gap-2.5 sm:grid-cols-2">
+                  <ul className="mt-5 space-y-2.5">
                     {PRESS_CENTER_POINTS.map((point) => (
                       <li key={point} className="flex items-start gap-2 text-sm text-[#42536e]">
                         <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#2563EB]" />
@@ -178,7 +178,7 @@ export default function AboutPage() {
                 </div>
               </div>
 
-              <div className="flex flex-col overflow-hidden rounded-2xl border border-[#E2E8F5] bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-xl lg:col-span-5">
+              <div className="flex flex-col overflow-hidden rounded-2xl border border-[#E2E8F5] bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-xl lg:col-span-6">
                 <div className="flex items-center gap-2.5 bg-gradient-to-r from-[#1470AF] to-[#3b8ec9] px-7 py-3.5">
                   <Images className="h-5 w-5 text-white" />
                   <p className="text-sm font-bold uppercase tracking-wide text-white">

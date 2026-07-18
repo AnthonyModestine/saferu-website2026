@@ -1,12 +1,10 @@
 import type { ExternalOpportunityInput } from "./types"
-
-type ZipLocation = {
-  zip: string
-  city?: string
-  state?: string
-  latitude: number
-  longitude: number
-}
+import { scanFederalHazards } from "./federal-scanner"
+import { scanNationalSafetyAlerts } from "./national-alerts-scanner"
+import {
+  resolveServiceAreaLocations,
+  type ServiceAreaLocation,
+} from "./geo-utils"
 
 type NwsPeriod = {
   name?: string
@@ -72,26 +70,6 @@ async function fetchJson<T>(url: string): Promise<T | null> {
   }
 }
 
-async function resolveZip(zip: string): Promise<ZipLocation | null> {
-  const data = await fetchJson<{
-    places?: Array<{
-      "place name"?: string
-      "state abbreviation"?: string
-      latitude?: string
-      longitude?: string
-    }>
-  }>(`https://api.zippopotam.us/us/${encodeURIComponent(zip)}`)
-  const place = data?.places?.[0]
-  if (!place?.latitude || !place.longitude) return null
-  return {
-    zip,
-    city: place["place name"],
-    state: place["state abbreviation"],
-    latitude: Number(place.latitude),
-    longitude: Number(place.longitude),
-  }
-}
-
 function heatSignals(maxTemp: number, forecastText: string): string[] {
   const signals = ["extreme_heat", "heat_illness", "hot_vehicle"]
   if (/humid|heat index/i.test(forecastText)) signals.push("hydration")
@@ -99,7 +77,7 @@ function heatSignals(maxTemp: number, forecastText: string): string[] {
 }
 
 function buildHeatOpportunity(
-  zip: string,
+  locationKey: string,
   locationLabel: string,
   hotPeriods: NwsPeriod[]
 ): ExternalOpportunityInput | null {
@@ -116,7 +94,7 @@ function buildHeatOpportunity(
     .join(" ")
 
   return {
-    id: `weather-heat-${zip}`,
+    id: `weather-heat-${locationKey}`,
     title: `High heat expected ${dayText}`,
     summary: `Forecast highs near ${maxTemp} degrees are expected in ${locationLabel}.`,
     category: "extreme_heat",
@@ -150,7 +128,7 @@ function buildHeatOpportunity(
 
 function buildWeatherAlertOpportunity(
   alert: NwsAlertFeature,
-  zip: string
+  locationKey: string
 ): ExternalOpportunityInput | null {
   const props = alert.properties
   const event = props?.event?.trim()
@@ -172,7 +150,7 @@ function buildWeatherAlertOpportunity(
 
   const priority = /warning|tornado|flash flood/i.test(event) ? "urgent" : "recommended_today"
   return {
-    id: `weather-alert-${zip}-${eventLower.replace(/[^a-z0-9]+/g, "-")}`,
+    id: `weather-alert-${locationKey}-${eventLower.replace(/[^a-z0-9]+/g, "-")}`,
     title: event,
     summary: props?.headline || `${event} is active for part of the service area.`,
     category: severeSignals[0] ?? "weather",
@@ -198,9 +176,13 @@ function buildWeatherAlertOpportunity(
   }
 }
 
-async function scanWeatherForZip(zip: string): Promise<ExternalOpportunityInput[]> {
-  const location = await resolveZip(zip)
-  if (!location) return []
+async function scanWeatherForLocation(
+  location: ServiceAreaLocation
+): Promise<ExternalOpportunityInput[]> {
+  const locationKey =
+    location.zip ||
+    [location.city, location.county, location.state].filter(Boolean).join("-").toLowerCase().replace(/[^a-z0-9]+/g, "-") ||
+    `${location.latitude.toFixed(2)}-${location.longitude.toFixed(2)}`
 
   const point = await fetchJson<{
     properties?: {
@@ -223,14 +205,14 @@ async function scanWeatherForZip(zip: string): Promise<ExternalOpportunityInput[
     (p) => p.temperatureUnit === "F" && typeof p.temperature === "number" && p.temperature >= 95
   )
 
-  const locationLabel = [location.city, location.state].filter(Boolean).join(", ") || `ZIP ${zip}`
-  const heat = buildHeatOpportunity(zip, locationLabel, hotPeriods)
+  const locationLabel = location.label
+  const heat = buildHeatOpportunity(locationKey, locationLabel, hotPeriods)
 
   const alerts = await fetchJson<{ features?: NwsAlertFeature[] }>(
     `https://api.weather.gov/alerts/active?point=${location.latitude},${location.longitude}`
   )
   const alertOpps = (alerts?.features ?? [])
-    .map((feature) => buildWeatherAlertOpportunity(feature, zip))
+    .map((feature) => buildWeatherAlertOpportunity(feature, locationKey))
     .filter((opp): opp is ExternalOpportunityInput => Boolean(opp))
     .slice(0, 3)
 
@@ -291,19 +273,39 @@ function roadImpactToOpportunity(impact: RoadImpactInput): ExternalOpportunityIn
 }
 
 export async function scanExternalOpportunities({
-  serviceZips,
+  serviceZips = [],
   roadImpacts = [],
+  state = "",
+  city = "",
+  county = "",
+  serviceAreaType,
 }: {
-  serviceZips: string[]
+  serviceZips?: string[]
   roadImpacts?: RoadImpactInput[]
+  state?: string
+  city?: string
+  county?: string
+  serviceAreaType?: string
 }): Promise<ExternalOpportunityInput[]> {
-  const uniqueZips = [...new Set(serviceZips)].slice(0, 3)
-  const weatherResults = await Promise.all(uniqueZips.map((zip) => scanWeatherForZip(zip)))
+  const locations = await resolveServiceAreaLocations({
+    serviceAreaType,
+    city,
+    county,
+    state,
+    serviceZips,
+  })
+  const [weatherResults, federal, national] = await Promise.all([
+    Promise.all(locations.map((location) => scanWeatherForLocation(location))),
+    scanFederalHazards({ serviceAreaType, city, county, state, serviceZips }),
+    state
+      ? scanNationalSafetyAlerts({ serviceAreaType, city, county, state, serviceZips })
+      : Promise.resolve([]),
+  ])
   const weather = weatherResults.flat()
   const roads = roadImpacts.map(roadImpactToOpportunity)
 
   const seen = new Set<string>()
-  return [...weather, ...roads].filter((opp) => {
+  return [...weather, ...federal, ...national, ...roads].filter((opp) => {
     const key = `${opp.category}:${opp.title}`.toLowerCase()
     if (seen.has(key)) return false
     seen.add(key)

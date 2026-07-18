@@ -20,6 +20,12 @@ export type AgencyType =
   | "fire"
   | "ems"
   | "emergency_management"
+  | "public_works"
+  | "parks_recreation"
+  | "utilities"
+  | "animal_services"
+  | "health_department"
+  | "local_government"
   | "municipality"
   | "other"
 

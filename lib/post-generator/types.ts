@@ -9,6 +9,16 @@ export type OpportunityPriority =
   | "plan_ahead"
   | "optional"
 
+/**
+ * Visible recommendation strength for the briefing UI.
+ * `uncertain` is retained for cached-data compatibility but the current engine
+ * only returns top_recommended / could_post (internal 4–5 stars).
+ */
+export type RecommendationTier =
+  | "top_recommended"
+  | "could_post"
+  | "uncertain"
+
 export type OpportunityStatus =
   | "new"
   | "viewed"
@@ -21,6 +31,7 @@ export type OpportunityStatus =
 export type SourceLabel =
   | "Current Local Opportunity"
   | "Weather Alert"
+  | "Weather Analysis"
   | "Upcoming Event"
   | "SaferU Curated Content"
   | "Seasonal Recommendation"
@@ -72,11 +83,17 @@ export interface PostOpportunity {
   category: string
   sourceLabel: SourceLabel
   whyItMatters: string
+  /** AI-written explanation of why this was surfaced now for this agency/community. */
+  surfacedReason?: string
   recommendedAction: string
   recommendedPostTiming: string
   opportunitySource: OpportunitySource
   priority: OpportunityPriority
   status: OpportunityStatus
+  /** How strongly we recommend posting this. */
+  recommendationTier?: RecommendationTier
+  /** own = home community; nearby = neighboring town; regional = broader area. */
+  jurisdictionFit?: "own" | "nearby" | "regional" | "unknown"
 
   eventStart?: string
   eventEnd?: string
@@ -129,6 +146,8 @@ export interface GeneratorRequest {
   agencyType?: string
   agencyTypeOther?: string
   city?: string
+  /** County-wide service area, primarily used by sheriff's offices. */
+  county?: string
   state: string
   serviceZips: string[]
   todayIso?: string
@@ -144,10 +163,27 @@ export interface GeneratorRequest {
   dailyLimit?: number
 }
 
+/** Recent content created inside SaferU, supplied for preventative follow-up analysis. */
+export interface RecentAgencyContent {
+  id: string
+  kind: "press_release" | "video_request" | "event_campaign"
+  title: string
+  content: string
+  createdAt: string
+  eventDate?: string
+  agencyRole?: string
+}
+
 export interface GeneratorResult {
   urgent: PostOpportunity[]
   recommendedToday: PostOpportunity[]
   planAhead: PostOpportunity[]
+  /** Strong fits — post these first. */
+  topRecommended: PostOpportunity[]
+  /** Solid options that may still be useful. */
+  couldPost: PostOpportunity[]
+  /** Found, but weaker fit / neighboring / lower confidence. */
+  uncertain: PostOpportunity[]
   fromSaferU: PostOpportunity[]
   emptyState: boolean
   demo: boolean
@@ -161,6 +197,7 @@ export interface ExternalOpportunityInput {
   category: string
   sourceLabel: SourceLabel
   whyItMatters: string
+  surfacedReason?: string
   recommendedAction: string
   recommendedPostTiming: string
   priority: OpportunityPriority
@@ -182,6 +219,8 @@ export interface ExternalOpportunityInput {
   confidenceLevel?: ConfidenceLevel
   /** Optional distance hint in miles when known (lower = closer = higher score). */
   distanceMiles?: number
+  recommendationTier?: RecommendationTier
+  jurisdictionFit?: "own" | "nearby" | "regional" | "unknown"
   /** Server-side internal score; never display in UI. */
   internalScores?: OpportunityInternalScores
 }

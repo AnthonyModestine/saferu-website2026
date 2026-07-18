@@ -3,41 +3,41 @@ import { Mail } from "lucide-react"
 
 export function Footer() {
   return (
-    <footer className="bg-[#1a365d]">
+    <footer className="border-t border-[#E2E8F5] bg-[#F0F4F8]">
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="flex flex-col items-center justify-between gap-6 md:flex-row">
           <nav className="flex flex-wrap items-center justify-center gap-2 text-sm">
             <Link
               href="/about"
-              className="text-[#a0c4e8] transition-colors hover:text-white px-3 py-1"
+              className="px-3 py-1 font-medium text-[#1A365D] transition-colors hover:text-[#1470AF]"
             >
               About Us
             </Link>
-            <span className="text-[#4a5568]">|</span>
+            <span className="text-[#C3D0E0]">|</span>
             <Link
               href="/privacy"
-              className="text-[#a0c4e8] transition-colors hover:text-white px-3 py-1"
+              className="px-3 py-1 font-medium text-[#1A365D] transition-colors hover:text-[#1470AF]"
             >
               Privacy Policy
             </Link>
-            <span className="text-[#4a5568]">|</span>
+            <span className="text-[#C3D0E0]">|</span>
             <Link
               href="/terms"
-              className="text-[#a0c4e8] transition-colors hover:text-white px-3 py-1"
+              className="px-3 py-1 font-medium text-[#1A365D] transition-colors hover:text-[#1470AF]"
             >
               Terms of Service
             </Link>
-            <span className="text-[#4a5568]">|</span>
+            <span className="text-[#C3D0E0]">|</span>
             <Link
               href="/contact"
-              className="text-[#a0c4e8] transition-colors hover:text-white px-3 py-1"
+              className="px-3 py-1 font-medium text-[#1A365D] transition-colors hover:text-[#1470AF]"
             >
               Contact Us
             </Link>
-            <span className="text-[#4a5568]">|</span>
+            <span className="text-[#C3D0E0]">|</span>
             <Link
               href="/pricing"
-              className="text-[#a0c4e8] transition-colors hover:text-white px-3 py-1"
+              className="px-3 py-1 font-medium text-[#1A365D] transition-colors hover:text-[#1470AF]"
             >
               Pricing
             </Link>
@@ -46,7 +46,7 @@ export function Footer() {
           <div className="flex items-center gap-4">
             <Link
               href="mailto:support@saferu.com"
-              className="flex items-center gap-2 text-[#a0c4e8] transition-colors hover:text-white"
+              className="flex items-center gap-2 text-[#42536e] transition-colors hover:text-[#1A365D]"
               aria-label="Email SaferU"
             >
               <Mail className="h-5 w-5" />
@@ -55,11 +55,11 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="mt-6 border-t border-[#2d4a6f] pt-6 text-center">
-          <p className="text-sm text-[#a0c4e8]">
+        <div className="mt-6 border-t border-[#E2E8F5] pt-6 text-center">
+          <p className="text-sm text-[#42536e]">
             Clear communication. Trusted by public safety.
           </p>
-          <p className="text-xs text-[#4a5568] mt-1">
+          <p className="mt-1 text-xs text-[#5c6b85]">
             &copy; {new Date().getFullYear()} SaferU | All rights reserved.
           </p>
         </div>

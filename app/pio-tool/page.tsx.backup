@@ -30,6 +30,7 @@ import {
   type PioEvent,
 } from "@/lib/pio-events-store"
 import { generatePostOpportunities, flattenOpportunities } from "@/lib/post-generator/engine"
+import { OpportunityPreviewLink } from "@/components/pio/opportunity-card"
 
 const MONTHLY_PRODUCT = "pio-tool-monthly"
 
@@ -101,7 +102,7 @@ const DEMO_POSTS = [
   {
     id: "dp2",
     time: "11:30 AM",
-    preview: "Free smoke alarms May 26 at the Community Center — stop by Station crews for install help.",
+    preview: "Free smoke alarms this Saturday at the Community Center — stop by Station crews for install help.",
     tag: "Smoke Alarm Day",
     tone: "orange" as const,
   },
@@ -113,25 +114,6 @@ const DEMO_POSTS = [
     tone: "green" as const,
   },
 ]
-
-/** Guest preview: area recommendations that match the demo events and posts below. */
-const DEMO_AREA_IDEAS = [
-  {
-    id: "demo-idea-nno",
-    title: "National Night Out",
-    whyItMatters: "Your event is coming up — share tonight’s reminder so families know where to go.",
-  },
-  {
-    id: "demo-idea-smoke",
-    title: "Smoke Alarm Install Day",
-    whyItMatters: "Promote the May 26 free installs at the Community Center before residents plan their weekend.",
-  },
-  {
-    id: "demo-idea-coffee",
-    title: "Coffee with the Chief",
-    whyItMatters: "Invite residents to Station 1 this week — a simple community post builds trust.",
-  },
-] as const
 
 function greetingForNow(name: string | null | undefined): string {
   const hour = new Date().getHours()
@@ -183,7 +165,6 @@ export default function PIODashboardPage() {
   // localStorage / Date are client-only — keep SSR + first paint identical
   const [hasMounted, setHasMounted] = useState(false)
   const [greeting, setGreeting] = useState("Welcome!")
-  const [dateLabel, setDateLabel] = useState("")
 
   useEffect(() => {
     if (!isSubscribed) return
@@ -197,22 +178,13 @@ export default function PIODashboardPage() {
 
   useEffect(() => {
     setHasMounted(true)
-    setUpcomingEvents(getUpcomingPioEvents().slice(0, 4))
+    setUpcomingEvents(getUpcomingPioEvents().slice(0, 5))
   }, [])
 
   useEffect(() => {
     if (!hasMounted) return
-    if (!member) {
-      setGreeting("Welcome to Press Center")
-    } else {
-      setGreeting(greetingForNow(member.name))
-    }
-    setDateLabel(
-      new Date()
-        .toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
-        .toUpperCase()
-    )
-  }, [hasMounted, member])
+    setGreeting(greetingForNow(member?.name))
+  }, [hasMounted, member?.name])
 
   const scheduledPosts = useMemo(() => {
     if (!hasMounted) return []
@@ -282,12 +254,9 @@ export default function PIODashboardPage() {
   }
 
   const ideaPreview = useMemo(() => {
-    // Guests see curated demo ideas that match Upcoming Events / Posts to Share
-    if (!member) return [...DEMO_AREA_IDEAS]
-
-    const state = settings.state?.trim() || ""
-    const city = settings.city || ""
-    const county = settings.county?.trim() || ""
+    const state = settings.state?.trim() || (member ? "" : "TX")
+    const city = settings.city || (member ? "" : "San Saba")
+    const county = settings.county?.trim() || (member ? "" : "San Saba County")
     const areaReady =
       Boolean(state) &&
       (settings.serviceAreaType === "state" ||
@@ -313,60 +282,25 @@ export default function PIODashboardPage() {
     member,
   ])
 
-  const briefingStats = useMemo(() => {
-    if (!member) {
-      return {
-        postsToday: DEMO_POSTS.length,
-        eventsSoon: 2,
-        ideas: DEMO_AREA_IDEAS.length,
-      }
-    }
-    const postsToday = hasMounted
-      ? getScheduledEventPosts({ from: todayIso(), to: todayIso() }).length
-      : 0
-    const eventsSoon = upcomingEvents.filter((e) => daysUntil(e.eventDate) <= 14).length
-    return { postsToday, eventsSoon, ideas: ideaPreview.length }
-  }, [member, hasMounted, upcomingEvents, ideaPreview])
-
-  const briefingSummary = useMemo(() => {
-    if (!member) {
-      return "A sample agency day — recommendations, events, and posts that stay in sync."
-    }
-    const parts: string[] = []
-    if (briefingStats.postsToday > 0)
-      parts.push(
-        `${briefingStats.postsToday} ${briefingStats.postsToday === 1 ? "post" : "posts"} ready to share`
-      )
-    if (briefingStats.eventsSoon > 0)
-      parts.push(
-        `${briefingStats.eventsSoon} ${briefingStats.eventsSoon === 1 ? "event" : "events"} coming up`
-      )
-    if (briefingStats.ideas > 0)
-      parts.push(
-        `${briefingStats.ideas} ${briefingStats.ideas === 1 ? "recommendation" : "recommendations"} for your area`
-      )
-    if (parts.length === 0) return "You're all caught up — let's keep our community informed and safe."
-    return `Here's your day: ${parts.join(", ")}.`
-  }, [briefingStats, member])
-
   const ideasLocationLabel = useMemo(() => {
-    if (!member) return "Montgomery County, PA"
     const state = settings.state?.trim()
-    if (!state) return null
-    if (settings.serviceAreaType === "state") return state
+    if (!state && member) return null
+    if (settings.serviceAreaType === "state") return state || (!member ? "TX" : null)
     if (settings.serviceAreaType === "county") {
       const county = settings.county?.trim()
       if (county && state) return `${county}, ${state}`
+      if (!member) return "Montgomery County, PA"
       return null
     }
     const city = settings.city?.trim()
     const county = settings.county?.trim()
     if (city && county && state) return `${city}, ${county}, ${state}`
+    if (!member) return "San Saba, San Saba County, TX"
     return null
   }, [settings.city, settings.county, settings.state, settings.serviceAreaType, member])
 
   return (
-    <div className="mx-auto max-w-[1120px] space-y-5 pb-8">
+    <div className="mx-auto max-w-[1120px] space-y-7 pb-8">
       {!loading && !isSubscribed && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#cfc3ff] bg-gradient-to-r from-[#f3eeff] to-[#eaf2ff] px-4 py-3">
           <p className="text-sm font-medium text-[#3d2d7a]">
@@ -396,108 +330,39 @@ export default function PIODashboardPage() {
         </div>
       )}
 
-      {/* Daily briefing hero */}
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0B1B3A] via-[#12275c] to-[#3b1d80] p-5 text-white shadow-lg sm:p-6">
-        <div className="pointer-events-none absolute inset-0" aria-hidden="true">
-          <div className="absolute -right-24 -top-32 h-[340px] w-[340px] rounded-full bg-[#7C5CFC]/25 blur-[100px]" />
-          <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff06_1px,transparent_1px),linear-gradient(to_bottom,#ffffff06_1px,transparent_1px)] bg-[size:3rem_3rem]" />
+      {/* Header */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-[#0f1c3f] sm:text-[2.05rem]">
+            {greeting}
+          </h1>
+          <p className="mt-1.5 text-[15px] text-[#667795]">
+            Let&apos;s keep our community informed and safe.
+          </p>
         </div>
-
-        <div className="relative">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              {dateLabel && (
-                <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#93C5FD]">
-                  {member ? `${dateLabel} · DAILY BRIEFING` : `${dateLabel} · LIVE PREVIEW`}
-                </p>
-              )}
-              <h1 className="mt-1.5 text-2xl font-bold tracking-tight sm:text-[1.7rem]">
-                {greeting}
-              </h1>
-              <p className="mt-1 text-sm text-[#BFDBFE]">
-                {briefingSummary}
-              </p>
-            </div>
-            <div className="flex items-center gap-2.5">
-              {member ? (
-                <div className="hidden items-center gap-2 rounded-full border border-white/15 bg-white/10 py-1 pl-1 pr-3 sm:flex">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#7c5cfc] to-[#4f8cff] text-[11px] font-bold text-white">
-                    {initials}
-                  </div>
-                  <div className="leading-tight">
-                    <p className="text-xs font-semibold text-white">{displayName}</p>
-                    <p className="text-[10px] text-[#a9bbdd]">PIO Admin</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  <Button asChild variant="outline" size="sm" className="border-white/25 bg-white/10 text-white hover:bg-white/20 hover:text-white">
-                    <Link href={pressCenterSignInUrl()}>Sign in</Link>
-                  </Button>
-                  <Button asChild size="sm" className="bg-[#F2B233] text-[#0f1c3f] hover:bg-[#ffc44d]">
-                    <Link href={pressCenterSignUpUrl()}>Create account</Link>
-                  </Button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Briefing stats */}
-          <div className="mt-4 grid gap-2.5 sm:grid-cols-3">
-            <a href="#posts-to-share" className="group flex items-baseline gap-2.5 rounded-xl border border-white/10 bg-white/[0.07] px-4 py-3 transition-colors hover:bg-white/[0.12]">
-              <span className="text-2xl font-bold">{briefingStats.postsToday}</span>
-              <span className="text-sm font-semibold text-[#BFDBFE]">
-                {briefingStats.postsToday === 1 ? "post ready to share today" : "posts ready to share today"}
-              </span>
-            </a>
-            <a href="#upcoming-events" className="group flex items-baseline gap-2.5 rounded-xl border border-white/10 bg-white/[0.07] px-4 py-3 transition-colors hover:bg-white/[0.12]">
-              <span className="text-2xl font-bold">{briefingStats.eventsSoon}</span>
-              <span className="text-sm font-semibold text-[#BFDBFE]">
-                {briefingStats.eventsSoon === 1 ? "event in the next 2 weeks" : "events in the next 2 weeks"}
-              </span>
-            </a>
-            <div className="flex items-baseline gap-2.5 rounded-xl border border-[#F2B233]/40 bg-[#F2B233]/10 px-4 py-3">
-              <span className="text-2xl font-bold text-[#F2B233]">{briefingStats.ideas}</span>
-              <span className="text-sm font-semibold text-[#ffe3a8]">
-                {briefingStats.ideas === 1 ? "AI recommendation for your area" : "AI recommendations for your area"}
-              </span>
-            </div>
-          </div>
-
-          {/* Today's recommendations inside the briefing */}
-          <div className="mt-4 border-t border-white/10 pt-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-2">
-                <Sparkles className="h-4 w-4 shrink-0 text-[#F2B233]" />
-                <p className="text-sm font-bold uppercase tracking-[0.14em] text-[#93C5FD]">
-                  Today for your area
-                </p>
-                {ideasLocationLabel ? (
-                  <span className="truncate text-sm text-[#8fa5c7]">· {ideasLocationLabel}</span>
-                ) : (
-                  <span className="truncate text-sm text-[#8fa5c7]">
-                    · Set your service area in Settings
-                  </span>
-                )}
+        <div className="flex items-center gap-2.5">
+          {member ? (
+            <div className="hidden items-center gap-2 rounded-full border border-[#dde5f5] bg-white py-1 pl-1 pr-3 shadow-sm sm:flex">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#7c5cfc] to-[#4f8cff] text-[11px] font-bold text-white">
+                {initials}
               </div>
-              {member ? (
-                <Button asChild size="sm" className="bg-white text-[#0f1c3f] hover:bg-[#E0E7FF]">
-                  <Link href={createHref("/pio-tool/ideas")}>
-                    {briefingStats.ideas > 0
-                      ? `See ${briefingStats.ideas} ${briefingStats.ideas === 1 ? "recommendation" : "recommendations"}`
-                      : "Open generator"}
-                    <ChevronRight className="ml-1 h-4 w-4" />
-                  </Link>
-                </Button>
-              ) : (
-                <Button asChild size="sm" className="bg-white text-[#0f1c3f] hover:bg-[#E0E7FF]">
-                  <Link href={pressCenterSignInUrl()}>Sign in to view</Link>
-                </Button>
-              )}
+              <div className="leading-tight">
+                <p className="text-xs font-semibold text-[#0f1c3f]">{displayName}</p>
+                <p className="text-[10px] text-[#7a8ab0]">PIO Admin</p>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              <Button asChild variant="outline" size="sm" className="border-[#d5def0] bg-white">
+                <Link href={pressCenterSignInUrl()}>Sign in</Link>
+              </Button>
+              <Button asChild size="sm" className="bg-[#2563EB] hover:bg-[#1d4ed8]">
+                <Link href={pressCenterSignUpUrl()}>Create account</Link>
+              </Button>
+            </div>
+          )}
         </div>
-      </section>
+      </div>
 
       {isOutOfGenerations && (
         <div className="rounded-2xl border border-[#f2d48a] bg-[#fff8e8] p-4">
@@ -519,78 +384,137 @@ export default function PIODashboardPage() {
         </div>
       )}
 
-      {/* Quick create is available after sign-in */}
-      {member && <section className="space-y-2">
-        <h2 className="text-xs font-bold uppercase tracking-wider text-[#667795]">Quick create</h2>
-        <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
-          <QuickCreateTile
+      {/* Create New — always visible */}
+      <section className="space-y-3">
+        <h2 className="text-lg font-bold text-[#0f1c3f]">Create New</h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <CreateCard
             href={createHref("/pio-tool/new")}
             title="Press Release"
+            description="Incidents, announcements, and community updates."
             icon={FileText}
             iconBg="bg-[#3B82F6]"
+            cardBg="bg-[#EFF6FF]"
+            arrowColor="text-[#3B82F6]"
           />
-          <QuickCreateTile
+          <CreateCard
             href={createHref("/pio-tool/community-post")}
             title="Video Request"
+            description="Ask the public for surveillance or dashcam footage."
             icon={Video}
             iconBg="bg-[#7C5CFC]"
+            cardBg="bg-[#F3EEFF]"
+            arrowColor="text-[#7C5CFC]"
           />
-          <QuickCreateTile
+          <CreateCard
             href={createHref("/pio-tool/events?new=1")}
             title="Community Event"
+            description="Promote events you host or support."
             icon={CalendarDays}
             iconBg="bg-[#10B981]"
+            cardBg="bg-[#ECFDF5]"
+            arrowColor="text-[#10B981]"
           />
-          <QuickCreateTile
+          <CreateCard
             href={createHref("/pio-tool/ideas")}
             title="AI Post Generator"
+            description="What to communicate today — with SaferU graphics."
             icon={Sparkles}
             iconBg="bg-[#F59E0B]"
+            cardBg="bg-[#FFFBEB]"
+            arrowColor="text-[#D97706]"
           />
         </div>
-      </section>}
+      </section>
+
+      {/* Local Ideas strip — same layout rhythm, adds energy */}
+      <section className="overflow-hidden rounded-2xl border border-[#e2e8f5] bg-gradient-to-r from-[#0B1B3A] via-[#1e3a8a] to-[#4c1d95] p-5 text-white shadow-md">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#93C5FD]">
+              Today for your area
+            </p>
+            <h2 className="mt-1 text-lg font-bold">AI Post Generator</h2>
+            <p className="mt-1 text-sm text-[#BFDBFE]">
+              {ideasLocationLabel ||
+                "Add your service area in Settings so recommendations match the communities you serve."}
+            </p>
+          </div>
+          <Button
+            asChild
+            size="sm"
+            className="bg-white text-[#0f1c3f] hover:bg-[#E0E7FF]"
+          >
+            <Link href={createHref("/pio-tool/ideas")}>
+              Open generator
+              <ChevronRight className="ml-1 h-4 w-4" />
+            </Link>
+          </Button>
+        </div>
+        {ideaPreview.length > 0 ? (
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            {ideaPreview.map((opp) => (
+              <OpportunityPreviewLink
+                key={opp.id}
+                opp={opp}
+                href={createHref("/pio-tool/ideas")}
+              />
+            ))}
+          </div>
+        ) : (
+          <p className="mt-4 text-sm text-[#BFDBFE]">
+            Set your service area in Settings — then see what your agency should communicate today,
+            with SaferU messages and graphics when available.
+          </p>
+        )}
+      </section>
 
       {/* Upcoming Events + Posts to Share — always visible */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div id="upcoming-events" className="scroll-mt-24">
-          <UpcomingEventsPanel events={upcomingEvents} forceDemo={!member} />
-        </div>
-        <div id="posts-to-share" className="scroll-mt-24">
-          <PostsToSharePanel
-            tab={postTab}
-            onTabChange={setPostTab}
-            posts={scheduledPosts}
-            forceDemo={!member}
-          />
-        </div>
+      <div className="grid gap-5 lg:grid-cols-2">
+        <UpcomingEventsPanel events={upcomingEvents} forceDemo={!member} />
+        <PostsToSharePanel
+          tab={postTab}
+          onTabChange={setPostTab}
+          posts={scheduledPosts}
+          forceDemo={!member}
+        />
       </div>
     </div>
   )
 }
 
-function QuickCreateTile({
+function CreateCard({
   href,
   title,
+  description,
   icon: Icon,
   iconBg,
+  cardBg,
+  arrowColor,
 }: {
   href: string
   title: string
+  description: string
   icon: React.ComponentType<{ className?: string }>
   iconBg: string
+  cardBg: string
+  arrowColor: string
 }) {
   return (
     <Link
       href={href}
-      className="group flex items-center gap-3 rounded-xl border border-[#e2e8f5] bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+      className={`group relative flex min-h-[148px] flex-col rounded-2xl ${cardBg} p-5 shadow-sm ring-1 ring-black/[0.04] transition hover:-translate-y-0.5 hover:shadow-md`}
     >
       <div
-        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${iconBg} text-white shadow-md`}
+        className={`mb-4 flex h-11 w-11 items-center justify-center rounded-xl ${iconBg} text-white shadow-md`}
       >
         <Icon className="h-5 w-5" />
       </div>
-      <span className="flex-1 text-sm font-bold text-[#0f1c3f]">{title}</span>
-      <ChevronRight className="h-4 w-4 text-[#9aa8c3] transition group-hover:translate-x-0.5" />
+      <h3 className="text-base font-bold text-[#0f1c3f]">{title}</h3>
+      <p className="mt-1.5 flex-1 text-sm leading-relaxed text-[#5b6b8c]">{description}</p>
+      <ChevronRight
+        className={`mt-3 h-5 w-5 ${arrowColor} transition group-hover:translate-x-0.5`}
+      />
     </Link>
   )
 }
@@ -606,7 +530,6 @@ function UpcomingEventsPanel({
   const rows = useDemo
     ? [...DEMO_EVENTS]
         .sort((a, b) => a.daysAway - b.daysAway)
-        .slice(0, 4)
         .map((event) => ({
           id: event.id,
           month: event.month,

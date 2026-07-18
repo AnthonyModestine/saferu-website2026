@@ -27,7 +27,7 @@ const features = [
 
 export function PIOToolSection() {
   return (
-    <section className="relative bg-[#1a365d] py-20">
+    <section className="relative bg-[#0B1B3A] py-20">
       {/* Subtle pattern overlay */}
       <div className="absolute inset-0 opacity-10">
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff08_1px,transparent_1px),linear-gradient(to_bottom,#ffffff08_1px,transparent_1px)] bg-[size:3rem_3rem]" />

@@ -20,30 +20,11 @@ type ModelEvent = {
   signals?: string[]
 }
 
-type ResolvedZip = { zip: string; city: string; state: string }
-
-async function resolveZipLocations(zips: string[]): Promise<ResolvedZip[]> {
-  const results = await Promise.all(
-    zips.slice(0, 3).map(async (zip): Promise<ResolvedZip | null> => {
-      try {
-        const res = await fetch(`https://api.zippopotam.us/us/${encodeURIComponent(zip)}`, {
-          next: { revalidate: 24 * 60 * 60 },
-        })
-        if (!res.ok) return null
-        const data = (await res.json()) as {
-          places?: Array<{ "place name"?: string; "state abbreviation"?: string }>
-        }
-        const place = data.places?.[0]
-        const city = String(place?.["place name"] || "").trim()
-        const state = String(place?.["state abbreviation"] || "").trim()
-        return city ? { zip, city, state } : null
-      } catch {
-        return null
-      }
-    })
-  )
-  return results.filter((item): item is ResolvedZip => Boolean(item))
-}
+import {
+  buildSourceCatalogPrompt,
+  getDiscoverySearchHints,
+} from "./source-catalog"
+import { formatServiceAreaLabel, resolveServiceAreaLocations } from "./geo-utils"
 
 function safeUrl(value: unknown): string | undefined {
   const raw = String(value || "").trim()
@@ -67,7 +48,9 @@ function slug(value: string): string {
 export async function discoverLocalCurrentEventsWithAI(opts: {
   state: string
   city?: string
-  serviceZips: string[]
+  county?: string
+  serviceAreaType?: string
+  serviceZips?: string[]
   needed: number
   todayIso?: string
   agencyType?: string
@@ -78,11 +61,28 @@ export async function discoverLocalCurrentEventsWithAI(opts: {
   if (opts.needed <= 0) return { ok: true, data: [] }
 
   const today = opts.todayIso || new Date().toISOString().slice(0, 10)
-  const resolvedZips = await resolveZipLocations(opts.serviceZips)
-  const resolvedLabel = resolvedZips.length
-    ? resolvedZips.map((item) => `${item.zip} = ${item.city}, ${item.state}`).join("; ")
-    : `ZIP codes ${opts.serviceZips.join(", ")}, ${opts.state}`
-  const primaryCity = resolvedZips[0]?.city || opts.city
+  const locations = await resolveServiceAreaLocations({
+    serviceAreaType: opts.serviceAreaType,
+    city: opts.city,
+    county: opts.county,
+    state: opts.state,
+    serviceZips: opts.serviceZips,
+  })
+  const resolvedLabel = formatServiceAreaLabel(locations, {
+    city: opts.city,
+    county: opts.county,
+    state: opts.state,
+  })
+  const primaryCity = opts.city || locations[0]?.city
+
+  const countyFocus = opts.county?.trim()
+  const isSheriff = opts.agencyType === "sheriff"
+  const searchHints = getDiscoverySearchHints(opts.state, primaryCity, countyFocus || primaryCity)
+  const sourceCatalog = buildSourceCatalogPrompt({
+    state: opts.state,
+    city: primaryCity,
+    county: countyFocus || primaryCity,
+  })
 
   try {
     const { default: OpenAI } = await import("openai")
@@ -90,7 +90,7 @@ export async function discoverLocalCurrentEventsWithAI(opts: {
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini-search-preview",
       web_search_options: {
-        search_context_size: "medium",
+        search_context_size: "high",
         user_location: {
           type: "approximate",
           approximate: {
@@ -109,24 +109,37 @@ Return ONLY valid JSON:
 {"events":[{"title":"","summary":"","whyItMatters":"","recommendedAction":"","recommendedPostTiming":"","category":"","eventDate":"YYYY-MM-DD","location":"","sourceName":"","sourceUrl":"https://...","verifiedFacts":[""],"publicCallToAction":[""],"signals":["snake_case"]}]}
 
 Rules:
-- Find only real, verifiable events or civic developments relevant to residents near the supplied ZIP codes.
+- Find only real, verifiable PUBLIC SAFETY / CIVIC UPDATES relevant to residents in the configured service area — not community festivals or entertainment events.
+- Prefer: weather impacts, road/traffic disruptions, utility outages, boil-water notices, school delays/closures, air quality, wildfire/smoke, health advisories, official missing-person campaigns, emergency management notices.
+- Do NOT recommend community events, festivals, open houses, fairs, concerts, or "save the date" activities unless the cited source clearly shows THIS agency type (${opts.agencyType || "public safety"}) is hosting or officially participating.
 - Prefer opportunities this agency type would realistically communicate (${opts.agencyType || "public safety"}).
-- Results must be in the resolved ZIP city/county, an immediately adjacent community, or explicitly serve residents of that ZIP. Being elsewhere in the same state is not local enough.
-- Prefer official municipal, county, police, fire, emergency management, school, library, parks, transit, road, utility, or established local-news sources.
-- Events must be happening today or within the next 3 days (occasionally up to 7 days for major community events residents can still act on).
-- Every event MUST include a working source URL that directly supports its facts.
-- Do not include rumors, crime incidents involving private victims, opinion pieces, generic seasonal advice, evergreen safety tips, or events outside the area.
+- Geographic scope: ${
+            isSheriff && countyFocus
+              ? `the full ${countyFocus} county jurisdiction. Search county-wide sources and communities throughout the county`
+              : "the configured city/county/state service area, an immediately adjacent community, or an area explicitly serving those residents"
+          }. Being elsewhere in the same state is not local enough.
+- Prefer official municipal, county, police, fire, emergency management, school, transit, road, utility, health department, or established local-news sources citing officials.
+- Updates must be happening today or within the next 3 days (occasionally up to 7 days for major disruptions residents can still act on).
+- Every item MUST include a working source URL that directly supports its facts.
+- Do not include rumors, crime incidents involving private victims, opinion pieces, generic seasonal advice, or evergreen safety tips.
 - Do not duplicate excluded titles.
 - Use only facts explicitly supported by the cited source.
-- If reliable results are unavailable, return fewer events rather than inventing anything.`,
+- If reliable results are unavailable, return fewer items rather than inventing anything.`,
         },
         {
           role: "user",
           content: `Today: ${today}
 Resolved service area: ${resolvedLabel}
+${countyFocus ? `County service area: ${countyFocus}${isSheriff ? " (PRIMARY jurisdiction for this sheriff's office)" : ""}` : ""}
 Agency type: ${opts.agencyType || "public safety"}
-Find up to ${Math.min(opts.needed, 4)} additional current local events.
-Exclude: ${(opts.excludeTitles ?? []).join("; ") || "none"}`,
+Find up to ${Math.min(opts.needed, 6)} additional current local public-safety updates (NOT unconfirmed community events).
+Exclude: ${(opts.excludeTitles ?? []).join("; ") || "none"}
+
+Authoritative source catalog:
+${sourceCatalog}
+
+Suggested searches:
+${searchHints.map((h) => `- ${h}`).join("\n")}`,
         },
       ],
     })
@@ -142,14 +155,16 @@ Exclude: ${(opts.excludeTitles ?? []).join("; ") || "none"}`,
     }
 
     const now = new Date(`${today}T00:00:00`).getTime()
+    const minDate = now - 3 * 24 * 60 * 60 * 1000
     const maxDate = now + 7 * 24 * 60 * 60 * 1000
     const opportunities: ExternalOpportunityInput[] = []
     for (const event of parsed.events) {
       const title = String(event.title || "").trim()
       const sourceUrl = safeUrl(event.sourceUrl)
-      const eventDate = String(event.eventDate || "").trim()
+      const eventDate = String(event.eventDate || today).trim() || today
       const eventTime = new Date(`${eventDate}T00:00:00`).getTime()
-      if (!title || !sourceUrl || Number.isNaN(eventTime) || eventTime < now || eventTime > maxDate) {
+      // Allow recent past dates for ongoing alerts (heat, outages, scams) — still reject stale items.
+      if (!title || !sourceUrl || Number.isNaN(eventTime) || eventTime < minDate || eventTime > maxDate) {
         continue
       }
 
@@ -170,31 +185,32 @@ Exclude: ${(opts.excludeTitles ?? []).join("; ") || "none"}`,
         id: `ai-local-${eventDate}-${slug(title)}`,
         title,
         summary: String(event.summary || facts[0]).trim(),
-        category: String(event.category || "community_event").trim(),
-        sourceLabel: "Upcoming Event",
+        category: String(event.category || "community_update").trim(),
+        sourceLabel: "Current Local Opportunity",
         whyItMatters: String(
           event.whyItMatters ||
-            `${title} is a verified upcoming event relevant to residents in the service area.`
+            `${title} is a verified update relevant to residents in the service area.`
         ).trim(),
         recommendedAction: String(
           event.recommendedAction ||
-            "Share the verified date, location, and public participation details."
+            "Share the verified update in a calm community voice."
         ).trim(),
         recommendedPostTiming: String(
-          event.recommendedPostTiming || "Post today or schedule a reminder before the event."
+          event.recommendedPostTiming || "Post today while the update is still timely."
         ).trim(),
         priority: "recommended_today",
-        signals: signals.length ? signals : ["community_engagement", "local_event"],
-        sourceName: String(event.sourceName || "Local event source").trim(),
+        signals: signals.length ? signals : ["community_awareness"],
+        sourceName: String(event.sourceName || "Local civic source").trim(),
         sourceUrl,
         eventStart: eventDate,
         eventEnd: eventDate,
         verifiedFacts: facts,
         publicCallToAction: Array.isArray(event.publicCallToAction)
-          ? event.publicCallToAction.map(String).map((v) => v.trim()).filter(Boolean).slice(0, 3)
-          : ["Review the official source for details."],
+          ? event.publicCallToAction.map(String).map((v) => v.trim()).filter(Boolean).slice(0, 2)
+          : ["Follow official channels for the latest information."],
         doNotClaim: [
-          "Do not add dates, locations, costs, participants, or activities not stated in the cited source.",
+          "Do not add dates, locations, or details not stated in the cited source.",
+          "Do not promote an event as agency-hosted unless the source confirms agency involvement.",
         ],
         confidenceLevel: "medium",
       })

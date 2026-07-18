@@ -48,7 +48,87 @@ export const contentLibrary: Category[] = [
         title: "Home",
         description: "Home security and residential safety tips",
         icon: "Home",
-        articles: [],
+        articles: [
+          {
+            id: "everyday-home-security",
+            title: "Everyday Home Security",
+            description:
+              "Five practical, evergreen reminders that help residents make their homes less inviting to opportunistic theft.",
+            posts: [
+              {
+                id: "lock-doors-and-windows",
+                title: "Start With the Locks",
+                image: "/images/start-with-the-locks.png",
+                message:
+                  "A simple home-security habit starts at the door. Lock exterior doors and accessible windows whenever you leave, even for a short trip. Before bed, make a quick check part of your nightly routine. Small, consistent steps can reduce opportunities for theft.",
+                captions: {
+                  facebook:
+                    "A simple home-security habit starts at the door. Lock exterior doors and accessible windows whenever you leave, even for a short trip. Before bed, make a quick check part of your nightly routine. Small, consistent steps can reduce opportunities for theft.",
+                  instagram:
+                    "A simple home-security habit starts at the door. Lock exterior doors and accessible windows whenever you leave, even for a short trip. Before bed, make a quick check part of your nightly routine. Small, consistent steps can reduce opportunities for theft.",
+                  twitter:
+                    "Make locking exterior doors and accessible windows part of your routine whenever you leave and before bed. Small, consistent steps can reduce opportunities for theft.",
+                },
+              },
+              {
+                id: "use-exterior-lighting",
+                title: "Light the Way",
+                message:
+                  "Keep entrances, walkways, and the area around your garage well lit. Motion-activated or dusk-to-dawn lighting can improve visibility without requiring you to remember a switch. Trim landscaping that blocks a clear view of doors and windows.",
+                captions: {
+                  facebook:
+                    "Keep entrances, walkways, and the area around your garage well lit. Motion-activated or dusk-to-dawn lighting can improve visibility without requiring you to remember a switch. Trim landscaping that blocks a clear view of doors and windows.",
+                  instagram:
+                    "Keep entrances, walkways, and the area around your garage well lit. Motion-activated or dusk-to-dawn lighting can improve visibility without requiring you to remember a switch. Trim landscaping that blocks a clear view of doors and windows.",
+                  twitter:
+                    "Keep entrances, walkways, and garage areas well lit. Motion-activated or dusk-to-dawn lights improve visibility, while trimmed landscaping keeps doors and windows in view.",
+                },
+              },
+              {
+                id: "secure-the-garage",
+                title: "Remember the Garage",
+                message:
+                  "Close and lock the garage door, and secure the door that connects the garage to your home. Avoid leaving garage remotes in vehicles parked outside. If you will be away, consider disabling the opener and checking that any garage windows are locked.",
+                captions: {
+                  facebook:
+                    "Close and lock the garage door, and secure the door that connects the garage to your home. Avoid leaving garage remotes in vehicles parked outside. If you will be away, consider disabling the opener and checking that any garage windows are locked.",
+                  instagram:
+                    "Close and lock the garage door, and secure the door that connects the garage to your home. Avoid leaving garage remotes in vehicles parked outside. If you will be away, consider disabling the opener and checking that any garage windows are locked.",
+                  twitter:
+                    "Close and lock the garage, secure the door into your home, and avoid leaving garage remotes in vehicles parked outside. Check garage windows before traveling.",
+                },
+              },
+              {
+                id: "plan-for-deliveries",
+                title: "Plan for Package Deliveries",
+                message:
+                  "When possible, schedule deliveries for a time someone will be home or use a secure delivery location. Turn on delivery notifications so packages are not left outside longer than necessary. Ask a trusted neighbor to collect a package if your plans change.",
+                captions: {
+                  facebook:
+                    "When possible, schedule deliveries for a time someone will be home or use a secure delivery location. Turn on delivery notifications so packages are not left outside longer than necessary. Ask a trusted neighbor to collect a package if your plans change.",
+                  instagram:
+                    "When possible, schedule deliveries for a time someone will be home or use a secure delivery location. Turn on delivery notifications so packages are not left outside longer than necessary. Ask a trusted neighbor to collect a package if your plans change.",
+                  twitter:
+                    "Use delivery notifications, schedule packages for when someone is home, or choose a secure pickup location. If plans change, ask a trusted neighbor to collect the delivery.",
+                },
+              },
+              {
+                id: "prepare-before-vacation",
+                title: "Prepare Before You Travel",
+                message:
+                  "Before a trip, pause mail and deliveries or ask someone you trust to collect them. Use timers for a few interior lights, avoid posting travel plans publicly, and arrange for a neighbor or friend to check the property. A lived-in appearance helps protect an empty home.",
+                captions: {
+                  facebook:
+                    "Before a trip, pause mail and deliveries or ask someone you trust to collect them. Use timers for a few interior lights, avoid posting travel plans publicly, and arrange for a neighbor or friend to check the property. A lived-in appearance helps protect an empty home.",
+                  instagram:
+                    "Before a trip, pause mail and deliveries or ask someone you trust to collect them. Use timers for a few interior lights, avoid posting travel plans publicly, and arrange for a neighbor or friend to check the property. A lived-in appearance helps protect an empty home.",
+                  twitter:
+                    "Before traveling, pause deliveries, use light timers, avoid posting plans publicly, and ask someone you trust to check the property. Help your home maintain a lived-in appearance.",
+                },
+              },
+            ],
+          },
+        ],
       },
       {
         id: "vehicle",

@@ -11,12 +11,13 @@ import { getPostMessage } from "@/lib/post-message"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
-import { ChevronRight, ArrowLeft, Download, ExternalLink, ShieldCheck, Flame, Star, CloudLightning, AlertTriangle, Users, Shield } from "lucide-react"
+import { ChevronRight, ArrowLeft, Download, ShieldCheck, Flame, Star, CloudLightning, AlertTriangle, Users, Shield, ImageIcon } from "lucide-react"
 import { PostMessageBlock } from "@/components/post-message-block"
 import { PostMediaPreview, PostMediaPlaceholder } from "@/components/post-media-preview"
 import { PostMediaLightbox } from "@/components/post-media-lightbox"
 import type { Article, Subcategory, Category } from "@/lib/data/content-library"
 import { isFlatCategory, getCategoryPublicPath } from "@/lib/category-layout"
+import { getCategoryAccent } from "@/lib/category-accents"
 import type { LucideIcon } from "lucide-react"
 
 const categoryIconMap: Record<string, LucideIcon> = {
@@ -86,18 +87,20 @@ export function ArticleDetailPage({
   category, 
   subcategory, 
   article, 
-  iconColor,
   isWhatsNew = false,
   flatArticles = false,
 }: ArticleDetailPageProps) {
   const pathname = usePathname()
   const CategoryIcon = categoryIconMap[category.id] || Shield
+  const accent = getCategoryAccent(category.id)
   const skipSubcategoryNav = isWhatsNew || flatArticles || isFlatCategory(category.id)
   const categoryHomeHref = isWhatsNew ? "/whats-new" : getCategoryPublicPath(category.id)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [copyErrorId, setCopyErrorId] = useState<string | null>(null)
   const [downloadingPostId, setDownloadingPostId] = useState<string | null>(null)
   const [lightbox, setLightbox] = useState<{ src: string; alt: string } | null>(null)
+
+  const posts = article.posts
 
   const copyToClipboard = async (text: string, id: string, postTitle?: string) => {
     setCopyErrorId(null)
@@ -118,40 +121,51 @@ export function ArticleDetailPage({
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#f8fafc]">
+    <div className="flex min-h-screen flex-col bg-[#F0F4F8]">
       <Header />
       <main className="flex-1">
         {/* Breadcrumb & Header */}
-        <section className="border-b border-border bg-white py-6">
-          <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+        <section className="border-b border-[#E2E8F5] bg-white py-8 sm:py-10">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             {/* Breadcrumb — What's New: no subcategory in path */}
-            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4 flex-wrap">
-              <Link href={categoryHomeHref} className="hover:text-foreground transition-colors">
+            <div className="mb-5 flex flex-wrap items-center gap-2 text-sm text-[#5c6b85]">
+              <Link href="/templates" className="transition-colors hover:text-[#1A365D]">
+                Content Library
+              </Link>
+              <ChevronRight className="h-4 w-4" />
+              <Link href={categoryHomeHref} className="transition-colors hover:text-[#1A365D]">
                 {category.title}
               </Link>
               {!skipSubcategoryNav && (
                 <>
                   <ChevronRight className="h-4 w-4" />
-                  <Link href={`/${category.id}/${subcategory.id}`} className="hover:text-foreground transition-colors">
+                  <Link href={`/${category.id}/${subcategory.id}`} className="transition-colors hover:text-[#1A365D]">
                     {subcategory.title}
                   </Link>
                 </>
               )}
               <ChevronRight className="h-4 w-4" />
-              <span className="text-foreground font-medium">{article.title}</span>
+              <span className="font-medium text-[#1A365D]">{article.title}</span>
             </div>
             
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-4">
-                <div className={`rounded-xl bg-[#1470AF]/10 p-3 ${iconColor}`}>
-                  <CategoryIcon className="h-7 w-7 text-[#1470AF]" />
+                <div
+                  className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl"
+                  style={{ backgroundColor: accent }}
+                >
+                  <CategoryIcon className="h-7 w-7 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold text-[#1a365d]">{article.title}</h1>
-                  <p className="text-muted-foreground">{article.posts.length} ready-to-share posts</p>
+                  <p className="text-xs font-bold uppercase tracking-[0.16em]" style={{ color: accent }}>
+                    {category.title}
+                  </p>
+                  <h1 className="mt-1 text-2xl font-bold tracking-tight text-[#1A365D] sm:text-3xl">{article.title}</h1>
+                  <p className="mt-1 max-w-2xl text-sm leading-relaxed text-[#42536e]">{article.description}</p>
+                  <p className="mt-2 text-sm font-medium text-[#5c6b85]">{article.posts.length} ready-to-share posts</p>
                 </div>
               </div>
-              <Button variant="outline" size="sm" asChild className="bg-transparent">
+              <Button variant="outline" size="sm" asChild className="shrink-0 border-[#E2E8F5] bg-white text-[#1A365D]">
                 <Link href={skipSubcategoryNav ? categoryHomeHref : `/${category.id}/${subcategory.id}`}>
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Back to {skipSubcategoryNav ? category.title : subcategory.title}
@@ -161,107 +175,151 @@ export function ArticleDetailPage({
           </div>
         </section>
 
-        {/* Posts Grid */}
-        <section className="py-10">
-          <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
-            <div className="grid gap-8 md:grid-cols-2">
-              {article.posts.map((post) => {
-                const message = getPostMessage(post)
-                const imageSrc = post.image ?? null
-                const isVideo = isVideoMediaUrl(imageSrc)
-                
-                return (
-                  <div key={post.id} className="flex flex-col rounded-2xl bg-white shadow-md overflow-hidden border border-gray-100">
-                    {/* Graphic or video — 16:9 */}
-                    <div className="relative aspect-video bg-muted overflow-hidden">
-                      {imageSrc ? (
-                        isVideo ? (
-                          <PostMediaPreview src={imageSrc} alt={post.title} />
-                        ) : (
-                          <button
-                            type="button"
-                            className="absolute inset-0 w-full h-full cursor-zoom-in focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1470AF] focus-visible:ring-offset-2"
-                            onClick={() => setLightbox({ src: imageSrc, alt: post.title })}
-                            aria-label={`View larger image: ${post.title}`}
-                          >
-                            <PostMediaPreview src={imageSrc} alt={post.title} />
-                          </button>
-                        )
-                      ) : null}
-                      <PostMediaPlaceholder
-                        label="No graphic"
-                        className={imageSrc ? "hidden" : undefined}
-                      />
-                      {imageSrc ? (
-                        <button
-                          type="button"
-                          disabled={downloadingPostId === post.id}
-                          onClick={async () => {
-                            setDownloadingPostId(post.id)
-                            try {
-                              await downloadMediaFile(
-                                imageSrc,
-                                post.title.toLowerCase().replace(/\s+/g, "-")
-                              )
-                              track("download", {
-                                path: pathname ?? undefined,
-                                name: post.title,
-                                postId: post.id,
-                                postTitle: post.title,
-                              })
-                            } catch {
-                              window.alert(
-                                isVideo
-                                  ? "Could not download this video. Try again in a moment."
-                                  : "Could not download this image. Try again in a moment."
-                              )
-                            } finally {
-                              setDownloadingPostId(null)
-                            }
-                          }}
-                          className={`absolute right-3 z-10 flex items-center gap-1.5 rounded-lg bg-white/95 backdrop-blur-sm px-3 py-2 text-sm font-medium text-[#1a365d] shadow-lg hover:bg-white transition-colors disabled:opacity-70 ${isVideo ? "top-3" : "bottom-3"}`}
-                        >
-                          <Download className="h-4 w-4" />
-                          {downloadingPostId === post.id
-                            ? "Downloading…"
-                            : isVideo
-                              ? "Download video"
-                              : "Download"}
-                        </button>
-                      ) : null}
-                    </div>
+        {/* Post workspace */}
+        <section className="py-10 sm:py-12">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            {posts.length === 0 ? (
+              <div className="mx-auto max-w-md rounded-2xl border border-[#E2E8F5] bg-white p-10 text-center shadow-sm">
+                <ImageIcon className="mx-auto h-8 w-8 text-[#5c6b85]" />
+                <h2 className="mt-4 text-lg font-bold text-[#1A365D]">
+                  No posts have been added yet.
+                </h2>
+                <p className="mt-2 text-sm text-[#42536e]">
+                  Ready-to-share content for this article is coming soon.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="mb-6">
+                  <h2 className="text-xl font-bold text-[#1A365D]">Ready-to-share content</h2>
+                  <p className="mt-1 text-sm text-[#42536e]">
+                    Review the caption, copy it, and download the graphic for each post.
+                  </p>
+                </div>
+                <div className="grid gap-8 md:grid-cols-2">
+                  {posts.map((post) => {
+                    const message = getPostMessage(post)
+                    const imageSrc = post.image ?? null
+                    const isVideo = isVideoMediaUrl(imageSrc)
 
-                    {/* Content */}
-                    <div className="flex flex-col flex-1 p-4">
-                      <PostMessageBlock
-                        postId={post.id}
-                        postTitle={post.title}
-                        message={message}
-                        copiedId={copiedId}
-                        copyErrorId={copyErrorId}
-                        onCopy={copyToClipboard}
-                      />
+                    return (
+                      <article
+                        key={post.id}
+                        className="flex flex-col overflow-hidden rounded-2xl border border-[#E2E8F5] bg-white shadow-sm"
+                      >
+                        {/* Graphic or video — 16:9 */}
+                        <div className="relative aspect-video overflow-hidden bg-muted">
+                          {imageSrc ? (
+                            isVideo ? (
+                              <PostMediaPreview src={imageSrc} alt={post.title} />
+                            ) : (
+                              <button
+                                type="button"
+                                className="absolute inset-0 h-full w-full cursor-zoom-in focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1470AF] focus-visible:ring-offset-2"
+                                onClick={() => setLightbox({ src: imageSrc, alt: post.title })}
+                                aria-label={`View larger image: ${post.title}`}
+                              >
+                                <PostMediaPreview src={imageSrc} alt={post.title} />
+                              </button>
+                            )
+                          ) : null}
+                          <PostMediaPlaceholder
+                            label="No graphic"
+                            className={imageSrc ? "hidden" : undefined}
+                          />
+                          {imageSrc ? (
+                            <button
+                              type="button"
+                              disabled={downloadingPostId === post.id}
+                              onClick={async () => {
+                                setDownloadingPostId(post.id)
+                                try {
+                                  await downloadMediaFile(
+                                    imageSrc,
+                                    post.title.toLowerCase().replace(/\s+/g, "-")
+                                  )
+                                  track("download", {
+                                    path: pathname ?? undefined,
+                                    name: post.title,
+                                    postId: post.id,
+                                    postTitle: post.title,
+                                  })
+                                } catch {
+                                  window.alert(
+                                    isVideo
+                                      ? "Could not download this video. Try again in a moment."
+                                      : "Could not download this image. Try again in a moment."
+                                  )
+                                } finally {
+                                  setDownloadingPostId(null)
+                                }
+                              }}
+                              className={`absolute right-3 z-10 flex items-center gap-1.5 rounded-lg bg-white/95 px-3 py-2 text-sm font-medium text-[#1a365d] shadow-lg backdrop-blur-sm transition-colors hover:bg-white disabled:opacity-70 ${isVideo ? "top-3" : "bottom-3"}`}
+                            >
+                              <Download className="h-4 w-4" />
+                              {downloadingPostId === post.id
+                                ? "Downloading…"
+                                : isVideo
+                                  ? "Download video"
+                                  : "Download"}
+                            </button>
+                          ) : null}
+                        </div>
 
-                      {/* Platform Links */}
-                      <div className="grid grid-cols-4 gap-2">
-                        {platforms.map((platform) => (
-                          <a
-                            key={platform.label}
-                            href={platform.href}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium text-white transition-opacity hover:opacity-80 ${platform.bgColor}`}
-                            aria-label={`Share on ${platform.label}`}
-                          >
-                            {platform.icon}
-                            <span>{platform.label}</span>
-                          </a>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
+                        {/* Content */}
+                        <div className="flex flex-1 flex-col p-5">
+                          <h3 className="mb-3 text-lg font-bold text-[#1A365D]">{post.title}</h3>
+                          <p className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-[#5c6b85]">
+                            Ready-to-share caption
+                          </p>
+                          <PostMessageBlock
+                            postId={post.id}
+                            postTitle={post.title}
+                            message={message}
+                            copiedId={copiedId}
+                            copyErrorId={copyErrorId}
+                            onCopy={copyToClipboard}
+                          />
+
+                          {/* Platform Links */}
+                          <div className="mt-auto grid grid-cols-4 gap-2">
+                            {platforms.map((platform) => (
+                              <a
+                                key={platform.label}
+                                href={platform.href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium text-white transition-opacity hover:opacity-80 ${platform.bgColor}`}
+                                aria-label={`Share on ${platform.label}`}
+                              >
+                                {platform.icon}
+                                <span>{platform.label}</span>
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      </article>
+                    )
+                  })}
+                </div>
+              </>
+            )}
+
+            <div className="mt-10 flex flex-col items-start justify-between gap-4 rounded-2xl border border-[#E2E8F5] bg-white p-6 sm:flex-row sm:items-center">
+              <div>
+                <h2 className="font-bold text-[#1A365D]">
+                  Explore more {skipSubcategoryNav ? category.title : subcategory.title} content
+                </h2>
+                <p className="mt-1 text-sm text-[#42536e]">
+                  Find additional graphics and captions ready for your agency to review and share.
+                </p>
+              </div>
+              <Button asChild className="shrink-0 bg-[#1A365D] text-white hover:bg-[#1A365D]/90">
+                <Link href={skipSubcategoryNav ? categoryHomeHref : `/${category.id}/${subcategory.id}`}>
+                  Browse related content
+                  <ChevronRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
             </div>
           </div>
         </section>

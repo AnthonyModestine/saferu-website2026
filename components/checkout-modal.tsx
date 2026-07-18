@@ -11,8 +11,17 @@ import {
 } from "@/components/ui/dialog"
 import { Checkout } from "@/components/checkout"
 
-export function CheckoutModal({ label = "Get Press Center", className }: { label?: string; className?: string }) {
+export function CheckoutModal({
+  label = "Get Press Center",
+  className,
+  productId = "pio-tool-monthly",
+}: {
+  label?: string
+  className?: string
+  productId?: string
+}) {
   const [open, setOpen] = useState(false)
+  const isAnnual = productId === "pio-tool-annual"
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -27,10 +36,12 @@ export function CheckoutModal({ label = "Get Press Center", className }: { label
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-[#1a365d]">
-            Subscribe to Press Center — $30/month
+            {isAnnual
+              ? "Subscribe to Press Center — $999/year"
+              : "Subscribe to Press Center — $99/month"}
           </DialogTitle>
         </DialogHeader>
-        <Checkout productId="pio-tool-monthly" />
+        <Checkout productId={productId} />
       </DialogContent>
     </Dialog>
   )

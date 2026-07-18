@@ -8,14 +8,22 @@ export interface Product {
   images?: string[]
 }
 
-// Base subscription - $30/month includes 30 generations (press releases + video requests)
+// Press Center subscriptions - monthly and annual billing
 export const SUBSCRIPTION_PRODUCTS: Product[] = [
   {
     id: "pio-tool-monthly",
     name: "Press Center",
-    description: "Press release and video request generator for public safety agencies. Includes 30 generations per month.",
-    priceInCents: 3000, // $30.00/month
+    description: "Communication workspace for public safety agencies. Includes monthly AI usage for press releases, video requests, event campaigns, and community posts.",
+    priceInCents: 9900, // $99.00/month
     interval: "month",
+    generations: 30,
+  },
+  {
+    id: "pio-tool-annual",
+    name: "Press Center (Annual)",
+    description: "Communication workspace for public safety agencies, billed annually. Includes monthly AI usage for press releases, video requests, event campaigns, and community posts.",
+    priceInCents: 99900, // $999.00/year
+    interval: "year",
     generations: 30,
   },
 ]

@@ -1,11 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Star, Lock, FileText, Bell, Sparkles, ChevronRight } from "lucide-react"
+import { Star, Lock, FileText, Bell, Sparkles } from "lucide-react"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ArticleCard } from "@/components/article-card"
 import Link from "next/link"
 import { useMemberSession } from "@/lib/use-member-session"
 import type { Article } from "@/lib/data/content-library"
@@ -42,34 +43,35 @@ export function WhatsNewClient({
     return (
       <div className="flex min-h-screen flex-col">
         <Header />
-        <main className="flex-1 bg-gradient-to-b from-background to-muted/30">
+        <main className="flex-1 bg-[#F0F4F8]">
           <div className="mx-auto max-w-2xl px-4 py-20 text-center sm:px-6 lg:px-8">
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[#f2b233]/20">
-              <Lock className="h-10 w-10 text-[#f2b233]" />
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#F2B233]/20">
+              <Lock className="h-8 w-8 text-[#C3880B]" />
             </div>
-            <h1 className="mt-6 text-3xl font-bold tracking-tight text-[#1a365d] sm:text-4xl">
-              Members Only Content
+            <h1 className="mt-6 text-3xl font-bold tracking-tight text-[#1A365D] sm:text-4xl">
+              Weekly content for SaferU members
             </h1>
-            <p className="mt-4 text-lg text-muted-foreground">
-              The What&apos;s New section contains our latest templates, seasonal content, and timely updates exclusively for SaferU members.
+            <p className="mt-4 text-lg leading-relaxed text-[#42536e]">
+              What&apos;s New brings together fresh seasonal content and timely safety topics. Free
+              members receive access to new graphics and captions added each week.
             </p>
 
-            <Card className="mt-10 text-left">
+            <Card className="mt-10 rounded-2xl border-[#E2E8F5] text-left shadow-sm">
               <CardHeader>
                 <CardTitle>Free Membership Includes</CardTitle>
                 <CardDescription>Create a free account to access</CardDescription>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-3">
-                  <li className="flex items-center gap-3">
+                  <li className="flex items-center gap-3 text-[#42536e]">
                     <Sparkles className="h-5 w-5 text-[#f2b233]" />
                     <span>Latest seasonal safety templates</span>
                   </li>
-                  <li className="flex items-center gap-3">
+                  <li className="flex items-center gap-3 text-[#42536e]">
                     <Bell className="h-5 w-5 text-[#f2b233]" />
                     <span>Timely alerts and trending topics</span>
                   </li>
-                  <li className="flex items-center gap-3">
+                  <li className="flex items-center gap-3 text-[#42536e]">
                     <FileText className="h-5 w-5 text-[#f2b233]" />
                     <span>New content added weekly</span>
                   </li>
@@ -99,52 +101,54 @@ export function WhatsNewClient({
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
-      <main className="flex-1">
-        <section className="border-b border-border bg-muted/30 py-12">
+      <main className="flex-1 bg-[#F0F4F8]">
+        <section className="border-b border-[#E2E8F5] bg-white py-10 sm:py-12">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="mb-5 flex items-center gap-2 text-sm text-[#5c6b85]">
+              <Link href="/templates" className="transition-colors hover:text-[#1A365D]">
+                Content Library
+              </Link>
+              <span>/</span>
+              <span className="font-medium text-[#1A365D]">What&apos;s New</span>
+            </div>
             <div className="flex items-center gap-4">
-              <div className="rounded-lg bg-primary/10 p-3 text-[#f2b233]">
-                <Star className="h-8 w-8" />
+              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-[#F2B233]">
+                <Star className="h-7 w-7 text-[#1A365D]" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-[#1a365d]">{categoryTitle}</h1>
-                <p className="mt-1 text-muted-foreground">{categoryDescription}</p>
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#B77908]">
+                  New content added weekly
+                </p>
+                <h1 className="mt-1 text-3xl font-bold tracking-tight text-[#1A365D] sm:text-4xl">{categoryTitle}</h1>
+                <p className="mt-1 text-[#42536e]">{categoryDescription}</p>
               </div>
             </div>
           </div>
         </section>
 
-        <section className="py-12">
+        <section className="py-10 sm:py-12">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <h2 className="text-xl font-semibold text-[#1a365d] mb-6">Articles</h2>
+            <h2 className="mb-6 text-xl font-bold text-[#1A365D]">Latest content</h2>
             {articles.length === 0 ? (
-              <p className="text-muted-foreground">No articles yet. Check back soon.</p>
+              <div className="mx-auto max-w-md rounded-2xl border border-[#E2E8F5] bg-white p-10 text-center shadow-sm">
+                <FileText className="mx-auto h-8 w-8 text-[#5c6b85]" />
+                <h3 className="mt-4 text-lg font-bold text-[#1A365D]">No new content right now.</h3>
+                <p className="mt-2 text-sm text-[#42536e]">
+                  New member content is added weekly. Browse the public library in the meantime.
+                </p>
+                <Button asChild className="mt-6 bg-[#1A365D] text-white hover:bg-[#1A365D]/90">
+                  <Link href="/templates">Browse Content Library</Link>
+                </Button>
+              </div>
             ) : (
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                 {articles.map((article) => (
-                  <Link key={article.id} href={`/whats-new/${article.id}`}>
-                    <Card className="h-full transition-all hover:shadow-lg hover:border-primary/50 cursor-pointer group">
-                      <CardHeader className="pb-3">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                            <FileText className="h-5 w-5" />
-                          </div>
-                          <div className="flex-1">
-                            <CardTitle className="text-lg group-hover:text-primary transition-colors">
-                              {article.title}
-                            </CardTitle>
-                          </div>
-                          <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
-                        </div>
-                      </CardHeader>
-                      <CardContent className="pt-0">
-                        <CardDescription>{article.description}</CardDescription>
-                        <p className="text-xs text-muted-foreground mt-2">
-                          {article.posts.length} {article.posts.length === 1 ? "post" : "posts"} available
-                        </p>
-                      </CardContent>
-                    </Card>
-                  </Link>
+                  <ArticleCard
+                    key={article.id}
+                    article={article}
+                    href={`/whats-new/${article.id}`}
+                    accent="#F2B233"
+                  />
                 ))}
               </div>
             )}

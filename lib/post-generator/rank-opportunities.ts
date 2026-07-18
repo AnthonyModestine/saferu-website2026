@@ -1,6 +1,6 @@
 /**
  * Internal recommendation score (1–5 stars) for the Post Idea Generator.
- * Scores are never shown in the UI. Only 4–5 star items surface by default.
+ * Scores are never shown in the UI. Only 4–5 star opportunities may surface.
  */
 
 import type { DepartmentType } from "@/lib/department-types"
@@ -8,6 +8,11 @@ import {
   messagingAngleForOpportunity,
   scoreAgencyRelevance,
 } from "./agency-relevance"
+import {
+  inferJurisdictionFit,
+  jurisdictionMessagingGuidance,
+  type JurisdictionFit,
+} from "./jurisdiction"
 import {
   isNationalValueSource,
   isTrustedSourceUrl,
@@ -18,10 +23,14 @@ import type {
   OpportunityPriority,
   PioRating,
   RankedExternalOpportunity,
+  RecommendationTier,
 } from "./types"
 
 export type RankContext = {
   agencyType?: DepartmentType | string | null
+  agencyName?: string | null
+  city?: string | null
+  county?: string | null
   todayIso: string
   postedFingerprints?: string[]
   recentTopicKeys?: string[]
@@ -91,7 +100,52 @@ export function opportunityFingerprint(input: {
   return [title, category, day, primarySignal].filter(Boolean).join("|")
 }
 
-export function topicKey(input: { category?: string; signals?: string[]; title?: string }): string {
+/** Collapse related signals into one topic family so heat/storm/scam variants never double-post. */
+const TOPIC_FAMILIES: Array<{ family: string; match: RegExp }> = [
+  { family: "heat", match: /\b(heat|hot_vehicle|heat_illness|hydration|extreme_heat)\b/ },
+  { family: "severe_weather", match: /\b(severe_storm|thunderstorm|tornado|high_wind|wind_advisory|hail)\b/ },
+  { family: "flood", match: /\b(flood|flash_flood)\b/ },
+  { family: "winter", match: /\b(winter|ice_safety|snow|freeze|cold_exposure)\b/ },
+  { family: "air_quality", match: /\b(air_quality|aqi|respiratory|smoke)\b/ },
+  { family: "wildfire", match: /\b(wildfire|fire_weather|burn_ban)\b/ },
+  { family: "earthquake", match: /\b(earthquake)\b/ },
+  { family: "scams", match: /\b(scam|fraud|cyber|phishing|ic3|impersonation)\b/ },
+  { family: "missing_person", match: /\b(amber|missing_person|missing_child)\b/ },
+  { family: "traffic", match: /\b(road_closure|traffic|travel_delay|detour|511)\b/ },
+  { family: "utility", match: /\b(outage|boil_water|water_main|utility|power_outage)\b/ },
+  { family: "school", match: /\b(school_clos|school_delay|school_safety)\b/ },
+  { family: "holiday_safety", match: /\b(holiday|firework|halloween|thanksgiving|christmas|new_year)\b/ },
+]
+
+export function topicKey(input: {
+  category?: string
+  signals?: string[]
+  title?: string
+  summary?: string
+}): string {
+  const primarySignal = (input.signals?.[0] || "").toLowerCase()
+  const category = (input.category || "").toLowerCase()
+  if (/\b(air_quality|aqi|respiratory)\b/.test(`${primarySignal} ${category}`)) {
+    return "air_quality"
+  }
+  if (/\b(wildfire|fire_weather|burn_ban)\b/.test(`${primarySignal} ${category}`)) {
+    return "wildfire"
+  }
+
+  const blob = [
+    ...(input.signals ?? []),
+    input.category || "",
+    input.title || "",
+    input.summary || "",
+  ]
+    .join(" ")
+    .toLowerCase()
+    .replace(/[^a-z0-9_\s]+/g, " ")
+
+  for (const { family, match } of TOPIC_FAMILIES) {
+    if (match.test(blob)) return family
+  }
+
   const signal = (input.signals?.[0] || input.category || "").toLowerCase().replace(/\s+/g, "_")
   if (signal) return signal
   return normalizeText(input.title || "").split(" ").slice(0, 3).join("_")
@@ -100,10 +154,25 @@ export function topicKey(input: { category?: string; signals?: string[]; title?:
 function scoreGeographic(input: ExternalOpportunityInput): number {
   const label = input.sourceLabel
   const text = `${input.title} ${input.summary} ${input.whyItMatters}`.toLowerCase()
+
+  if (typeof input.distanceMiles === "number" && Number.isFinite(input.distanceMiles)) {
+    if (input.distanceMiles <= 5) return 100
+    if (input.distanceMiles <= 10) return 82
+    if (input.distanceMiles <= 25) return 62
+    // Far-away items need an explicit regional impact or nationally useful source.
+    if (
+      !/regional|statewide|major highway|evacuation|widespread|service area|affects residents/i.test(text) &&
+      !isNationalValueSource(input.sourceUrl, input.sourceName)
+    ) {
+      return 20
+    }
+  }
+
   if (label === "Weather Alert") return 98
   if (/road|closure|detour|outage|local|zip|county|township|city/i.test(text)) return 92
-  if (label === "Upcoming Event") return 88
-  if (isNationalValueSource(input.sourceUrl, input.sourceName)) return 78
+  if (label === "Upcoming Event") return 82
+  // National value is judged by resident usefulness, not physical distance.
+  if (isNationalValueSource(input.sourceUrl, input.sourceName)) return 84
   if (/national|nationwide|across the country/i.test(text) && !isNationalValueSource(input.sourceUrl, input.sourceName)) {
     return 35
   }
@@ -228,6 +297,22 @@ function scoreEngagement(input: ExternalOpportunityInput): number {
   return 50
 }
 
+function isOngoingAlertFamily(input: ExternalOpportunityInput): boolean {
+  const key = topicKey(input)
+  return [
+    "scams",
+    "missing_person",
+    "wildfire",
+    "earthquake",
+    "air_quality",
+    "utility",
+    "heat",
+    "severe_weather",
+    "flood",
+    "winter",
+  ].includes(key)
+}
+
 function scoreFreshness(input: ExternalOpportunityInput, todayIso: string): {
   score: number
   reject: boolean
@@ -242,23 +327,34 @@ function scoreFreshness(input: ExternalOpportunityInput, todayIso: string): {
   if (days == null) {
     // Weather alerts without a start date are treated as current.
     if (input.sourceLabel === "Weather Alert") return { score: 90, reject: false }
-    return { score: 60, reject: false }
+    return { score: 70, reject: false }
   }
 
-  // Current bucket: generally surface only for the next 1–3 days.
-  if (days < 0) return { score: 0, reject: true }
+  // Past start dates: allow recent ongoing alerts (scams, wildfires, quakes, missing persons).
+  // These are not "upcoming events" — their publish/discovery date is often in the past.
+  if (days < 0) {
+    const age = Math.abs(days)
+    if (isOngoingAlertFamily(input) && age <= 30) {
+      if (age <= 3) return { score: 90, reject: false }
+      if (age <= 14) return { score: 78, reject: false }
+      return { score: 62, reject: false }
+    }
+    // Stale one-off items (old community updates) should not surface.
+    return { score: 0, reject: true }
+  }
+
+  // Upcoming: surface for the next 1–3 days; allow up to 7 for plan-ahead.
   if (days <= 1) return { score: 95, reject: false }
   if (days <= 3) return { score: 85, reject: false }
-  // Plan-ahead community events can remain if otherwise excellent and near-term.
-  if (days <= 7 && input.sourceLabel === "Upcoming Event") return { score: 55, reject: false }
-  if (days <= 7) return { score: 40, reject: false }
+  if (days <= 7) return { score: 58, reject: false }
   return { score: 15, reject: true }
 }
 
 function compositeToStars(score: number): PioRating {
-  if (score >= 84) return 5
-  if (score >= 72) return 4
-  if (score >= 58) return 3
+  if (score >= 82) return 5
+  // Slightly lower 4★ floor so legitimate local/national alerts can fill a 4-post briefing.
+  if (score >= 66) return 4
+  if (score >= 55) return 3
   if (score >= 40) return 2
   return 1
 }
@@ -268,10 +364,15 @@ function adjustedPriority(
   pioRating: PioRating,
   urgency: number
 ): OpportunityPriority {
+  // Preserve plan-ahead / optional framing unless urgency clearly justifies promotion.
   if (pioRating === 5 && urgency >= 90) return "urgent"
   if (input.priority === "urgent" && pioRating >= 4) return "urgent"
+  if (input.priority === "plan_ahead" || input.priority === "optional") {
+    if (urgency >= 85 && pioRating >= 4) return "recommended_today"
+    return input.priority
+  }
   if (pioRating >= 4 && urgency >= 70) return "recommended_today"
-  if (pioRating >= 4) return "recommended_today"
+  if (pioRating >= 4) return input.priority === "urgent" ? "urgent" : "recommended_today"
   return input.priority
 }
 
@@ -281,15 +382,33 @@ function finalPioGate(input: ExternalOpportunityInput, dims: {
   actionability: number
   sourceTrust: number
 }): boolean {
-  // "If I were the PIO today, would this genuinely help my community?"
   if (dims.agencyRelevance < 40) return false
-  if (dims.residentValue < 45) return false
-  if (dims.actionability < 40) return false
+  if (dims.residentValue < 55) return false
+  if (dims.actionability < 55) return false
   if (dims.sourceTrust < 50) return false
   const text = `${input.title} ${input.summary} ${input.whyItMatters}`.toLowerCase()
   if (/celebrity|political debate|opinion piece|clickbait/i.test(text)) return false
   if (!input.verifiedFacts?.length && input.sourceLabel !== "Weather Alert") return false
   return true
+}
+
+function assignRecommendationTier(
+  pioRating: PioRating,
+  geographicRelevance: number,
+  jurisdictionFit: JurisdictionFit,
+  urgency: number
+): RecommendationTier {
+  if (pioRating >= 5 || (pioRating >= 4 && geographicRelevance >= 85 && jurisdictionFit === "own")) {
+    return "top_recommended"
+  }
+  if (pioRating >= 4 && urgency >= 90) return "top_recommended"
+  if (pioRating >= 4 && jurisdictionFit === "own") return "top_recommended"
+  if (pioRating >= 4) return "could_post"
+  if (pioRating >= 3 && (jurisdictionFit === "nearby" || jurisdictionFit === "regional")) {
+    return "uncertain"
+  }
+  if (pioRating >= 3) return "could_post"
+  return "uncertain"
 }
 
 export function scoreExternalOpportunity(
@@ -301,6 +420,9 @@ export function scoreExternalOpportunity(
     return null
   }
 
+  // Do not recommend community events unless the agency is clearly involved.
+  if (isUnconfirmedCommunityEvent(input)) return null
+
   const requireTrusted = ctx.requireTrustedSource !== false
   if (requireTrusted && input.sourceUrl && !isTrustedSourceUrl(input.sourceUrl, input.sourceName)) {
     // Allow medium-confidence local civic sources only when sourceName looks official.
@@ -310,8 +432,27 @@ export function scoreExternalOpportunity(
   const freshness = scoreFreshness(input, ctx.todayIso)
   if (freshness.reject) return null
 
+  const jurisdictionFit =
+    input.jurisdictionFit ||
+    inferJurisdictionFit({
+      agencyName: ctx.agencyName || undefined,
+      city: ctx.city || undefined,
+      county: ctx.county || undefined,
+      title: input.title,
+      summary: input.summary,
+      whyItMatters: input.whyItMatters,
+      sourceName: input.sourceName,
+      category: input.category,
+      signals: input.signals,
+      distanceMiles: input.distanceMiles,
+    })
+
   const agency = scoreAgencyRelevance(input.signals ?? [], input.category, ctx.agencyType)
-  const geographicRelevance = scoreGeographic(input)
+  let geographicRelevance = scoreGeographic(input)
+  if (jurisdictionFit === "own") geographicRelevance = Math.max(geographicRelevance, 92)
+  if (jurisdictionFit === "nearby") geographicRelevance = Math.min(geographicRelevance, 78)
+  if (jurisdictionFit === "regional") geographicRelevance = Math.min(geographicRelevance, 62)
+
   const residentValue = scoreResidentValue(input)
   const actionability = scoreActionability(input)
   const urgency = scoreUrgency(input, ctx.todayIso)
@@ -347,19 +488,52 @@ export function scoreExternalOpportunity(
   if ((ctx.recentTopicKeys ?? []).includes(key)) {
     composite -= 12
   }
+  if (jurisdictionFit === "nearby") composite -= 4
+  if (jurisdictionFit === "regional") composite -= 8
 
   composite = clamp(composite)
   const pioRating = compositeToStars(composite)
+  // Quality gate: 1–3 stars never reach the user.
   if (pioRating < 4) return null
 
-  const messagingAngle = messagingAngleForOpportunity(
+  let messagingAngle = messagingAngleForOpportunity(
     input.signals ?? [],
     input.category,
-    ctx.agencyType
+    ctx.agencyType,
+    `${input.title} ${input.summary || ""} ${input.whyItMatters || ""}`
   )
+  const jurisdictionNote = jurisdictionMessagingGuidance(
+    jurisdictionFit,
+    ctx.agencyName || "this agency",
+    ctx.city || undefined
+  )
+  messagingAngle = messagingAngle
+    ? `${messagingAngle} ${jurisdictionNote}`
+    : jurisdictionNote
+
+  const recommendationTier = assignRecommendationTier(
+    pioRating,
+    geographicRelevance,
+    jurisdictionFit,
+    urgency
+  )
+
+  // Neighboring road closures should not read as "own jurisdiction" ownership posts.
+  const doNotClaim = [
+    ...(input.doNotClaim ?? []),
+    ...(jurisdictionFit === "nearby" || jurisdictionFit === "regional"
+      ? [
+          "Do not claim this agency owns, manages, or is performing the work.",
+          'Do not say "thank you for your understanding," "our crews," or "we apologize for the inconvenience" for another jurisdiction\'s project.',
+        ]
+      : []),
+  ]
 
   return {
     ...input,
+    doNotClaim,
+    jurisdictionFit,
+    recommendationTier,
     priority: adjustedPriority(input, pioRating, urgency),
     internalScores: {
       agencyRelevance: Math.round(agency.score),
@@ -379,23 +553,62 @@ export function scoreExternalOpportunity(
   }
 }
 
+function isUnconfirmedCommunityEvent(input: ExternalOpportunityInput): boolean {
+  const label = input.sourceLabel
+  const category = (input.category || "").toLowerCase()
+  const text = `${input.title} ${input.summary} ${input.whyItMatters}`.toLowerCase()
+  const looksLikeEvent =
+    label === "Upcoming Event" ||
+    category.includes("community_event") ||
+    /\b(community night|open house|festival|fair|parade|ribbon.?cutting|fun run|concert|movie night)\b/i.test(
+      text
+    )
+  if (!looksLikeEvent) return false
+
+  const agencyInvolved =
+    /\b(our department|hosted by|co-?hosted|agency.?hosted|police.?night|fire.?open.?house|department.?open.?house)\b/i.test(
+      text
+    ) ||
+    /\b(police|fire|ems|sheriff|emergency management)\b/i.test(
+      `${input.sourceName || ""} ${input.title}`
+    )
+  return !agencyInvolved
+}
+
 function areNearDuplicates(a: ExternalOpportunityInput, b: ExternalOpportunityInput): boolean {
+  // Same topic family (heat vs heat, storm vs storm) is always a duplicate for the daily briefing.
+  if (topicKey(a) === topicKey(b)) return true
+
   const titleSim = jaccard(tokenSet(a.title), tokenSet(b.title))
-  if (titleSim >= 0.72) return true
-  const sameTopic =
-    topicKey(a) === topicKey(b) &&
-    (a.eventStart || "").slice(0, 10) === (b.eventStart || "").slice(0, 10) &&
-    Boolean(a.eventStart)
-  if (sameTopic && titleSim >= 0.45) return true
+  if (titleSim >= 0.55) return true
+
   const factA = tokenSet((a.verifiedFacts || []).join(" "))
   const factB = tokenSet((b.verifiedFacts || []).join(" "))
-  if (jaccard(factA, factB) >= 0.75) return true
+  if (jaccard(factA, factB) >= 0.65) return true
   return false
 }
 
+function acceptDistinctTopics(
+  scored: RankedExternalOpportunity[],
+  into: RankedExternalOpportunity[],
+  usedTopics: Set<string>,
+  limit: number
+) {
+  for (const item of scored) {
+    if (into.length >= limit) break
+    const key = topicKey(item)
+    // One item per topic family across the full briefing (heat once, AQI once, etc.).
+    if (usedTopics.has(key)) continue
+    if (into.some((existing) => areNearDuplicates(existing, item))) continue
+    usedTopics.add(key)
+    into.push(item)
+  }
+}
+
 /**
- * Score, gate (4–5 stars only), and dedupe external opportunities.
- * Internal scores remain on the object for server-side debugging and are stripped before API responses.
+ * Score, tier, and dedupe external opportunities.
+ * Only accepts 4–5 star opportunities.
+ * Internal scores remain on the object for server-side use and are stripped before API responses.
  */
 export function rankAndGateExternalOpportunities(
   candidates: ExternalOpportunityInput[],
@@ -411,15 +624,26 @@ export function rankAndGateExternalOpportunities(
 
   const accepted: RankedExternalOpportunity[] = []
   const usedTopics = new Set<string>()
-  for (const item of scored) {
-    if (accepted.some((existing) => areNearDuplicates(existing, item))) continue
-    const key = topicKey(item)
-    // Prefer topical variety: allow at most one heat/scam/flood family unless urgency is extreme.
-    if (usedTopics.has(key) && item.internalScores.urgency < 92) continue
-    usedTopics.add(key)
-    accepted.push(item)
-  }
+  acceptDistinctTopics(scored, accepted, usedTopics, 8)
+
   return accepted
+}
+
+/** True when at least one item earned Top recommended via scoring. */
+export function hasTopRecommended(
+  ranked: Array<{ recommendationTier?: RecommendationTier | null }>
+): boolean {
+  return ranked.some((opp) => (opp.recommendationTier || "") === "top_recommended")
+}
+
+/** True when at least one item is recommendable (top or could-post), not only uncertain fillers. */
+export function hasRecommendablePost(
+  ranked: Array<{ recommendationTier?: RecommendationTier | null }>
+): boolean {
+  return ranked.some((opp) => {
+    const tier = opp.recommendationTier || ""
+    return tier === "top_recommended" || tier === "could_post"
+  })
 }
 
 /** Strip internal scoring fields before sending opportunities to the client UI. */

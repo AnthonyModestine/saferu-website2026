@@ -6,16 +6,21 @@ import { isLocalHostname } from "@/lib/local-preview"
 
 const STORAGE_KEY = "pio_agency_settings"
 
+export type ServiceAreaType = "city" | "county" | "state"
+
 /** Generic public-safety badge for localhost testing (Settings + weather graphics). */
 export const DEMO_AGENCY_LOGO_URL = "/images/demo-agency-badge.svg"
 
 interface AgencySettings {
   agencyName: string
-  agencyType: DepartmentType
+  agencyType: DepartmentType | ""
   agencyTypeOther: string
+  serviceAreaType: ServiceAreaType
   city: string
+  /** County-wide jurisdiction, especially for sheriff's offices. */
+  county: string
   state: string
-  /** Comma- or space-separated ZIPs the agency serves — used for Local Ideas. */
+  /** Comma- or space-separated ZIPs — legacy field; service area now uses city/county/state. */
   serviceZips: string
   boilerplate: string
   logoUrl: string | null
@@ -32,9 +37,11 @@ interface AgencyContextType {
 
 const defaultSettings: AgencySettings = {
   agencyName: "",
-  agencyType: "other",
+  agencyType: "",
   agencyTypeOther: "",
+  serviceAreaType: "city",
   city: "",
+  county: "",
   state: "",
   serviceZips: "",
   boilerplate: "",
@@ -90,8 +97,26 @@ function loadStored(): AgencySettings {
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<AgencySettings>
       const merged = { ...defaultSettings, ...parsed }
-      if (!merged.agencyType) merged.agencyType = "other"
+      if (typeof merged.agencyType !== "string") merged.agencyType = ""
+      if (
+        [
+          "public_works",
+          "parks_recreation",
+          "utilities",
+          "animal_services",
+          "health_department",
+          "municipality",
+        ].includes(merged.agencyType)
+      ) {
+        merged.agencyType = "local_government"
+      } else if (merged.agencyType === "other") {
+        merged.agencyType = ""
+      }
       if (typeof merged.agencyTypeOther !== "string") merged.agencyTypeOther = ""
+      if (!["city", "county", "state"].includes(String(merged.serviceAreaType))) {
+        merged.serviceAreaType = merged.county && !merged.city ? "county" : "city"
+      }
+      if (typeof merged.county !== "string") merged.county = ""
       if (typeof merged.serviceZips !== "string") merged.serviceZips = ""
       const sanitized = sanitizeSettings(merged)
       const withTesting = withLocalTestingDefaults(sanitized)

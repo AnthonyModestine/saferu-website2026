@@ -50,7 +50,9 @@ function buildCuratedOpportunity(
     recommendedAction: `Share the existing SaferU post: "${scored.post.title}".`,
     recommendedPostTiming: timing,
     opportunitySource: "saferu_curated",
-    priority: scored.post.evergreen ? "optional" : "recommended_today",
+    priority: "optional",
+    recommendationTier: "could_post",
+    surfacedReason: whyItMatters,
     status: "new",
     curated,
     curatedMessage: scored.post.message,
@@ -92,6 +94,8 @@ function buildExternalFromInput(
     opportunitySource: curated ? "external_with_saferu_match" : "external",
     priority: input.priority,
     status: "new",
+    recommendationTier: input.recommendationTier,
+    jurisdictionFit: input.jurisdictionFit,
     eventStart: input.eventStart,
     eventEnd: input.eventEnd,
     expiresAt: input.expiresAt,
@@ -150,86 +154,103 @@ export function generatePostOpportunities(req: GeneratorRequest): GeneratorResul
   const dismissed = new Set(req.dismissedIds ?? [])
   const posted = new Set(req.postedFingerprints ?? [])
 
-  const urgent: PostOpportunity[] = []
-  const recommendedToday: PostOpportunity[] = []
-  const planAhead: PostOpportunity[] = []
-  const fromSaferU: PostOpportunity[] = []
-
-  // Incoming externals are already scored/gated (4–5★ only). Assemble the daily briefing from them.
+  const built: PostOpportunity[] = []
   for (const input of req.externalOpportunities ?? []) {
     if (posted.has(input.id)) continue
-    const opp = buildExternalFromInput(input, undefined, true)
-    if (opp.priority === "urgent") urgent.push(opp)
-    else if (opp.priority === "recommended_today") recommendedToday.push(opp)
-    else planAhead.push(opp)
+    const curatedMatch = rankCuratedPosts(posts, ctx, input.signals ?? [], used, 1, true)[0]
+    built.push(buildExternalFromInput(input, curatedMatch, true))
   }
 
   const demo = posts.every((p) => p.contentId.startsWith("demo::"))
+  const cleaned = filterDismissed(dedupeByTitle(built), dismissed).sort(
+    (a, b) => b.totalScore - a.totalScore
+  )
 
-  const cleanedExternal = [
-    ...filterDismissed(dedupeByTitle(urgent), dismissed),
-    ...filterDismissed(dedupeByTitle(recommendedToday), dismissed),
-    ...filterDismissed(dedupeByTitle(planAhead), dismissed),
-  ].sort((a, b) => b.totalScore - a.totalScore)
+  // Quality over quantity: only scored 4–5 star opportunities reach this stage.
+  const topRecommended = cleaned
+    .filter((opp) => (opp.recommendationTier || "top_recommended") === "top_recommended")
+    .slice(0, 4)
+  const couldPost = cleaned
+    .filter((opp) => opp.recommendationTier === "could_post")
+    .slice(0, 4)
+  const uncertain: PostOpportunity[] = []
 
-  // Prefer: up to 4 current recommendations that already cleared the intelligence gate.
-  const dailyLimit = Math.max(1, Math.min(4, req.dailyLimit ?? 4))
-  const timelyHoliday = cleanedExternal.find((opp) => opp.category === "holiday_safety")
-  const nonHolidayLimit = timelyHoliday ? Math.max(0, dailyLimit - 1) : dailyLimit
-  const dailySet: PostOpportunity[] = []
-  for (const opp of cleanedExternal) {
-    if (opp.id === timelyHoliday?.id) continue
-    if (dailySet.length >= nonHolidayLimit) break
-    dailySet.push(opp)
-  }
-  if (timelyHoliday && dailySet.length < dailyLimit) dailySet.push(timelyHoliday)
-  dailySet.sort((a, b) => b.totalScore - a.totalScore)
+  // Legacy priority buckets still used by older UI paths.
+  const dailySet = [...topRecommended, ...couldPost]
+  const urgent = dailySet.filter((opp) => opp.priority === "urgent")
+  const recommendedToday = dailySet.filter(
+    (opp) => opp.priority === "recommended_today" && opp.opportunitySource !== "saferu_curated"
+  )
+  const planAhead = dailySet.filter(
+    (opp) =>
+      (opp.priority === "plan_ahead" || opp.priority === "optional") &&
+      opp.opportunitySource !== "saferu_curated"
+  )
 
-  // Match curated safety graphics ONLY to the final selected current events.
-  // Preserve both the original curated graphic and original curated message.
-  const selectedSignals = [...new Set(dailySet.flatMap((opp) => opp.signals ?? []))]
-  const matchedCurated = rankCuratedPosts(posts, ctx, selectedSignals, used, 6, true)
-  for (const scored of matchedCurated) {
-    if (fromSaferU.length >= 2) break
-    if (!scored.post.hasGraphic || !scored.post.graphicUrl || !scored.post.hasMessage) continue
-    fromSaferU.push(
+  // Curated graphics attach to scored recommendations above. If nothing scored
+  // high enough, always surface SaferU safety content so the briefing is never empty.
+  let saferuSet: PostOpportunity[] = []
+  if (dailySet.length === 0) {
+    const curatedFallback = rankCuratedPosts(posts, ctx, ctx.signals, used, 2, false)
+    saferuSet = curatedFallback.map((scored) =>
       buildCuratedOpportunity(
         scored,
         ctx,
-        `${scored.matchReason} Matched to today's local recommendations.`,
-        "Use today or save for later this week."
+        scored.matchReason,
+        "Optional — share when it supports your agency’s communication calendar."
       )
     )
   }
-  const saferuSet = filterDismissed(dedupeByTitle(fromSaferU), dismissed).slice(0, 2)
 
-  const result: GeneratorResult = {
-    urgent: dailySet.filter((opp) => opp.priority === "urgent"),
-    recommendedToday: dailySet.filter(
-      (opp) => opp.priority === "recommended_today" && opp.opportunitySource !== "saferu_curated"
-    ),
-    planAhead: dailySet.filter(
-      (opp) =>
-        (opp.priority === "plan_ahead" || opp.priority === "optional") &&
-        opp.opportunitySource !== "saferu_curated"
-    ),
+  return {
+    urgent,
+    recommendedToday,
+    planAhead,
+    topRecommended,
+    couldPost,
+    uncertain,
     fromSaferU: saferuSet,
-    emptyState: dailySet.length === 0 && saferuSet.length === 0,
+    emptyState:
+      topRecommended.length === 0 &&
+      couldPost.length === 0 &&
+      uncertain.length === 0 &&
+      saferuSet.length === 0,
     demo,
     generatedAt: new Date().toISOString(),
   }
-
-  return result
 }
 
 export function findOpportunityInResult(
   result: GeneratorResult,
   id: string
 ): PostOpportunity | undefined {
-  const all = [...result.urgent, ...result.recommendedToday, ...result.planAhead, ...result.fromSaferU]
+  const all = [
+    ...result.topRecommended,
+    ...result.couldPost,
+    ...result.uncertain,
+    ...result.urgent,
+    ...result.recommendedToday,
+    ...result.planAhead,
+    ...result.fromSaferU,
+  ]
   return all.find((o) => o.id === id)
 }
 
 export function flattenOpportunities(result: GeneratorResult): PostOpportunity[] {
-  return [...result.urgent, ...result.recommendedToday, ...result.planAhead, ...result.fromSaferU]
+  const seen = new Set<string>()
+  const out: PostOpportunity[] = []
+  for (const opp of [
+    ...result.topRecommended,
+    ...result.couldPost,
+    ...result.uncertain,
+    ...result.urgent,
+    ...result.recommendedToday,
+    ...result.planAhead,
+    ...result.fromSaferU,
+  ]) {
+    if (seen.has(opp.id)) continue
+    seen.add(opp.id)
+    out.push(opp)
+  }
+  return out
 }

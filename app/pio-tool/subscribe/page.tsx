@@ -173,7 +173,7 @@ export default function SubscribePage() {
               onClick={handleSubscribe}
               disabled={redirectingToStripe}
             >
-              Subscribe — $30/month
+              Subscribe — $99/month
             </Button>
           </div>
         </CardContent>

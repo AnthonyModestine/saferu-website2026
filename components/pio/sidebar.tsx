@@ -15,6 +15,7 @@ import {
   LogOut,
   Settings,
   Sparkles,
+  Lock,
 } from "lucide-react"
 import { useAgency } from "@/lib/agency-context"
 import { useMemberSession } from "@/lib/use-member-session"
@@ -84,6 +85,37 @@ const assistantItems = [
   },
 ]
 
+function LockedNavItem({
+  title,
+  description,
+  icon: Icon,
+  accent,
+}: {
+  title: string
+  description: string
+  icon: React.ComponentType<{ className?: string }>
+  accent?: string
+}) {
+  return (
+    <div
+      className="flex cursor-not-allowed items-start gap-3 rounded-xl px-3 py-2.5 opacity-55"
+      title="Sign in to unlock"
+      aria-disabled="true"
+    >
+      <Icon className={cn("mt-0.5 h-5 w-5 shrink-0", accent || "text-[#93A4C7]")} />
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-1.5 text-sm font-semibold text-[#E8EEF9]">
+          {title}
+          <Lock className="h-3 w-3 text-[#7B8BB0]" aria-hidden="true" />
+        </span>
+        <span className="mt-0.5 block text-[11px] leading-snug text-[#94A3B8]">
+          {description}
+        </span>
+      </span>
+    </div>
+  )
+}
+
 export function PIOSidebar() {
   const pathname = usePathname()
   const { settings } = useAgency()
@@ -123,18 +155,29 @@ export function PIOSidebar() {
       </Link>
 
       <div className="px-4 pb-3">
-        <Link
-          href="/pio-tool/events?new=1"
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#2563EB] px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-[#2563EB]/30 transition hover:bg-[#1d4ed8]"
-        >
-          <Plus className="h-4 w-4" />
-          Create New
-        </Link>
+        {member ? (
+          <Link
+            href="/pio-tool/events?new=1"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#2563EB] px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-[#2563EB]/30 transition hover:bg-[#1d4ed8]"
+          >
+            <Plus className="h-4 w-4" />
+            Create New
+          </Link>
+        ) : (
+          <div
+            className="flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl bg-[#2563EB]/45 px-4 py-3 text-sm font-semibold text-white/80"
+            title="Sign in to unlock"
+            aria-disabled="true"
+          >
+            <Lock className="h-4 w-4" />
+            Create New
+          </div>
+        )}
       </div>
 
       <nav className="flex-1 space-y-5 overflow-y-auto px-3 pb-4">
         <Link
-          href="/pio-tool"
+          href={member ? "/pio-tool" : "/pio-tool?guest=1"}
           className={cn(
             "flex items-start gap-3 rounded-xl px-3 py-2.5 transition-colors",
             dashboardActive
@@ -163,6 +206,17 @@ export function PIOSidebar() {
           </p>
           <div className="space-y-1">
             {createItems.map((item) => {
+              if (!member) {
+                return (
+                  <LockedNavItem
+                    key={item.title}
+                    title={item.title}
+                    description={item.description}
+                    icon={item.icon}
+                    accent={item.accent}
+                  />
+                )
+              }
               const matchPath = item.match || item.href.split("?")[0]
               const active =
                 pathname === matchPath ||
@@ -199,40 +253,50 @@ export function PIOSidebar() {
             {assistantItems
               .filter((item) => item.href !== "/pio-tool")
               .map((item) => {
-              const active =
-                pathname === item.href || pathname.startsWith(item.href + "/")
-              return (
-                <Link
-                  key={item.title}
-                  href={item.href}
-                  className={cn(
-                    "flex items-start gap-3 rounded-xl px-3 py-2.5 transition-colors",
-                    active ? "bg-white/15 text-white ring-1 ring-white/20" : "hover:bg-white/10"
-                  )}
-                  aria-current={active ? "page" : undefined}
-                >
-                  <item.icon
+                if (!member) {
+                  return (
+                    <LockedNavItem
+                      key={item.title}
+                      title={item.title}
+                      description={item.description}
+                      icon={item.icon}
+                    />
+                  )
+                }
+                const active =
+                  pathname === item.href || pathname.startsWith(item.href + "/")
+                return (
+                  <Link
+                    key={item.title}
+                    href={item.href}
                     className={cn(
-                      "mt-0.5 h-5 w-5 shrink-0",
-                      active ? "text-white" : "text-[#93A4C7]"
+                      "flex items-start gap-3 rounded-xl px-3 py-2.5 transition-colors",
+                      active ? "bg-white/15 text-white ring-1 ring-white/20" : "hover:bg-white/10"
                     )}
-                  />
-                  <span className="min-w-0">
-                    <span
+                    aria-current={active ? "page" : undefined}
+                  >
+                    <item.icon
                       className={cn(
-                        "block text-sm font-semibold",
-                        active ? "text-white" : "text-[#E8EEF9]"
+                        "mt-0.5 h-5 w-5 shrink-0",
+                        active ? "text-white" : "text-[#93A4C7]"
                       )}
-                    >
-                      {item.title}
+                    />
+                    <span className="min-w-0">
+                      <span
+                        className={cn(
+                          "block text-sm font-semibold",
+                          active ? "text-white" : "text-[#E8EEF9]"
+                        )}
+                      >
+                        {item.title}
+                      </span>
+                      <span className="mt-0.5 block text-[11px] leading-snug text-[#94A3B8]">
+                        {item.description}
+                      </span>
                     </span>
-                    <span className="mt-0.5 block text-[11px] leading-snug text-[#94A3B8]">
-                      {item.description}
-                    </span>
-                  </span>
-                </Link>
-              )
-            })}
+                  </Link>
+                )
+              })}
           </div>
         </div>
       </nav>
@@ -274,7 +338,7 @@ export function PIOSidebar() {
           <div className="space-y-2 rounded-xl bg-white/5 p-3">
             <p className="text-xs font-medium text-[#d7e0f7]">Previewing as guest</p>
             <p className="text-[11px] leading-snug text-[#9fb0d9]">
-              Sign in to unlock AI generation and save your agency settings.
+              Sign in to unlock creating and publishing for your department.
             </p>
             <div className="flex gap-2 pt-1">
               <Link

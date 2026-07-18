@@ -35,7 +35,7 @@ export function PostMessageBlock({
 
   return (
     <>
-      <div className="relative mb-3 rounded-xl border border-gray-200 bg-white p-4 pb-9 shadow-sm">
+      <div className="relative mb-3 rounded-xl border border-[#E2E8F5] bg-[#F8FAFC] p-4 pb-9">
         <p
           className={`text-[15px] text-gray-900 leading-[1.65] whitespace-pre-wrap ${
             long && !expanded ? "line-clamp-6" : ""
@@ -63,19 +63,19 @@ export function PostMessageBlock({
       <Button
         type="button"
         onClick={() => onCopy(message, postId, postTitle)}
-        className="w-full bg-[#f2b233] text-[#1a365d] hover:bg-[#f2b233]/90 font-semibold mb-3"
+        className="mb-3 w-full bg-[#f2b233] font-semibold text-[#1a365d] hover:bg-[#f2b233]/90"
       >
         {copiedId === postId ? (
           <>
             <Check className="h-4 w-4 mr-2" />
-            Copied!
+            Caption copied
           </>
         ) : copyErrorId === postId ? (
           "Copy failed — select text manually"
         ) : (
           <>
             <Copy className="h-4 w-4 mr-2" />
-            Copy Message
+            Copy Caption
           </>
         )}
       </Button>

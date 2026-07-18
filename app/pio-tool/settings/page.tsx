@@ -7,9 +7,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Save, Upload, Building2, X, CreditCard, ExternalLink } from "lucide-react"
 import { useAgency, DEMO_AGENCY_LOGO_URL } from "@/lib/agency-context"
+import { DEPARTMENT_TYPES, type SupportedDepartmentType } from "@/lib/department-types"
 import { isLocalHostname } from "@/lib/local-preview"
 import { useSubscription } from "@/lib/use-subscription"
 import { useMemberSession } from "@/lib/use-member-session"
@@ -24,6 +32,8 @@ export default function AgencySettingsPage() {
   const { isSubscribed, isLoading: subLoading } = useSubscription()
   const isLoading = sessionLoading || subLoading
   const locked = !isSubscribed
+  const isCityArea = settings.serviceAreaType === "city"
+  const isCountyArea = settings.serviceAreaType === "county"
   const [genUsage, setGenUsage] = useState<{
     used: number
     quota: number
@@ -87,7 +97,7 @@ export default function AgencySettingsPage() {
           <div>
             <p className="font-bold text-[#1a365d] text-lg">Get started with Press Center</p>
             <p className="text-sm text-muted-foreground mt-0.5">
-              $30/month. Confident communication for public safety — draft press releases and video requests in minutes without compromising oversight.
+              $99/month. Confident communication for public safety — draft press releases and video requests in minutes without compromising oversight.
             </p>
           </div>
           <Button asChild className="shrink-0 bg-[#f2b233] text-[#1a365d] hover:bg-[#f2b233]/90 font-semibold">
@@ -121,40 +131,113 @@ export default function AgencySettingsPage() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="defaultCity">Default City</Label>
-              <Input
-                id="defaultCity"
-                placeholder="City Name"
-                className="placeholder:text-muted-foreground/60"
-                value={settings.city}
-                onChange={(e) => updateSettings({ city: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="defaultState">Default State</Label>
-              <Input
-                id="defaultState"
-                placeholder="State"
-                className="placeholder:text-muted-foreground/60"
-                value={settings.state}
-                onChange={(e) => updateSettings({ state: e.target.value })}
-              />
+              <Label htmlFor="agencyType">Agency type</Label>
+              <Select
+                value={settings.agencyType}
+                onValueChange={(value) =>
+                  updateSettings({
+                    agencyType: value as SupportedDepartmentType,
+                    agencyTypeOther: "",
+                  })
+                }
+              >
+                <SelectTrigger id="agencyType" className="w-full">
+                  <SelectValue placeholder="Choose agency type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {DEPARTMENT_TYPES.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Shapes which Post Ideas are relevant for your agency — not only police topics.
+              </p>
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="serviceZips">Service ZIP codes</Label>
-            <Input
-              id="serviceZips"
-              placeholder="e.g. 19067, 19047, 18940"
-              className="placeholder:text-muted-foreground/60"
-              value={settings.serviceZips}
-              onChange={(e) => updateSettings({ serviceZips: e.target.value })}
-            />
-            <p className="text-xs text-muted-foreground">
-              Used for Local Ideas (weather, holidays, and what’s happening near you). Add every ZIP you
-              serve so results match your coverage area — not just a shared city or county name.
-            </p>
+          <div className="space-y-4 rounded-xl border border-[#e2e8f5] bg-[#f8faff] p-4">
+            <div>
+              <p className="text-sm font-semibold text-[#0f1c3f]">Service area</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Choose how your agency covers the community. We use this to search the right area
+                for Post Ideas.
+              </p>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="serviceAreaType">Area type</Label>
+                <Select
+                  value={settings.serviceAreaType}
+                  onValueChange={(value) =>
+                    updateSettings({
+                      serviceAreaType: value as "city" | "county" | "state",
+                    })
+                  }
+                >
+                  <SelectTrigger id="serviceAreaType" className="w-full bg-white">
+                    <SelectValue placeholder="Choose coverage area" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="city">City / township / borough</SelectItem>
+                    <SelectItem value="county">County-wide</SelectItem>
+                    <SelectItem value="state">Statewide</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="defaultState">State</Label>
+                <Input
+                  id="defaultState"
+                  placeholder="e.g. PA"
+                  className="placeholder:text-muted-foreground/60"
+                  value={settings.state}
+                  onChange={(e) => updateSettings({ state: e.target.value })}
+                />
+              </div>
+            </div>
+
+            {isCityArea && (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="defaultCity">City / township / borough</Label>
+                  <Input
+                    id="defaultCity"
+                    placeholder="e.g. Lansdale"
+                    className="placeholder:text-muted-foreground/60"
+                    value={settings.city}
+                    onChange={(e) => updateSettings({ city: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="serviceCounty">County</Label>
+                  <Input
+                    id="serviceCounty"
+                    placeholder="e.g. Montgomery County"
+                    className="placeholder:text-muted-foreground/60"
+                    value={settings.county}
+                    onChange={(e) => updateSettings({ county: e.target.value })}
+                  />
+                </div>
+              </div>
+            )}
+
+            {isCountyArea && (
+              <div className="space-y-2">
+                <Label htmlFor="serviceCounty">County</Label>
+                <Input
+                  id="serviceCounty"
+                  placeholder="e.g. Montgomery County"
+                  className="placeholder:text-muted-foreground/60"
+                  value={settings.county}
+                  onChange={(e) => updateSettings({ county: e.target.value })}
+                />
+              </div>
+            )}
+
           </div>
 
           <div className="space-y-2">
@@ -307,7 +390,7 @@ export default function AgencySettingsPage() {
           <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-4">
             <div>
               <p className="font-medium text-foreground">Press Center Pro</p>
-              <p className="text-sm text-muted-foreground">Monthly subscription - $30/month</p>
+              <p className="text-sm text-muted-foreground">Monthly subscription - $99/month</p>
             </div>
             <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">
               Active

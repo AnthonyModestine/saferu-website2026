@@ -156,7 +156,7 @@ export default function HistoryPage() {
           <div>
             <p className="font-bold text-[#1a365d] text-lg">Get started with Press Center</p>
             <p className="text-sm text-muted-foreground mt-0.5">
-              $30/month. Confident communication for public safety — draft press releases and video requests in minutes without compromising oversight.
+              $99/month. Confident communication for public safety — draft press releases and video requests in minutes without compromising oversight.
             </p>
           </div>
           <Button asChild className="shrink-0 bg-[#f2b233] text-[#1a365d] hover:bg-[#f2b233]/90 font-semibold">
