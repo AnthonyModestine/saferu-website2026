@@ -81,12 +81,29 @@ export function OpportunityCard({
       )}
 
       {overview && (
-        <p className="mt-2 text-sm leading-relaxed text-[#475569] line-clamp-3">{overview}</p>
+        <div className="mt-3 rounded-xl border border-[#E2E8F5] bg-[#F8FAFC] p-3">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-[#64748B]">
+            Why SaferU recommends it
+          </p>
+          <p className="mt-1 text-sm leading-relaxed text-[#475569] line-clamp-3">{overview}</p>
+        </div>
       )}
 
-      {sourceName && (
+      {!compact && opp.communicationGoal && (
+        <div className="mt-3">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-[#64748B]">
+            Communication goal
+          </p>
+          <p className="mt-1 text-sm leading-relaxed text-[#475569]">{opp.communicationGoal}</p>
+        </div>
+      )}
+
+      {(sourceName || opp.issuingAuthority) && (
         <p className="mt-2 text-xs text-[#64748B]">
-          <span className="font-semibold text-[#334155]">Issued by:</span> {sourceName}
+          <span className="font-semibold text-[#334155]">
+            {opp.issuingAuthority ? "Issuing authority:" : "Source:"}
+          </span>{" "}
+          {opp.issuingAuthority || sourceName}
         </p>
       )}
 

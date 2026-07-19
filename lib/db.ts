@@ -252,5 +252,17 @@ export async function ensureSchema(): Promise<void> {
     )
   `
 
+  await db`
+    CREATE TABLE IF NOT EXISTS agency_source_catalogs (
+      member_email TEXT PRIMARY KEY,
+      agency_name TEXT,
+      state TEXT NOT NULL,
+      service_area_key TEXT NOT NULL,
+      data JSONB NOT NULL DEFAULT '{}',
+      updated_at BIGINT NOT NULL
+    )
+  `
+  await db`CREATE INDEX IF NOT EXISTS idx_agency_source_catalogs_updated ON agency_source_catalogs (updated_at)`
+
   schemaReady = true
 }

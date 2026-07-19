@@ -23,7 +23,11 @@ const TRUSTED_HOST_SUFFIXES = [
   "airnow.gov",
   "epa.gov",
   "nifc.gov",
+  "watchduty.org",
   "watchduty.com",
+  "poweroutage.us",
+  "arcgis.com",
+  "esri.com",
   "accuweather.com",
   "weather.com",
   "inciweb.wildfire.gov",
@@ -34,6 +38,20 @@ const TRUSTED_HOST_SUFFIXES = [
   "ftc.gov",
   "nfpa.org",
   "usfa.fema.gov",
+  "nvfc.org",
+  "firewise.org",
+  "hhs.gov",
+  "fda.gov",
+  "fsis.usda.gov",
+  "cpsc.gov",
+  "recalls.gov",
+  "poison.org",
+  "heart.org",
+  "uspis.gov",
+  "justice.gov",
+  "dea.gov",
+  "atf.gov",
+  "fcc.gov",
   "amberalert.gov",
   "spc.noaa.gov",
   "nhc.noaa.gov",
@@ -87,6 +105,8 @@ export function isTrustedSourceUrl(url?: string | null, sourceName?: string | nu
     if (SECONDARY_WEATHER_HOST_SUFFIXES.some((suffix) => hostMatches(host, suffix))) return true
     // Municipal/county school/utility sites are often .org or civic domains with official names.
     if (/\.(us)$/i.test(host)) return true
+    // Never let a model-supplied source name make an unrelated hostname trusted.
+    return false
   }
 
   const name = (sourceName || "").toLowerCase()

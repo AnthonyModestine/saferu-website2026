@@ -105,6 +105,21 @@ export interface PostOpportunity {
   verifiedFacts?: string[]
   publicCallToAction?: string[]
   doNotClaim?: string[]
+  /** Production PIO strategy fields generated before the post-writing stage. */
+  communicationPillar?: string
+  communicationGoal?: string
+  whyNow?: string
+  whyThisAgency?: string
+  whyThisCommunity?: string
+  residentValue?: string
+  relationshipValue?: string
+  issuingAuthority?: string
+  supportingSources?: Array<{
+    sourceName: string
+    sourceUrl: string
+    sourceClass: string
+  }>
+  qualityGateStatus?: "approved" | "approved_with_revision" | "needs_human_review" | "rejected"
   /** Retrieval tags used to match SaferU curated content to this opportunity. */
   signals?: string[]
 
@@ -210,6 +225,20 @@ export interface ExternalOpportunityInput {
   verifiedFacts?: string[]
   publicCallToAction?: string[]
   doNotClaim?: string[]
+  communicationPillar?: string
+  communicationGoal?: string
+  whyNow?: string
+  whyThisAgency?: string
+  whyThisCommunity?: string
+  residentValue?: string
+  relationshipValue?: string
+  issuingAuthority?: string
+  supportingSources?: Array<{
+    sourceName: string
+    sourceUrl: string
+    sourceClass: string
+  }>
+  qualityGateStatus?: "approved" | "approved_with_revision" | "needs_human_review" | "rejected"
   suggestedMessage?: string
   graphicUrl?: string
   graphicThumbnailUrl?: string

@@ -27,7 +27,9 @@ import {
 } from "@/lib/post-generator/rank-opportunities"
 import { discoverStrongRecommendedTopics } from "@/lib/post-generator/deep-recommended-search"
 import { discoverCreatedContentFollowups } from "@/lib/post-generator/content-followup-ai"
-import { validateRecommendationsAsPio } from "@/lib/post-generator/final-pio-validation"
+import { runProductionPostPipeline } from "@/lib/post-generator/production-pipeline"
+import { agencyRoleBrief, agencyTypeLabel } from "@/lib/post-generator/agency-relevance"
+import { buildAndSaveAgencySourceCatalog } from "@/lib/post-generator/agency-source-catalog"
 import type {
   ExternalOpportunityInput,
   GeneratorRequest,
@@ -142,6 +144,17 @@ export async function POST(request: Request) {
       resolvedDept.departmentOther || body.agencyTypeOther || body.departmentOther || ""
     ).trim()
     await ensureContentLoaded()
+    await buildAndSaveAgencySourceCatalog({
+      memberEmail: session.email,
+      agencyName,
+      state,
+      city,
+      county,
+      serviceAreaType,
+      agencyOfficialUrls: Array.isArray(body.agencyOfficialUrls)
+        ? body.agencyOfficialUrls.map(String).slice(0, 20)
+        : [],
+    })
 
     const roadImpacts: RoadImpactInput[] = Array.isArray(body.roadImpacts)
       ? (body.roadImpacts as unknown[])
@@ -431,28 +444,60 @@ export async function POST(request: Request) {
       }
     }
 
-    // Final AI editorial override for scored items. If validation fails or returns
-    // nothing, continue so SaferU curated fallback can still fill the briefing.
-    if (ranked.length > 0) {
-      const finalValidation = await validateRecommendationsAsPio({
-        opportunities: ranked,
-        agencyName,
-        agencyType,
-        agencyTypeOther,
-        city,
-        state,
-      })
-      if (finalValidation.ok) {
-        ranked = finalValidation.data
-      } else {
-        // Transport/parse failure: keep already-ranked live items rather than
-        // discarding verified NWS/federal candidates for curated-only fallback.
-        console.error(
-          "[post-opportunities] Final PIO validation failed — keeping ranked set:",
-          finalValidation.reason,
-          finalValidation.detail || ""
-        )
-      }
+    // Production architecture: retrieved evidence -> strategy -> writer -> quality gate.
+    // This path is intentionally fail-closed. Demo fixtures remain deterministic.
+    let pipelineSummary
+    const typeLabel = agencyTypeLabel(agencyType, agencyTypeOther)
+    const pipelineContext = {
+      agencyName: agencyName || "the public safety agency",
+      agencyType,
+      agencyTypeOther,
+      agencyRoleProfile: agencyRoleBrief(agencyType),
+      agencyVoiceProfile: `${typeLabel}: calm, credible, clear, professional, community-oriented, and appropriate to the agency's public-safety role.`,
+      agencyServices: Array.isArray(body.agencyServices)
+        ? body.agencyServices.map(String).slice(0, 30)
+        : [],
+      city,
+      county,
+      state,
+      serviceAreaType,
+      serviceZips,
+      todayIso,
+      localDateTime:
+        typeof body.localDateTime === "string" && body.localDateTime
+          ? body.localDateTime
+          : new Date().toISOString(),
+      timezone:
+        typeof body.timezone === "string" && body.timezone
+          ? body.timezone
+          : "America/New_York",
+      recentAgencyPosts: Array.isArray(body.recentAgencyPosts)
+        ? body.recentAgencyPosts.slice(0, 30)
+        : [],
+      recentRecommendations: Array.isArray(body.recentRecommendations)
+        ? body.recentRecommendations.slice(0, 30)
+        : [],
+      dismissedRecommendations: Array.isArray(body.dismissedIds)
+        ? body.dismissedIds.slice(0, 50)
+        : [],
+      recentSaferUContent: recentCreatedContent,
+      upcomingEvents: Array.isArray(body.upcomingEvents) ? body.upcomingEvents.slice(0, 30) : [],
+      availableSaferUContent: Array.isArray(body.availableSaferUContent)
+        ? body.availableSaferUContent.slice(0, 30)
+        : [],
+      recentSignals: recentTopicKeys,
+      recentCommunicationPillars: Array.isArray(body.recentCommunicationPillars)
+        ? body.recentCommunicationPillars.map(String).slice(0, 20)
+        : [],
+      knownActiveConditions: candidates
+        .filter((candidate) => candidate.priority === "urgent")
+        .slice(0, 10),
+      excludedTopics: Array.isArray(body.dismissedIds) ? body.dismissedIds.map(String) : [],
+    }
+    if (!useDemo && ranked.length > 0) {
+      const pipeline = await runProductionPostPipeline(pipelineContext, ranked)
+      ranked = pipeline.approved
+      pipelineSummary = pipeline.stage1Summary
     }
 
     const externalOpportunities: ExternalOpportunityInput[] = ranked.map(
@@ -480,35 +525,66 @@ export async function POST(request: Request) {
     const result = generatePostOpportunities(req)
     const dailyOpportunities = flattenOpportunities(result)
 
-    // Customize SaferU fallback captions so they still sound like this agency.
-    if (result.fromSaferU.length > 0) {
-      const { generateMessageFromOpportunity } = await import("@/lib/post-generator-ai")
-      await Promise.all(
-        result.fromSaferU.map(async (opp) => {
-          const generated = await generateMessageFromOpportunity(
-            opp.title,
-            opp.whyItMatters || opp.surfacedReason || opp.summary,
-            opp.verifiedFacts ?? [],
-            opp.doNotClaim ?? [],
-            opp.publicCallToAction ?? [],
-            opp.recommendedAction,
-            agencyName,
-            city,
-            state,
-            opp.summary,
-            opp.sourceLabel,
-            agencyType,
-            agencyTypeOther
-          )
-          if (generated.ok && generated.data) {
-            opp.curatedMessage = generated.data
-            if (!opp.surfacedReason) {
-              opp.surfacedReason =
-                "Optional SaferU safety reminder matched to your season and agency — useful anytime, not an urgent local alert."
-            }
-          }
-        })
-      )
+    // SaferU fallback content is already editorially approved. Any agency-specific
+    // rewrite must still pass the same three production stages before replacing it.
+    if (!useDemo && ranked.length === 0 && result.fromSaferU.length > 0) {
+      const curatedCandidates = result.fromSaferU.map((opp) => ({
+        id: opp.id,
+        title: opp.title,
+        summary: opp.summary,
+        category: opp.category,
+        sourceLabel: opp.sourceLabel,
+        whyItMatters: opp.whyItMatters,
+        surfacedReason: opp.surfacedReason,
+        recommendedAction: opp.recommendedAction,
+        recommendedPostTiming: opp.recommendedPostTiming,
+        priority: opp.priority,
+        signals: opp.signals ?? [],
+        sourceName: "SaferU Content Library",
+        verifiedFacts: [
+          `SaferU's approved Content Library includes a post titled "${opp.title}".`,
+          `Approved message: ${opp.curatedMessage || opp.curated?.message || opp.summary}`,
+        ],
+        publicCallToAction: ["Share the approved SaferU safety message."],
+        doNotClaim: ["Do not invent a local incident, trend, alert, or emergency."],
+        suggestedMessage: opp.curatedMessage,
+        confidenceLevel: "high" as const,
+        recommendationTier: "could_post" as const,
+        jurisdictionFit: "own" as const,
+        internalScores: {
+          agencyRelevance: 75,
+          geographicRelevance: 70,
+          residentValue: 80,
+          actionability: 75,
+          urgency: 45,
+          sourceTrust: 95,
+          seasonalRelevance: 75,
+          engagementPotential: 70,
+          freshness: 70,
+          composite: 74,
+          pioRating: 4 as const,
+          agencyFitReason: opp.whyItMatters,
+          messagingAngle: "Provide useful prevention or education without implying a local incident.",
+        },
+      }))
+      const curatedPipeline = await runProductionPostPipeline(pipelineContext, curatedCandidates)
+      const approvedById = new Map(curatedPipeline.approved.map((opp) => [opp.id, opp]))
+      for (const opportunity of result.fromSaferU) {
+        const approved = approvedById.get(opportunity.id)
+        if (!approved) continue
+        opportunity.curatedMessage = approved.suggestedMessage
+        opportunity.surfacedReason = approved.surfacedReason
+        opportunity.communicationPillar = approved.communicationPillar
+        opportunity.communicationGoal = approved.communicationGoal
+        opportunity.whyNow = approved.whyNow
+        opportunity.whyThisAgency = approved.whyThisAgency
+        opportunity.whyThisCommunity = approved.whyThisCommunity
+        opportunity.residentValue = approved.residentValue
+        opportunity.relationshipValue = approved.relationshipValue
+        opportunity.issuingAuthority = approved.issuingAuthority
+        opportunity.supportingSources = approved.supportingSources
+        opportunity.qualityGateStatus = approved.qualityGateStatus
+      }
     }
 
     const opportunities = dailyOpportunities.map((opp) => ({
@@ -529,6 +605,8 @@ export async function POST(request: Request) {
       generatedAt: result.generatedAt,
       opportunities,
       demo: useDemo,
+      pipelineVersion: "three-stage-v1",
+      pipelineSummary,
     })
   } catch (e) {
     console.error("Post opportunities error:", e)
