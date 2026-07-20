@@ -25,8 +25,11 @@ import Image from "next/image"
 import Link from "next/link"
 
 export default function AgencySettingsPage() {
-  const { settings, updateSettings } = useAgency()
+  const { settings, updateSettings, persistSettings, locationReady, locationMissing } =
+    useAgency()
   const [saved, setSaved] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { member, isLoading: sessionLoading } = useMemberSession()
   const { isSubscribed, isLoading: subLoading } = useSubscription()
@@ -51,9 +54,17 @@ export default function AgencySettingsPage() {
       .catch(() => {})
   }, [isSubscribed])
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    setSaving(true)
+    setSaveError(null)
+    const result = await persistSettings()
+    setSaving(false)
+    if (!result.ok) {
+      setSaveError(result.error || "Could not save settings")
+      return
+    }
     setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+    setTimeout(() => setSaved(false), 2500)
   }
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -213,7 +224,7 @@ export default function AgencySettingsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="serviceCounty">County</Label>
+                  <Label htmlFor="serviceCounty">County (recommended)</Label>
                   <Input
                     id="serviceCounty"
                     placeholder="e.g. Montgomery County"
@@ -221,6 +232,9 @@ export default function AgencySettingsPage() {
                     value={settings.county}
                     onChange={(e) => updateSettings({ county: e.target.value })}
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Optional, but helps when city names appear in more than one county.
+                  </p>
                 </div>
               </div>
             )}
@@ -425,10 +439,20 @@ export default function AgencySettingsPage() {
       </Card>
 
       <div className="flex justify-end">
-        <Button onClick={handleSave} className="bg-primary text-primary-foreground">
+        <Button
+          onClick={() => void handleSave()}
+          disabled={saving || locked}
+          className="bg-primary text-primary-foreground"
+        >
           <Save className="mr-2 h-4 w-4" />
-          {saved ? "Saved!" : "Save Settings"}
+          {saving ? "Saving…" : saved ? "Saved!" : "Save Settings"}
         </Button>
+        {saveError ? <p className="text-sm text-destructive">{saveError}</p> : null}
+        {!locationReady && locationMissing.length > 0 ? (
+          <p className="text-sm text-[#92400e]">
+            Post Generator still needs: {locationMissing.join(", ")}.
+          </p>
+        ) : null}
       </div>
       </div>
     </div>

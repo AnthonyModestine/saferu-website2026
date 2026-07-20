@@ -3,6 +3,10 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 import type { DepartmentType } from "@/lib/department-types"
 import { isLocalHostname } from "@/lib/local-preview"
+import {
+  agencyLocationMissing,
+  isAgencyLocationReady,
+} from "@/lib/agency-location"
 
 const STORAGE_KEY = "pio_agency_settings"
 
@@ -33,6 +37,11 @@ interface AgencySettings {
 interface AgencyContextType {
   settings: AgencySettings
   updateSettings: (settings: Partial<AgencySettings>) => void
+  /** Persist current settings to the signed-in agency account. */
+  persistSettings: () => Promise<{ ok: boolean; error?: string }>
+  settingsHydrated: boolean
+  locationReady: boolean
+  locationMissing: string[]
 }
 
 const defaultSettings: AgencySettings = {
@@ -150,32 +159,60 @@ const AgencyContext = createContext<AgencyContextType | null>(null)
 
 export function AgencyProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<AgencySettings>(defaultSettings)
+  const [settingsHydrated, setSettingsHydrated] = useState(false)
 
   useEffect(() => {
+    let cancelled = false
     const hadStored =
       typeof window !== "undefined" && Boolean(localStorage.getItem(STORAGE_KEY))
     const stored = loadStored()
     setSettings(stored)
 
-    if (hadStored) return
+    async function hydrateFromAccount() {
+      try {
+        const sessionRes = await fetch("/api/auth/session")
+        const sessionData = sessionRes.ok ? await sessionRes.json() : null
+        const member = sessionData?.member
+        if (!member) {
+          if (!cancelled) setSettingsHydrated(true)
+          return
+        }
 
-    fetch("/api/auth/session")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        const member = data?.member
-        if (!member) return
+        // Prefer account-backed service area when available.
+        const remoteRes = await fetch("/api/pio/agency-settings")
+        const remoteData = remoteRes.ok ? await remoteRes.json() : null
+        const remote = remoteData?.settings as Partial<AgencySettings> | null | undefined
+
+        if (cancelled) return
         setSettings((prev) => {
           const next: AgencySettings = {
             ...prev,
-            agencyName: member.agency || prev.agencyName,
-            agencyType: member.departmentType || prev.agencyType,
-            agencyTypeOther: member.departmentOther || prev.agencyTypeOther,
+            ...(remote || {}),
+            agencyName: remote?.agencyName || member.agency || prev.agencyName,
+            agencyType:
+              (remote?.agencyType as DepartmentType | "") ||
+              member.departmentType ||
+              prev.agencyType,
+            agencyTypeOther:
+              remote?.agencyTypeOther || member.departmentOther || prev.agencyTypeOther,
           }
-          saveStored(next)
-          return next
+          const sanitized = withLocalTestingDefaults(sanitizeSettings(next))
+          saveStored(sanitized)
+          return sanitized
         })
-      })
-      .catch(() => {})
+      } catch {
+        if (!hadStored) {
+          // keep local defaults
+        }
+      } finally {
+        if (!cancelled) setSettingsHydrated(true)
+      }
+    }
+
+    void hydrateFromAccount()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const updateSettings = (newSettings: Partial<AgencySettings>) => {
@@ -186,8 +223,38 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
     })
   }
 
+  const persistSettings = async () => {
+    saveStored(settings)
+    try {
+      const res = await fetch("/api/pio/agency-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(settings),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        return { ok: false, error: String(data.error || "Could not save to your account") }
+      }
+      return { ok: true }
+    } catch {
+      return { ok: false, error: "Could not save to your account" }
+    }
+  }
+
+  const locationReady = isAgencyLocationReady(settings)
+  const locationMissing = agencyLocationMissing(settings)
+
   return (
-    <AgencyContext.Provider value={{ settings, updateSettings }}>
+    <AgencyContext.Provider
+      value={{
+        settings,
+        updateSettings,
+        persistSettings,
+        settingsHydrated,
+        locationReady,
+        locationMissing,
+      }}
+    >
       {children}
     </AgencyContext.Provider>
   )

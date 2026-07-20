@@ -110,7 +110,7 @@ function serviceAreaLabel(settings: {
 
 export default function PostGeneratorPage() {
   const router = useRouter()
-  const { settings } = useAgency()
+  const { settings, locationReady, locationMissing } = useAgency()
   const { member, isLoading: sessionLoading } = useMemberSession()
   const [localGuestPreview, setLocalGuestPreview] = useState(false)
   const guest = localGuestPreview || (!sessionLoading && !member)
@@ -128,15 +128,6 @@ export default function PostGeneratorPage() {
   }, [])
 
   const agencyName = settings.agencyName || "Your Agency"
-  const locationReady = Boolean(
-    settings.agencyType &&
-      settings.state.trim() &&
-      (settings.serviceAreaType === "state" ||
-        (settings.serviceAreaType === "county" && settings.county.trim()) ||
-        (settings.serviceAreaType === "city" &&
-          settings.city.trim() &&
-          settings.county.trim()))
-  )
 
   async function hydrateOpportunityGraphics(opportunities: PostOpportunity[]) {
     await attachWeatherAlertGraphics(opportunities, {
@@ -550,12 +541,18 @@ export default function PostGeneratorPage() {
 
       {!locationReady && (
         <div className="rounded-2xl border border-[#e2e8f5] bg-white px-5 py-4 text-sm text-[#475569]">
-          Set your state and service area in{" "}
+          Finish{" "}
           <Link href="/pio-tool/settings" className="font-semibold text-[#2563EB] hover:underline">
             Agency Settings
           </Link>{" "}
-          to get recommendations. City agencies need city + county (place names can repeat in a
-          state).
+          before generating
+          {locationMissing.length > 0 ? (
+            <>
+              {" "}
+              — still needed: <span className="font-semibold">{locationMissing.join(", ")}</span>
+            </>
+          ) : null}
+          . City agencies need agency type, state, and city (county is optional but recommended).
           {guest ? (
             <>
               {" "}

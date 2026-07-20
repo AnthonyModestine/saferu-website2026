@@ -135,14 +135,14 @@ export async function POST(request: Request) {
     const hasServiceArea =
       serviceAreaType === "state" ||
       (serviceAreaType === "county" && Boolean(county)) ||
-      (serviceAreaType === "city" && Boolean(city) && Boolean(county))
+      (serviceAreaType === "city" && Boolean(city))
 
     if (!state || !hasServiceArea) {
       return NextResponse.json(
         {
           error:
             serviceAreaType === "city"
-              ? "Add state, city/township/borough, and county in Agency Settings so recommendations match your coverage area."
+              ? "Add state and city/township/borough in Agency Settings so recommendations match your coverage area."
               : "Add your service area in Agency Settings so recommendations match your coverage area.",
         },
         { status: 400 }
