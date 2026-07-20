@@ -174,6 +174,20 @@ export default function UsePostPage() {
       topicKey: topicKey(opp),
       contentId: opp.curated?.contentId,
     })
+    void fetch("/api/pio/recommendation-feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "published",
+        opportunityId: opp.id,
+        title: opp.title,
+        category: opp.category,
+        sourceLabel: opp.sourceLabel,
+        signals: opp.signals ?? [],
+        topicKey: topicKey(opp),
+        agencyName: settings.agencyName,
+      }),
+    }).catch(() => {})
     setMarkedPosted(true)
   }
 
@@ -307,7 +321,7 @@ export default function UsePostPage() {
                   disabled={markedPosted}
                   onClick={handleMarkPosted}
                 >
-                  {markedPosted ? "Marked as posted" : "Mark as posted"}
+                  {markedPosted ? "Published" : "Mark as published"}
                 </Button>
               </>
             )}

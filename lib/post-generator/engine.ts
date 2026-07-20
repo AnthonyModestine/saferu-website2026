@@ -56,8 +56,14 @@ function buildCuratedOpportunity(
     status: "new",
     curated,
     curatedMessage: scored.post.message,
-    graphicUrl: scored.post.graphicUrl,
-    graphicThumbnailUrl: scored.post.graphicUrl,
+    graphicUrl:
+      scored.post.hasGraphic && !isPlaceholderGraphic(scored.post.graphicUrl)
+        ? scored.post.graphicUrl
+        : undefined,
+    graphicThumbnailUrl:
+      scored.post.hasGraphic && !isPlaceholderGraphic(scored.post.graphicUrl)
+        ? scored.post.graphicUrl
+        : undefined,
     signals: scored.post.signals,
     timelinessScore: scored.post.relevantMonths.includes(ctx.month) ? 85 : 60,
     safetyValueScore: 80,
@@ -72,6 +78,19 @@ function buildCuratedOpportunity(
   }
 }
 
+function isPlaceholderGraphic(url?: string): boolean {
+  if (!url?.trim()) return true
+  return /placeholder-\d+\.jpg/i.test(url)
+}
+
+function isOfficialAlertTemplateTopic(input: ExternalOpportunityInput): boolean {
+  return (
+    input.sourceLabel === "Weather Alert" ||
+    input.sourceLabel === "Weather Analysis" ||
+    /road_closure|boil_water|utility|public_works/i.test(input.category || "")
+  )
+}
+
 function buildExternalFromInput(
   input: ExternalOpportunityInput,
   match: { post: IndexedCuratedPost; score: number; matchReason: string } | undefined,
@@ -81,6 +100,18 @@ function buildExternalFromInput(
   const curated = match ? toCuratedRef(match.post, match.matchReason) : undefined
   const externalGraphic = allowGraphic ? input.graphicUrl : undefined
   const externalThumbnail = allowGraphic ? input.graphicThumbnailUrl : undefined
+
+  // Official alerts use the premade Weather Alert / public-info canvas template
+  // (client-side). Do not invent or attach unrelated SaferU safety graphics.
+  // For all other topics, only attach real SaferU library images (never placeholders).
+  const useAlertTemplate = isOfficialAlertTemplateTopic(input)
+  const libraryGraphic =
+    !useAlertTemplate &&
+    match?.post.graphicUrl &&
+    match.post.hasGraphic &&
+    !isPlaceholderGraphic(match.post.graphicUrl)
+      ? match.post.graphicUrl
+      : undefined
 
   return {
     id: input.id,
@@ -116,14 +147,22 @@ function buildExternalFromInput(
     supportingSources: input.supportingSources,
     qualityGateStatus: input.qualityGateStatus,
     signals: input.signals,
-    curated,
+    curated: useAlertTemplate ? undefined : curated,
     // External facts drive the message; a curated match supplies the optional graphic/reference.
     curatedMessage: input.suggestedMessage,
-    graphicUrl: externalGraphic ?? match?.post.graphicUrl,
-    graphicThumbnailUrl: externalThumbnail ?? externalGraphic ?? match?.post.graphicUrl,
-    graphicSourceName: externalGraphic ? input.graphicSourceName : undefined,
+    graphicUrl: externalGraphic ?? libraryGraphic,
+    graphicThumbnailUrl: externalThumbnail ?? externalGraphic ?? libraryGraphic,
+    graphicSourceName: externalGraphic
+      ? input.graphicSourceName
+      : libraryGraphic
+        ? "SaferU"
+        : undefined,
     graphicSourceUrl: externalGraphic ? input.graphicSourceUrl : undefined,
-    graphicAltText: externalGraphic ? input.graphicAltText : undefined,
+    graphicAltText: externalGraphic
+      ? input.graphicAltText
+      : libraryGraphic
+        ? match?.post.title
+        : undefined,
     timelinessScore: input.internalScores?.urgency ??
       (input.priority === "urgent" ? 95 : input.priority === "recommended_today" ? 88 : 70),
     safetyValueScore: input.internalScores?.residentValue ?? (input.category.includes("road") ? 75 : 85),
@@ -131,12 +170,12 @@ function buildExternalFromInput(
       input.internalScores?.actionability ?? (input.publicCallToAction?.length ? 90 : 75),
     sourceReliabilityScore:
       input.internalScores?.sourceTrust ?? (input.sourceName ? 85 : 70),
-    curatedMatchScore: match?.score ?? 0,
+    curatedMatchScore: useAlertTemplate ? 0 : match?.score ?? 0,
     freshnessScore: input.internalScores?.freshness ?? 85,
     totalScore:
       input.internalScores?.composite ??
       ((input.priority === "urgent" ? 95 : input.priority === "recommended_today" ? 82 : 65) +
-        (match ? 20 : 0)),
+        (!useAlertTemplate && match ? 20 : 0)),
     confidenceLevel: input.confidenceLevel ?? "medium",
     discoveredAt: now,
     updatedAt: now,

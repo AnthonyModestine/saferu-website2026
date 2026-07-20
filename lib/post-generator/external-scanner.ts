@@ -18,6 +18,8 @@ type NwsPeriod = {
 }
 
 type NwsAlertFeature = {
+  /** Feature-level API URL, e.g. https://api.weather.gov/alerts/urn:oid:... */
+  id?: string
   properties?: {
     event?: string
     headline?: string
@@ -29,8 +31,35 @@ type NwsAlertFeature = {
     severity?: string
     urgency?: string
     areaDesc?: string
+    /** Rare; prefer feature `id` for a verifiable alert document. */
     uri?: string
+    id?: string
   }
+}
+
+/** Prefer the alert API document URL — never bare alerts.weather.gov homepage. */
+function nwsAlertSourceUrl(alert: NwsAlertFeature): string | null {
+  const featureId = typeof alert.id === "string" ? alert.id.trim() : ""
+  if (/^https?:\/\/api\.weather\.gov\/alerts\//i.test(featureId)) return featureId
+  const propUri = alert.properties?.uri?.trim() || ""
+  if (/^https?:\/\/api\.weather\.gov\/alerts\//i.test(propUri)) return propUri
+  if (
+    /^https?:\/\//i.test(propUri) &&
+    !/alerts\.weather\.gov\/?$/i.test(propUri) &&
+    !/\/alerts\/active\/?$/i.test(propUri)
+  ) {
+    return propUri
+  }
+  const propId = alert.properties?.id?.trim() || ""
+  if (/^https?:\/\/api\.weather\.gov\/alerts\//i.test(propId)) return propId
+  // Last resort: still better than a homepage when we only have an oid path
+  if (featureId.startsWith("urn:oid:") || featureId.includes("urn:oid:")) {
+    const oid = featureId.includes("urn:oid:")
+      ? featureId.slice(featureId.indexOf("urn:oid:"))
+      : featureId
+    return `https://api.weather.gov/alerts/${oid}`
+  }
+  return null
 }
 
 export type RoadImpactInput = {
@@ -58,13 +87,43 @@ async function fetchJson<T>(url: string): Promise<T | null> {
   try {
     const res = await fetch(url, {
       headers: {
-        Accept: "application/json",
+        // Prefer GeoJSON for NWS alert/point APIs so we get feature.id document URLs.
+        Accept: "application/geo+json, application/ld+json, application/json",
         "User-Agent": "SaferU Press Center (https://saferu.com)",
       },
       next: { revalidate: 60 * 30 },
     })
     if (!res.ok) return null
-    return (await res.json()) as T
+    const data = (await res.json()) as T & {
+      features?: NwsAlertFeature[]
+      "@graph"?: Array<Record<string, unknown> & { "@id"?: string; event?: string }>
+    }
+    // Some Accept negotiations return JSON-LD (@graph) instead of GeoJSON features.
+    if (
+      data &&
+      typeof data === "object" &&
+      !Array.isArray((data as { features?: unknown }).features) &&
+      Array.isArray(data["@graph"])
+    ) {
+      const features = data["@graph"].map((item) => ({
+        id: typeof item["@id"] === "string" ? item["@id"] : undefined,
+        properties: {
+          event: typeof item.event === "string" ? item.event : undefined,
+          headline: typeof item.headline === "string" ? item.headline : undefined,
+          description: typeof item.description === "string" ? item.description : undefined,
+          instruction: typeof item.instruction === "string" ? item.instruction : undefined,
+          effective: typeof item.effective === "string" ? item.effective : undefined,
+          ends: typeof item.ends === "string" ? item.ends : undefined,
+          expires: typeof item.expires === "string" ? item.expires : undefined,
+          severity: typeof item.severity === "string" ? item.severity : undefined,
+          urgency: typeof item.urgency === "string" ? item.urgency : undefined,
+          areaDesc: typeof item.areaDesc === "string" ? item.areaDesc : undefined,
+          id: typeof item.id === "string" ? item.id : undefined,
+        },
+      }))
+      return { ...data, features } as T
+    }
+    return data as T
   } catch {
     return null
   }
@@ -85,6 +144,7 @@ function buildHeatOpportunity(
   if (hotPeriods.length === 0) return null
   const maxTemp = Math.max(...hotPeriods.map((p) => p.temperature ?? 0))
   if (maxTemp < 95) return null
+  if (!forecastUrl?.trim()) return null
 
   const days = hotPeriods
     .slice(0, 3)
@@ -107,7 +167,7 @@ function buildHeatOpportunity(
     priority: "recommended_today",
     signals: heatSignals(maxTemp, forecastText),
     sourceName: "National Weather Service forecast",
-    sourceUrl: forecastUrl || "https://api.weather.gov/",
+    sourceUrl: forecastUrl,
     eventStart: hotPeriods[0]?.startTime,
     eventEnd: hotPeriods[hotPeriods.length - 1]?.endTime,
     verifiedFacts: [
@@ -150,31 +210,55 @@ function buildWeatherAlertOpportunity(
               : ["weather_safety"]
 
   const priority = /warning|tornado|flash flood/i.test(event) ? "urgent" : "recommended_today"
+  const area = props?.areaDesc?.trim() || ""
+  const headline = props?.headline?.trim() || ""
+  const description = cleanAlertSnippet(props?.description)
+  const sourceUrl = nwsAlertSourceUrl(alert)
+  if (!sourceUrl) {
+    console.warn(
+      `[external-scanner] Skipping NWS alert "${event}" — no verifiable api.weather.gov alert URL`
+    )
+    return null
+  }
   return {
     id: `weather-alert-${locationKey}-${eventLower.replace(/[^a-z0-9]+/g, "-")}`,
     title: event,
-    summary: props?.headline || `${event} is active for part of the service area.`,
+    summary:
+      headline ||
+      (area
+        ? `${event} is in effect for ${area}.`
+        : `${event} is active for part of the service area.`),
     category: severeSignals[0] ?? "weather",
     sourceLabel: "Weather Alert",
     whyItMatters:
-      props?.headline ||
+      headline ||
       `${event} may affect residents in your service area. A clear public safety reminder can help people prepare and avoid unnecessary travel or exposure.`,
     recommendedAction: "Share official timing, expected impacts, and practical safety steps.",
     recommendedPostTiming: priority === "urgent" ? "Post as soon as possible." : "Post today.",
     priority,
     signals: severeSignals,
     sourceName: "National Weather Service alert",
-    sourceUrl: props?.uri || "https://alerts.weather.gov/",
+    sourceUrl,
     eventStart: props?.effective,
     eventEnd: props?.ends || props?.expires,
     expiresAt: props?.expires,
-    verifiedFacts: compact([props?.headline, props?.areaDesc ? `Affected area: ${props.areaDesc}` : null]),
+    verifiedFacts: compact([
+      headline,
+      area ? `Affected area: ${area}` : null,
+      description ? `NWS details: ${description}` : null,
+      event ? `National Weather Service ${event}` : null,
+    ]),
     publicCallToAction: props?.instruction ? [props.instruction] : undefined,
     doNotClaim: [
       "Do not add shelter, evacuation, or road-closure details unless confirmed by an official source.",
     ],
     confidenceLevel: "high",
   }
+}
+
+function cleanAlertSnippet(value?: string | null): string {
+  if (!value?.trim()) return ""
+  return value.replace(/\s+/g, " ").trim().slice(0, 280)
 }
 
 async function scanWeatherForLocation(

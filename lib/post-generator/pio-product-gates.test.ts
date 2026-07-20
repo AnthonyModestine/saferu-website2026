@@ -263,6 +263,21 @@ describe("Test 10: Serious Weather", () => {
       true
     )
   })
+
+  it("accepts official Weather Alert with high confidence even without warning keyword in title", () => {
+    assert.equal(
+      isSeriousWeatherRecommendation({
+        title: "Severe Thunderstorm",
+        summary: "Strong storms are expected this evening across the county.",
+        category: "severe_storms",
+        sourceLabel: "Weather Alert",
+        sourceName: "National Weather Service alert",
+        confidenceLevel: "high",
+        signals: ["severe_storms"],
+      }),
+      true
+    )
+  })
 })
 
 describe("Test 11: No Strong Recommendations", () => {

@@ -264,5 +264,22 @@ export async function ensureSchema(): Promise<void> {
   `
   await db`CREATE INDEX IF NOT EXISTS idx_agency_source_catalogs_updated ON agency_source_catalogs (updated_at)`
 
+  await db`
+    CREATE TABLE IF NOT EXISTS agency_recommendation_preferences (
+      id TEXT PRIMARY KEY,
+      member_id TEXT NOT NULL,
+      agency_name TEXT,
+      action TEXT NOT NULL,
+      opportunity_id TEXT NOT NULL,
+      title TEXT,
+      category TEXT,
+      topic_key TEXT,
+      source_label TEXT,
+      signals JSONB NOT NULL DEFAULT '[]',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `
+  await db`CREATE INDEX IF NOT EXISTS idx_agency_rec_prefs_member ON agency_recommendation_preferences (member_id, created_at DESC)`
+
   schemaReady = true
 }

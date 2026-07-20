@@ -11,6 +11,8 @@ export type WeatherCandidateLike = {
   signals?: string[]
   verifiedFacts?: string[]
   priority?: string
+  confidenceLevel?: string
+  sourceName?: string
 }
 
 const SERIOUS_WEATHER =
@@ -45,6 +47,15 @@ export function looksLikeWeatherTopic(input: WeatherCandidateLike): boolean {
 }
 
 export function isSeriousWeatherRecommendation(input: WeatherCandidateLike): boolean {
+  // Official NWS alert products are serious by definition — do not require
+  // the event title to restate "warning/watch/advisory" when sourceLabel already says so.
+  if (
+    input.sourceLabel === "Weather Alert" &&
+    (input.confidenceLevel === "high" ||
+      /\bnational weather service\b/i.test(input.sourceName || ""))
+  ) {
+    return true
+  }
   const text = weatherBlob(input)
   if (SERIOUS_WEATHER.test(text)) return true
   if (input.priority === "urgent" && RESIDENT_ACTION_NEED.test(text)) return true

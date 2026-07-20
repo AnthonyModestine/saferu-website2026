@@ -42,6 +42,12 @@ export type RankContext = {
   postedFingerprints?: string[]
   recentTopicKeys?: string[]
   requireTrustedSource?: boolean
+  /** Topics this agency previously endorsed as a strong fit. */
+  endorsedTopicKeys?: string[]
+  /** Topics this agency declined as not relevant. */
+  declinedTopicKeys?: string[]
+  /** Topics recently published — soft-dedupe. */
+  publishedTopicKeys?: string[]
 }
 
 const WEIGHTS = {
@@ -545,6 +551,7 @@ export function scoreExternalOpportunity(
       sourceName: input.sourceName,
       category: input.category,
       signals: input.signals,
+      verifiedFacts: input.verifiedFacts,
       distanceMiles: input.distanceMiles,
     })
 
@@ -591,12 +598,22 @@ export function scoreExternalOpportunity(
   if ((ctx.recentTopicKeys ?? []).includes(key)) {
     composite -= 12
   }
+  if ((ctx.publishedTopicKeys ?? []).includes(key)) {
+    composite -= 18
+  }
+  if ((ctx.declinedTopicKeys ?? []).includes(key)) {
+    composite -= 22
+  }
+  if ((ctx.endorsedTopicKeys ?? []).includes(key)) {
+    composite += 8
+  }
   if (jurisdictionFit === "nearby") composite -= 4
   if (jurisdictionFit === "regional") composite -= 8
 
   composite = clamp(composite)
   const pioRating = compositeToStars(composite)
   // Quality gate: 1–3 stars never reach the user.
+  // Declined topic families can still surface when newly urgent (4–5★ after penalties).
   if (pioRating < 4) return null
 
   let messagingAngle = messagingAngleForOpportunity(

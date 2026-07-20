@@ -32,6 +32,10 @@ import { discoverCreatedContentFollowups } from "@/lib/post-generator/content-fo
 import { runProductionPostPipeline } from "@/lib/post-generator/production-pipeline"
 import { agencyRoleBrief, agencyTypeLabel } from "@/lib/post-generator/agency-relevance"
 import { buildAndSaveAgencySourceCatalog } from "@/lib/post-generator/agency-source-catalog"
+import {
+  getAgencyPreferenceProfile,
+  preferenceBriefForPrompts,
+} from "@/lib/agency-recommendation-preferences"
 import type {
   ExternalOpportunityInput,
   GeneratorRequest,
@@ -203,6 +207,8 @@ export async function POST(request: Request) {
     const recentTopicKeys = Array.isArray(body.recentTopicKeys)
       ? body.recentTopicKeys.map(String)
       : []
+    const preferenceProfile = await getAgencyPreferenceProfile(session.memberId)
+    const preferenceBrief = preferenceBriefForPrompts(preferenceProfile)
     const recentCreatedContent: RecentAgencyContent[] = Array.isArray(body.recentCreatedContent)
       ? (body.recentCreatedContent as unknown[])
           .map((item): RecentAgencyContent | null => {
@@ -406,6 +412,12 @@ export async function POST(request: Request) {
       )
     )
 
+    const rankPrefs = {
+      endorsedTopicKeys: preferenceProfile.endorsedTopicKeys,
+      declinedTopicKeys: preferenceProfile.declinedTopicKeys,
+      publishedTopicKeys: preferenceProfile.publishedTopicKeys,
+    }
+
     let ranked = rankAndGateExternalOpportunities(candidates, {
       agencyType,
       agencyName,
@@ -416,13 +428,14 @@ export async function POST(request: Request) {
       recentTopicKeys,
       // Demo fixtures may omit source URLs; live path enforces trust.
       requireTrustedSource: !useDemo,
+      ...rankPrefs,
     })
 
-    // Deep search only when ranking produced zero candidates — empty is valid; do not hunt filler.
-    if (!useDemo && ranked.length === 0) {
-      console.info(
-        "[post-opportunities] No ranked recommendations — starting deep search passes."
-      )
+    // Deep search when ranking produced zero — empty is valid; do not hunt filler.
+    // Also allow a single recovery pass later if the production pipeline wipes ranked
+    // official items (e.g. evidence failure), so live alerts are not silently replaced
+    // by SaferU curated-only briefings.
+    const runDeepSearch = async (excludeTitles: string[]) => {
       const deep = await discoverStrongRecommendedTopics({
         state,
         city,
@@ -433,7 +446,7 @@ export async function POST(request: Request) {
         agencyName,
         todayIso,
         needed: 6,
-        excludeTitles: candidates.map((opp) => opp.title),
+        excludeTitles,
         activeSignals: [
           ...new Set([
             ...candidates.flatMap((opp) => opp.signals ?? []),
@@ -452,18 +465,27 @@ export async function POST(request: Request) {
           postedFingerprints,
           recentTopicKeys,
           requireTrustedSource: true,
+          ...rankPrefs,
         })
         console.info(
           `[post-opportunities] Deep search added ${deep.data.length} candidates; ` +
             `top_recommended=${hasTopRecommended(ranked)} recommendable=${hasRecommendablePost(ranked)}`
         )
-      } else {
-        console.warn(
-          "[post-opportunities] Deep recommended search unavailable:",
-          deep.ok ? "empty" : deep.reason,
-          deep.ok ? "" : deep.detail || ""
-        )
+        return true
       }
+      console.warn(
+        "[post-opportunities] Deep recommended search unavailable:",
+        deep.ok ? "empty" : deep.reason,
+        deep.ok ? "" : deep.detail || ""
+      )
+      return false
+    }
+
+    if (!useDemo && ranked.length === 0) {
+      console.info(
+        "[post-opportunities] No ranked recommendations — starting deep search passes."
+      )
+      await runDeepSearch(candidates.map((opp) => opp.title))
     }
 
     // Production architecture: retrieved evidence -> strategy -> writer -> quality gate.
@@ -508,15 +530,23 @@ export async function POST(request: Request) {
       availableSaferUContent: Array.isArray(body.availableSaferUContent)
         ? body.availableSaferUContent.slice(0, 30)
         : [],
-      recentSignals: recentTopicKeys,
+      recentSignals: [
+        ...recentTopicKeys,
+        ...preferenceProfile.endorsedTopicKeys.map((k) => `endorsed:${k}`),
+      ],
       recentCommunicationPillars: Array.isArray(body.recentCommunicationPillars)
         ? body.recentCommunicationPillars.map(String).slice(0, 20)
         : [],
       knownActiveConditions: candidates
         .filter((candidate) => candidate.priority === "urgent")
         .slice(0, 10),
-      excludedTopics: Array.isArray(body.dismissedIds) ? body.dismissedIds.map(String) : [],
+      excludedTopics: [
+        ...(Array.isArray(body.dismissedIds) ? body.dismissedIds.map(String) : []),
+        ...preferenceProfile.declinedTopicKeys,
+        ...(preferenceBrief ? [preferenceBrief] : []),
+      ],
     }
+    const rankedBeforePipeline = ranked.length
     if (!useDemo && ranked.length > 0) {
       const pipeline = await runProductionPostPipeline(pipelineContext, ranked)
       ranked = pipeline.approved
@@ -528,6 +558,27 @@ export async function POST(request: Request) {
           pipeline.diagnostics.fallbackReason,
           `approved=${pipeline.diagnostics.approvedCount}`
         )
+      }
+      // If evidence/stages wiped everything after ranking found official items,
+      // attempt one recovery discovery pass (not filler — still goes through rank+pipeline).
+      if (ranked.length === 0 && rankedBeforePipeline > 0) {
+        console.warn(
+          `[post-opportunities] Pipeline emptied ${rankedBeforePipeline} ranked item(s); attempting recovery discovery`
+        )
+        const recovered = await runDeepSearch([
+          ...candidates.map((opp) => opp.title),
+          ...pipeline.diagnostics.droppedAtEvidence.map((d) => d.id),
+        ])
+        if (recovered && ranked.length > 0) {
+          const retry = await runProductionPostPipeline(pipelineContext, ranked)
+          ranked = retry.approved
+          pipelineSummary = retry.stage1Summary
+          pipelineDiagnostics = {
+            ...retry.diagnostics,
+            fallbackReason:
+              `${pipeline.diagnostics.fallbackReason || "pipeline_empty"};recovery_attempt`,
+          }
+        }
       }
     }
 

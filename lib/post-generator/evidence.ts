@@ -55,6 +55,19 @@ function fallbackSourceClass(url: string): SourceClass {
   return "established_local_media"
 }
 
+/** Homepages and bare alert hubs cannot verify specific incident/alert claims. */
+function isUnverifiableHomepage(parsed: URL): boolean {
+  const host = parsed.hostname.toLowerCase().replace(/^www\./, "")
+  const path = (parsed.pathname || "/").replace(/\/+$/, "") || "/"
+  if (host === "alerts.weather.gov" && (path === "/" || path === "")) return true
+  if (host === "weather.gov" && (path === "/" || path === "")) return true
+  if (host === "inciweb.wildfire.gov" && (path === "/" || path === "")) return true
+  if (host === "nifc.gov" && (path === "/" || path === "")) return true
+  // api.weather.gov/alerts/active is a feed index, not a single alert document
+  if (host === "api.weather.gov" && /^\/alerts\/active$/i.test(path)) return true
+  return false
+}
+
 function factId(sourceUrl: string, claim: string, index: number): string {
   return `fact_${createHash("sha256")
     .update(`${sourceUrl}|${claim}|${index}`)
@@ -295,6 +308,32 @@ export async function verifyOpportunityEvidence(
     if (!["http:", "https:"].includes(parsed.protocol)) return []
   } catch {
     return []
+  }
+
+  // Homepages cannot ground specific alert/incident claims. Require a document URL.
+  if (isUnverifiableHomepage(parsed)) {
+    console.warn(
+      `[evidence] Dropped ${opportunity.id}: unverifiable homepage sourceUrl=${sourceUrl}`
+    )
+    return [
+      {
+        sourceId: "homepage_rejected",
+        sourceName: cleanText(opportunity.sourceName || parsed.hostname, 180),
+        sourceUrl,
+        sourceClass: fallbackSourceClass(sourceUrl),
+        issuingAuthority: "",
+        publishedAt: opportunity.eventStart || "",
+        updatedAt: "",
+        expiresAt: opportunity.expiresAt || opportunity.eventEnd || "",
+        retrievedAt: new Date().toISOString(),
+        location: "",
+        geometry: null,
+        jurisdictionMatch: jurisdictionStatus(opportunity.jurisdictionFit),
+        active: false,
+        facts: [],
+        verificationStatus: "unverified",
+      },
+    ]
   }
 
   const fetched = await fetchSource(parsed.toString())

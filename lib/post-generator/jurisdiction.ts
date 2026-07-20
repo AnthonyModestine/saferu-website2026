@@ -63,10 +63,17 @@ export function inferJurisdictionFit(opts: {
   sourceName?: string
   category?: string
   signals?: string[]
+  verifiedFacts?: string[]
   distanceMiles?: number
 }): JurisdictionFit {
   const placeTokens = extractPlaceTokens(opts.city, opts.county)
-  const text = [opts.title, opts.summary, opts.whyItMatters, opts.sourceName]
+  const text = [
+    opts.title,
+    opts.summary,
+    opts.whyItMatters,
+    opts.sourceName,
+    ...(opts.verifiedFacts || []),
+  ]
     .filter(Boolean)
     .join(" ")
 

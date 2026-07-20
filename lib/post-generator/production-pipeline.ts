@@ -2,6 +2,10 @@ import { runStage1Discovery } from "@/lib/post-generator/stage-1-discovery"
 import { runStage2Writer } from "@/lib/post-generator/stage-2-writer"
 import { runStage3QualityGate } from "@/lib/post-generator/stage-3-quality-gate"
 import { verifyRankedEvidence } from "@/lib/post-generator/evidence"
+import {
+  isKeepableWithoutPerfectEvidence,
+  provisionalEvidenceFromOpportunity,
+} from "@/lib/post-generator/source-retention"
 import type {
   PipelineAgencyContext,
   Stage1Recommendation,
@@ -114,8 +118,19 @@ export async function runProductionPostPipeline(
   }
 
   const candidates = await verifyRankedEvidence(ranked)
-  const verified = candidates.filter((candidate) => hasVerifiedEvidence(candidate.evidence))
-  const droppedAtEvidence = candidates
+  const enriched = candidates.map((candidate) => {
+    if (hasVerifiedEvidence(candidate.evidence)) return candidate
+    if (!isKeepableWithoutPerfectEvidence(candidate.opportunity)) return candidate
+    const provisional = provisionalEvidenceFromOpportunity(candidate.opportunity)
+    if (!provisional.length) return candidate
+    console.info(
+      `[production-pipeline] Retaining ranked source with provisional evidence: ${candidate.opportunity.id} (${candidate.opportunity.sourceLabel})`
+    )
+    return { ...candidate, evidence: provisional }
+  })
+
+  const verified = enriched.filter((candidate) => hasVerifiedEvidence(candidate.evidence))
+  const droppedAtEvidence = enriched
     .filter((candidate) => !hasVerifiedEvidence(candidate.evidence))
     .map((candidate) => {
       const status =
@@ -130,11 +145,11 @@ export async function runProductionPostPipeline(
     })
 
   console.info(
-    `[production-pipeline] Evidence: ${verified.length}/${candidates.length} verified; ` +
+    `[production-pipeline] Evidence: ${verified.length}/${enriched.length} usable; ` +
       `dropped=${droppedAtEvidence.map((item) => `${item.id}:${item.status}`).join(", ") || "none"}`
   )
 
-  const stage1 = await runStage1Discovery(context, candidates)
+  const stage1 = await runStage1Discovery(context, enriched)
   if (!stage1.ok) {
     console.error(
       "[production-pipeline] Stage 1 failed:",

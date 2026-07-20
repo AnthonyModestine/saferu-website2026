@@ -71,6 +71,7 @@ export function weatherAlertHeadline(
   if (/tornado watch/.test(haystack)) return "TORNADO WATCH"
   if (/severe thunderstorm warning|thunderstorm warning/.test(haystack)) return "STORM WARNING"
   if (/severe thunderstorm watch|thunderstorm watch/.test(haystack)) return "STORM WATCH"
+  if (/severe thunderstorm|thunderstorm/.test(haystack)) return "STORM ALERT"
   if (/winter storm warning/.test(haystack)) return "WINTER STORM WARNING"
   if (/winter weather advisory|winter storm watch|ice storm|blizzard/.test(haystack)) {
     return "WINTER WEATHER ALERT"

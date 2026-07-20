@@ -438,6 +438,19 @@ export default function PostGeneratorPage() {
 
   function handleDismiss(opp: PostOpportunity) {
     dismissOpportunity(opp.id)
+    void fetch("/api/pio/recommendation-feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "decline",
+        opportunityId: opp.id,
+        title: opp.title,
+        category: opp.category,
+        sourceLabel: opp.sourceLabel,
+        signals: opp.signals ?? [],
+        agencyName: settings.agencyName,
+      }),
+    }).catch(() => {})
     setResult((prev) => ({
       ...prev,
       urgent: prev.urgent.filter((o) => o.id !== opp.id),
@@ -451,8 +464,20 @@ export default function PostGeneratorPage() {
   }
 
   function handleSave(opp: PostOpportunity) {
-    // Local signal for now — marks this recommendation as useful for future learning.
     saveOpportunityForLater(opp)
+    void fetch("/api/pio/recommendation-feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "endorse",
+        opportunityId: opp.id,
+        title: opp.title,
+        category: opp.category,
+        sourceLabel: opp.sourceLabel,
+        signals: opp.signals ?? [],
+        agencyName: settings.agencyName,
+      }),
+    }).catch(() => {})
   }
 
   const recommendations = [

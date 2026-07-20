@@ -163,11 +163,11 @@ export function OpportunityCard({
               type="button"
               size="sm"
               variant="ghost"
-              title="Mark as useful so we learn what to recommend"
+              title="Endorse this as a strong fit for your agency’s communications"
               onClick={() => onSave(opp)}
             >
               <Bookmark className="mr-1.5 h-3.5 w-3.5" />
-              Useful
+              Endorse
             </Button>
           )}
 
@@ -176,11 +176,11 @@ export function OpportunityCard({
               type="button"
               size="sm"
               variant="ghost"
-              title="Hide this and don’t recommend it again"
+              title="Decline — not relevant for this agency"
               onClick={() => onDismiss(opp)}
             >
               <ThumbsDown className="mr-1.5 h-3.5 w-3.5" />
-              Not useful
+              Decline
             </Button>
           )}
         </div>
