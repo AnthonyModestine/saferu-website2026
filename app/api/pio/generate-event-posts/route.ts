@@ -27,6 +27,12 @@ function asStringList(val: unknown, maxItems = 20): string[] {
   return []
 }
 
+function isValidYmd(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const date = new Date(`${value}T12:00:00`)
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value
+}
+
 export async function POST(request: Request) {
   const session = await getMemberSession()
   if (!session) {
@@ -84,6 +90,19 @@ export async function POST(request: Request) {
     const eventPartners = cap(body.eventPartners, 500)
     const photosAvailable = cap(body.photosAvailable, 200)
     const nextStep = cap(body.nextStep, 400)
+    const audience = cap(body.audience, 500)
+    const parking = cap(body.parking, 1000)
+    const registration = cap(body.registration, 1000)
+    const registrationDeadline = cap(body.registrationDeadline, 20)
+    const registrationUrl = cap(body.registrationUrl, 500)
+    const cost = cap(body.cost, 200)
+    const accessibility = cap(body.accessibility, 1000)
+    const arrivalInstructions = cap(body.arrivalInstructions, 1000)
+    const website = cap(body.website, 500)
+    const primaryImage = cap(body.primaryImage, 500)
+    const additionalAssets = cap(body.additionalAssets, 1000)
+    const capacityStatus = cap(body.capacityStatus, 300)
+    const weatherPlan = cap(body.weatherPlan, 1000)
     const audienceGoals = cap(body.audienceGoals, 2000)
     const contentPrefs = cap(body.contentPrefs, 2000)
     const keys = Array.isArray(body.keys)
@@ -95,11 +114,17 @@ export async function POST(request: Request) {
     const channel =
       channelRaw === "x" || channelRaw === "twitter" || channelRaw === "x/twitter"
         ? "X"
-        : "Facebook"
+        : channelRaw === "nextdoor"
+          ? "Nextdoor"
+          : channelRaw === "email"
+            ? "Email"
+            : channelRaw === "website"
+              ? "Website"
+              : "Facebook"
 
     const registrationOnly =
       /registration|rsvp required|ticket|sold.?out|private|limited capac/i.test(
-        `${audienceGoals} ${contentPrefs} ${eventDescription}`
+        `${audienceGoals} ${contentPrefs} ${eventDescription} ${registration} ${capacityStatus}`
       )
     const allowOptionalFinalReminder =
       body.allowOptionalFinalReminder === false ? false : !registrationOnly
@@ -107,8 +132,17 @@ export async function POST(request: Request) {
     if (!eventName) {
       return NextResponse.json({ error: "Event title is required." }, { status: 400 })
     }
-    if (!eventDate || !/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) {
+    if (!isValidYmd(eventDate)) {
       return NextResponse.json({ error: "A valid event date is required." }, { status: 400 })
+    }
+    if (
+      registrationDeadline &&
+      (!isValidYmd(registrationDeadline) || registrationDeadline > eventDate)
+    ) {
+      return NextResponse.json(
+        { error: "Registration deadline must be a valid date on or before the event." },
+        { status: 400 }
+      )
     }
     if (!locationName) {
       return NextResponse.json({ error: "Event location is required." }, { status: 400 })
@@ -126,7 +160,15 @@ export async function POST(request: Request) {
       )
     }
 
-    const today = new Date().toISOString().slice(0, 10)
+    const now = new Date()
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
+      now.getDate()
+    ).padStart(2, "0")}`
+    const currentTime = now.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    })
     const descriptionWithContext = [
       eventDescription,
       audienceGoals ? `Audience & goals: ${audienceGoals}` : "",
@@ -158,7 +200,22 @@ export async function POST(request: Request) {
       photosAvailable: photosAvailable || undefined,
       nextStep: nextStep || undefined,
       allowOptionalFinalReminder,
+      audience: audience || undefined,
+      parking: parking || undefined,
+      registration: registration || undefined,
+      registrationRequired: Boolean(body.registrationRequired),
+      registrationDeadline: registrationDeadline || undefined,
+      registrationUrl: registrationUrl || undefined,
+      cost: cost || undefined,
+      accessibility: accessibility || undefined,
+      arrivalInstructions: arrivalInstructions || undefined,
+      website: website || undefined,
+      primaryImage: primaryImage || undefined,
+      additionalAssets: additionalAssets || undefined,
+      capacityStatus: capacityStatus || undefined,
+      weatherPlan: weatherPlan || undefined,
       today,
+      currentTime,
       keys,
       channel,
     })
@@ -180,8 +237,12 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({
-      posts: result.data,
-      campaignCount: result.data.length,
+      posts: result.data.posts,
+      campaignCount: result.data.posts.length,
+      status: result.data.status,
+      strategy: result.data.strategy,
+      detailsToVerify: result.data.detailsToVerify,
+      humanReviewReason: result.data.humanReviewReason,
     })
   } catch (err) {
     console.error("[generate-event-posts]", err)

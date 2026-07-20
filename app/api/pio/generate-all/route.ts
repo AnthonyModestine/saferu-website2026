@@ -14,6 +14,7 @@ import { aiErrorPayload } from "@/lib/ai-result"
 import { validatePressReleaseInput } from "@/lib/pio-generate-validation"
 import { logPressReleaseSessions } from "@/lib/pio-session-helper"
 import { resolveMemberDepartment } from "@/lib/member-profile"
+import { normalizePressReleasePayload } from "@/lib/pio-normalized-facts"
 
 const MAX = 1000 // max chars for free-text fields
 
@@ -65,54 +66,25 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json()
-
+    const nestedFacts =
+      body.facts && typeof body.facts === "object" ? body.facts as Record<string, unknown> : {}
     const validationError = validatePressReleaseInput({
-      incidentType: body.incidentType,
-      incidentSummary: body.incidentSummary,
+      incidentType: body.incidentType ?? nestedFacts.incidentType ?? nestedFacts.incident_type,
+      incidentSummary: body.incidentSummary ?? nestedFacts.incidentSummary ?? nestedFacts.incident_summary,
       otherIncidentType: body.otherIncidentType,
     })
     if (validationError) {
       return NextResponse.json({ error: validationError }, { status: 400 })
     }
 
-    const rawType = cap(body.incidentType, 100)
+    const rawType = cap(body.incidentType ?? nestedFacts.incidentType ?? nestedFacts.incident_type, 100)
     const resolvedType =
       rawType === "other" ? cap(body.otherIncidentType, 100) || "other" : rawType
 
-    const payload = {
-      agencyName: cap(body.agencyName, 100),
-      city: cap(body.city, 100),
-      state: cap(body.state, 50),
+    const payload = normalizePressReleasePayload({
+      ...body,
       incidentType: resolvedType,
-      incidentSummary: body.incidentSummary != null ? cap(body.incidentSummary, 4500) : undefined,
-      incidentDate: body.incidentDate != null ? cap(body.incidentDate, 20) : undefined,
-      incidentTime: body.incidentTime != null ? cap(body.incidentTime, 20) : undefined,
-      location: body.location != null ? cap(body.location, 200) : undefined,
-      investigationOngoing: Boolean(body.investigationOngoing),
-      persons: Array.isArray(body.persons) ? body.persons.slice(0, 10).map((p: { name?: string; isMinor?: boolean; description?: string }) => ({
-        name: cap(p?.name, 100),
-        isMinor: Boolean(p?.isMinor),
-        description: cap(p?.description, 500),
-      })) : [],
-      entryType: cap(body.entryType, 20) || "none",
-      arrests: Array.isArray(body.arrests) ? body.arrests.slice(0, 10).map((a: { name?: string; details?: string }) => ({
-        name: cap(a?.name, 100),
-        details: cap(a?.details, 500),
-      })) : [],
-      propertyDamage: body.propertyDamage != null ? cap(body.propertyDamage, 500) : undefined,
-      tipLine: body.tipLine != null ? cap(body.tipLine, 100) : undefined,
-      detectiveContact: body.detectiveContact != null ? cap(body.detectiveContact, 200) : undefined,
-      resolutionText: body.resolutionText != null ? cap(body.resolutionText, 500) : undefined,
-      boilerplate: body.boilerplate != null ? cap(body.boilerplate, 1000) : undefined,
-      contactName: cap(body.contactName, 100),
-      contactPhone: cap(body.contactPhone, 30),
-      contactPhone2: body.contactPhone2 != null ? cap(body.contactPhone2, 30) || undefined : undefined,
-      contactEmail: cap(body.contactEmail, 100),
-      requestFootage: Boolean(body.requestFootage),
-      footageTimeframe: body.footageTimeframe != null ? cap(body.footageTimeframe, 200) : undefined,
-      whatToLookFor: body.whatToLookFor != null ? cap(body.whatToLookFor, 500) : undefined,
-      onlineTipsUrl: body.onlineTipsUrl != null ? cap(body.onlineTipsUrl, 200) : undefined,
-    }
+    })
 
     const parsedSelection = parseMultiOutputSelection(body.outputs)
     // If client doesn't send outputs, keep legacy "generate everything" behavior

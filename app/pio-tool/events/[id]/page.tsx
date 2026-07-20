@@ -172,6 +172,23 @@ function EventDetailInner() {
       isRecurring: event.recurring ? "yes" : "no",
       agencyRole: event.hostingRole || "hosting",
       hostOrganization: event.hostOrganization || "",
+      audience: event.audience,
+      parking: event.parking,
+      registration: event.registration,
+      registrationRequired: event.registrationRequired,
+      registrationDeadline: event.registrationDeadline,
+      registrationUrl: event.registrationUrl,
+      cost: event.cost,
+      accessibility: event.accessibility,
+      arrivalInstructions: event.arrivalInstructions,
+      website: event.website,
+      primaryImage: event.primaryImage,
+      additionalAssets: event.additionalAssets,
+      capacityStatus: event.capacityStatus,
+      weatherPlan: event.weatherPlan,
+      allowOptionalFinalReminder: !/registration|rsvp required|ticket|sold.?out|private|limited capac/i.test(
+        `${event.registration || ""} ${event.capacityStatus || ""} ${event.description}`
+      ),
     }
     return buildEventCampaignPlan(facts, todayYmd())
   }, [event, settings.agencyName, settings.agencyType])

@@ -15,12 +15,19 @@ export type PioEventPost = {
   postTime?: string
   /** Short label e.g. "About 30 days before", "Day of event" */
   timingLabel: string
+  /** Human-readable campaign stage returned by the strategist */
+  campaignStage?: string
+  /** Why SaferU recommends this campaign stage */
+  strategicPurpose?: string
+  /** Code-calculated relationship between posting and event time */
+  timeUntilEvent?: string
   channel: "Facebook" | "X" | "Nextdoor" | "Email" | "Website"
   postTitle?: string
   message: string
   callToAction?: string
   suggestedImage?: string
   detailsToVerify?: string[]
+  qualityStatus?: "approved" | "needs_human_review"
   tag?: string
 }
 
@@ -49,7 +56,17 @@ export type PioEvent = {
   audience?: string
   parking?: string
   registration?: string
+  registrationRequired?: boolean
+  registrationDeadline?: string
+  registrationUrl?: string
+  cost?: string
+  accessibility?: string
+  arrivalInstructions?: string
   website?: string
+  primaryImage?: string
+  additionalAssets?: string
+  capacityStatus?: string
+  weatherPlan?: string
   /** Private staff notes — not used in AI posts */
   internalNotes?: string
   status?: "draft" | "generated" | "cancelled" | "rescheduled"

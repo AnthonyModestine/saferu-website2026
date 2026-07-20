@@ -57,7 +57,10 @@ const SLOT_BLURBS: Record<EventCampaignKey, string> = {
 }
 
 function todayYmd() {
-  return new Date().toISOString().slice(0, 10)
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
+    now.getDate()
+  ).padStart(2, "0")}`
 }
 
 function isCampaignKey(value: string | null): value is EventCampaignKey {
@@ -125,6 +128,8 @@ function GenerateMessagesInner() {
   const [langView, setLangView] = useState<"en" | "es">("en")
   const [translating, setTranslating] = useState(false)
   const [translateError, setTranslateError] = useState<string | null>(null)
+  const [editingMessage, setEditingMessage] = useState(false)
+  const [messageDraft, setMessageDraft] = useState("")
 
   const refresh = useCallback(() => {
     setEvent(getPioEventById(id))
@@ -159,6 +164,23 @@ function GenerateMessagesInner() {
       isRecurring: event.recurring ? "yes" : "no",
       agencyRole: event.hostingRole || "hosting",
       hostOrganization: event.hostOrganization || "",
+      audience: event.audience,
+      parking: event.parking,
+      registration: event.registration,
+      registrationRequired: event.registrationRequired,
+      registrationDeadline: event.registrationDeadline,
+      registrationUrl: event.registrationUrl,
+      cost: event.cost,
+      accessibility: event.accessibility,
+      arrivalInstructions: event.arrivalInstructions,
+      website: event.website,
+      primaryImage: event.primaryImage,
+      additionalAssets: event.additionalAssets,
+      capacityStatus: event.capacityStatus,
+      weatherPlan: event.weatherPlan,
+      allowOptionalFinalReminder: !/registration|rsvp required|ticket|sold.?out|private|limited capac/i.test(
+        `${event.registration || ""} ${event.capacityStatus || ""} ${event.description}`
+      ),
     }
     return buildEventCampaignPlan(facts, todayYmd())
   }, [event, settings.agencyName, settings.agencyType])
@@ -192,6 +214,7 @@ function GenerateMessagesInner() {
     setSpanishMessage("")
     setLangView("en")
     setTranslateError(null)
+    setEditingMessage(false)
     router.replace(`/pio-tool/events/${id}/generate?key=${key}`, { scroll: false })
   }
 
@@ -228,6 +251,20 @@ function GenerateMessagesInner() {
           recurring: event.recurring,
           hostingRole: event.hostingRole,
           hostOrganization: event.hostOrganization,
+          audience: event.audience,
+          parking: event.parking,
+          registration: event.registration,
+          registrationRequired: event.registrationRequired,
+          registrationDeadline: event.registrationDeadline,
+          registrationUrl: event.registrationUrl,
+          cost: event.cost,
+          accessibility: event.accessibility,
+          arrivalInstructions: event.arrivalInstructions,
+          website: event.website,
+          primaryImage: event.primaryImage,
+          additionalAssets: event.additionalAssets,
+          capacityStatus: event.capacityStatus,
+          weatherPlan: event.weatherPlan,
           keys: [selectedSlot.key],
           channel,
         }),
@@ -237,6 +274,17 @@ function GenerateMessagesInner() {
         setError(data.error || "Failed to generate message.")
         return
       }
+      if (data.status === "needs_human_review") {
+        const verification = Array.isArray(data.detailsToVerify)
+          ? data.detailsToVerify.join(" ")
+          : ""
+        setError(
+          [data.humanReviewReason || "This campaign needs human review before publication.", verification]
+            .filter(Boolean)
+            .join(" ")
+        )
+        return
+      }
       const incoming: PioEventPost[] = (data.posts as Array<Partial<PioEventPost>>).map(
         (p) => ({
           id: crypto.randomUUID(),
@@ -244,12 +292,16 @@ function GenerateMessagesInner() {
           postDate: String(p.postDate || selectedSlot.recommendedPostDate),
           postTime: p.postTime || selectedSlot.recommendedPostTime,
           timingLabel: String(p.timingLabel || selectedSlot.timingLabel),
+          campaignStage: p.campaignStage,
+          strategicPurpose: p.strategicPurpose,
+          timeUntilEvent: p.timeUntilEvent,
           channel,
           postTitle: p.postTitle,
           message: String(p.message || ""),
           callToAction: p.callToAction,
           suggestedImage: p.suggestedImage,
           detailsToVerify: p.detailsToVerify,
+          qualityStatus: p.qualityStatus,
           tag: p.tag || event.title,
         })
       )
@@ -263,6 +315,7 @@ function GenerateMessagesInner() {
       setSpanishMessage("")
       setLangView("en")
       setTranslateError(null)
+      setEditingMessage(false)
     } catch {
       setError("Something went wrong. Please try again.")
     } finally {
@@ -285,6 +338,24 @@ function GenerateMessagesInner() {
     }
   }
 
+  function saveMessageEdit() {
+    if (!event || !existingPost || !messageDraft.trim()) return
+    if (channel === "X" && messageDraft.length > 280) {
+      setError("X messages must be 280 characters or fewer.")
+      return
+    }
+    const next: PioEvent = {
+      ...event,
+      posts: event.posts.map((post) =>
+        post.id === existingPost.id ? { ...post, message: messageDraft.trim() } : post
+      ),
+    }
+    savePioEvent(next)
+    setEvent(next)
+    setEditingMessage(false)
+    setError(null)
+  }
+
   async function translateFacebook() {
     if (channel !== "Facebook" || !existingPost?.message?.trim()) return
     setTranslating(true)
@@ -293,7 +364,7 @@ function GenerateMessagesInner() {
       const res = await fetch("/api/pio/translate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: existingPost.message }),
+        body: JSON.stringify({ text: existingPost.message, contentType: "event" }),
       })
       const data = await res.json()
       if (res.ok && data.translation) {
@@ -468,6 +539,7 @@ function GenerateMessagesInner() {
                     setSpanishMessage("")
                     setLangView("en")
                     setTranslateError(null)
+                    setEditingMessage(false)
                   }}
                   className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
                     active
@@ -526,11 +598,48 @@ function GenerateMessagesInner() {
                       {existingPost.postTitle}
                     </p>
                   )}
-                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-[#405172]">
-                    {channel === "Facebook" && langView === "es" && spanishMessage
-                      ? spanishMessage
-                      : existingPost.message}
-                  </p>
+                  {langView === "en" && (
+                    <div className="mb-3 rounded-xl border border-[#DBEAFE] bg-[#EFF6FF] px-3 py-2 text-xs text-[#1D4ED8]">
+                      <p className="font-semibold">
+                        {existingPost.campaignStage || existingPost.timingLabel}
+                      </p>
+                      <p className="mt-1">
+                        Recommended {existingPost.postDate}
+                        {existingPost.postTime ? ` at ${existingPost.postTime}` : ""}
+                      </p>
+                      {existingPost.strategicPurpose && (
+                        <p className="mt-1 text-[#405172]">
+                          Why SaferU recommends it: {existingPost.strategicPurpose}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {editingMessage && langView === "en" ? (
+                    <div>
+                      <textarea
+                        value={messageDraft}
+                        onChange={(e) => setMessageDraft(e.target.value)}
+                        rows={8}
+                        className="w-full rounded-xl border border-[#cbd5e1] bg-white p-3 text-sm leading-relaxed text-[#405172] outline-none focus:border-[#2563EB]"
+                        aria-label="Edit event message"
+                      />
+                      {channel === "X" && (
+                        <p
+                          className={`mt-1 text-right text-xs ${
+                            messageDraft.length > 280 ? "text-red-600" : "text-[#94A3B8]"
+                          }`}
+                        >
+                          {messageDraft.length}/280
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-[#405172]">
+                      {channel === "Facebook" && langView === "es" && spanishMessage
+                        ? spanishMessage
+                        : existingPost.message}
+                    </p>
+                  )}
                   {existingPost.callToAction && (
                     <p className="mt-3 text-sm font-medium text-[#2563EB]">
                       {existingPost.callToAction}
@@ -540,6 +649,16 @@ function GenerateMessagesInner() {
                     <div className="mt-4 flex items-center gap-2 rounded-xl bg-[#F8FAFC] px-3 py-2 text-xs text-[#64748b]">
                       <ImageIcon className="h-4 w-4 shrink-0" />
                       Suggested image: {existingPost.suggestedImage}
+                    </div>
+                  )}
+                  {langView === "en" && (existingPost.detailsToVerify?.length ?? 0) > 0 && (
+                    <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                      <p className="font-semibold">Details to verify before publishing</p>
+                      <ul className="mt-1 list-disc space-y-1 pl-4">
+                        {existingPost.detailsToVerify!.map((detail) => (
+                          <li key={detail}>{detail}</li>
+                        ))}
+                      </ul>
                     </div>
                   )}
                   {channel === "X" && (
@@ -589,6 +708,34 @@ function GenerateMessagesInner() {
                 <p className="text-sm text-destructive">{translateError}</p>
               )}
               <div className="flex flex-wrap gap-2">
+                {editingMessage ? (
+                  <>
+                    <Button type="button" onClick={saveMessageEdit}>
+                      <Check className="mr-2 h-4 w-4" />
+                      Save Edit
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setEditingMessage(false)}
+                    >
+                      Cancel
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setMessageDraft(existingPost.message)
+                      setEditingMessage(true)
+                      setLangView("en")
+                    }}
+                  >
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Edit
+                  </Button>
+                )}
                 <Button type="button" variant="outline" onClick={copyMessage}>
                   {copied ? (
                     <>
@@ -622,6 +769,19 @@ function GenerateMessagesInner() {
                     )}
                   </Button>
                 )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={requestGenerate}
+                  disabled={generating || !isSubscribed}
+                >
+                  {generating ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Megaphone className="mr-2 h-4 w-4" />
+                  )}
+                  Regenerate
+                </Button>
               </div>
             </div>
           )}

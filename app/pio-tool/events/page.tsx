@@ -447,6 +447,13 @@ function CreateEventWizard() {
         setError(data.error || "Failed to generate content.")
         return
       }
+      if (data.status === "needs_human_review") {
+        setError(
+          data.humanReviewReason ||
+            "SaferU could not safely approve this campaign. Review the event details and try again."
+        )
+        return
+      }
 
       const posts: PioEventPost[] = (data.posts as Array<Partial<PioEventPost>>).map((p) => ({
         id: crypto.randomUUID(),
@@ -454,12 +461,16 @@ function CreateEventWizard() {
         postDate: String(p.postDate || ""),
         postTime: p.postTime,
         timingLabel: String(p.timingLabel || ""),
+        campaignStage: p.campaignStage,
+        strategicPurpose: p.strategicPurpose,
+        timeUntilEvent: p.timeUntilEvent,
         channel: (p.channel as PioEventPost["channel"]) || "Facebook",
         postTitle: p.postTitle,
         message: String(p.message || ""),
         callToAction: p.callToAction,
         suggestedImage: p.suggestedImage,
         detailsToVerify: p.detailsToVerify,
+        qualityStatus: p.qualityStatus,
         tag: p.tag || form.title.trim(),
       }))
       const now = new Date().toISOString()

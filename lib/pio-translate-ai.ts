@@ -4,9 +4,12 @@
  */
 
 import type { AiResult } from "./ai-result"
-import { TRANSLATE_SYSTEM_PROMPT } from "./pio-prompts"
+import { EVENT_TRANSLATE_SYSTEM_PROMPT, TRANSLATE_SYSTEM_PROMPT } from "./pio-prompts"
 
-export async function translateToAmericanSpanish(text: string): Promise<AiResult<string>> {
+export async function translateToAmericanSpanish(
+  text: string,
+  options?: { contentType?: "general" | "event" }
+): Promise<AiResult<string>> {
   const trimmed = text.trim()
   if (!trimmed) {
     return { ok: false, reason: "empty_input" }
@@ -24,10 +27,16 @@ export async function translateToAmericanSpanish(text: string): Promise<AiResult
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: TRANSLATE_SYSTEM_PROMPT },
+        {
+          role: "system",
+          content:
+            options?.contentType === "event"
+              ? EVENT_TRANSLATE_SYSTEM_PROMPT
+              : TRANSLATE_SYSTEM_PROMPT,
+        },
         {
           role: "user",
-          content: `Translate this public-safety message to U.S. Spanish:\n\n${trimmed}`,
+          content: `Translate this ${options?.contentType === "event" ? "event" : "public-safety"} message to U.S. Spanish:\n\n${trimmed}`,
         },
       ],
       max_tokens: 1200,

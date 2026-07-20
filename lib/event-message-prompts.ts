@@ -36,6 +36,20 @@ export type EventSharedFacts = {
   eventPartners?: string
   photosAvailable?: string
   nextStep?: string
+  audience?: string
+  parking?: string
+  registration?: string
+  registrationRequired?: boolean
+  registrationDeadline?: string
+  registrationUrl?: string
+  cost?: string
+  accessibility?: string
+  arrivalInstructions?: string
+  website?: string
+  primaryImage?: string
+  additionalAssets?: string
+  capacityStatus?: string
+  weatherPlan?: string
   /** Whether optional final reminder is appropriate */
   allowOptionalFinalReminder?: boolean
 }
@@ -46,7 +60,19 @@ export type CampaignSlot = {
   recommendedPostDate: string
   recommendedPostTime: string
   timeUntilEvent: string
+  strategicPurpose: string
   promptBody: string
+}
+
+export const EVENT_STAGE_PURPOSES: Record<EventCampaignKey, string> = {
+  initial_announcement: "Build awareness early and give the community enough information to plan.",
+  event_highlight: "Create a fresh reason to attend by spotlighting one or two supported benefits.",
+  one_week_reminder: "Turn awareness into intent with a timely logistics-focused reminder.",
+  what_to_expect: "Reduce uncertainty by helping prospective attendees picture the experience.",
+  day_before: "Convert intent into attendance with an accurate tomorrow reminder.",
+  event_day: "Reach people who can still attend with a concise, time-accurate same-day message.",
+  optional_final: "Give eligible nearby audiences one final low-pressure opportunity to attend.",
+  thank_you: "Close the campaign, recognize supported contributions, and sustain the relationship.",
 }
 
 const SHARED_RULES = `You are an experienced event marketing manager who helps public safety agencies, local governments, nonprofits, schools, and community organizations promote events.
@@ -400,6 +426,7 @@ export function buildEventCampaignPlan(
       recommendedPostDate: c.recommendedPostDate,
       recommendedPostTime: c.recommendedPostTime,
       timeUntilEvent: c.timeUntilEvent,
+      strategicPurpose: EVENT_STAGE_PURPOSES[c.key],
       promptBody,
     })
   }

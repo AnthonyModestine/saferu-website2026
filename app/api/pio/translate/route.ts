@@ -46,7 +46,9 @@ export async function POST(request: Request) {
       )
     }
 
-    const result = await translateToAmericanSpanish(text)
+    const result = await translateToAmericanSpanish(text, {
+      contentType: body.contentType === "event" ? "event" : "general",
+    })
     if (!result.ok) {
       console.error("[translate] AI failed:", result.reason, result.detail ?? "")
       return NextResponse.json(aiErrorPayload(result.reason, result.detail), { status: 503 })

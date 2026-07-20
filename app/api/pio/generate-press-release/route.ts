@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
-import { generatePressReleaseWithAI } from "@/lib/press-release-ai"
+import { generateMultiOutput } from "@/lib/multi-output-ai"
+import { normalizePressReleasePayload } from "@/lib/pio-normalized-facts"
 import { getMemberSession } from "@/lib/member-session"
 import { getIsPaidByEmail } from "@/lib/member-access"
 import { isOnActiveTrial } from "@/lib/pio-trial"
@@ -47,52 +48,30 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json()
-
+    const nestedFacts =
+      body.facts && typeof body.facts === "object" ? body.facts as Record<string, unknown> : {}
     const validationError = validatePressReleaseInput({
-      incidentType: body.incidentType,
-      incidentSummary: body.incidentSummary,
+      incidentType: body.incidentType ?? nestedFacts.incidentType ?? nestedFacts.incident_type,
+      incidentSummary: body.incidentSummary ?? nestedFacts.incidentSummary ?? nestedFacts.incident_summary,
       otherIncidentType: body.otherIncidentType,
     })
     if (validationError) {
       return NextResponse.json({ error: validationError }, { status: 400 })
     }
 
-    const rawType = cap(body.incidentType, 100)
+    const rawType = cap(body.incidentType ?? nestedFacts.incidentType ?? nestedFacts.incident_type, 100)
     const resolvedType =
       rawType === "other" ? cap(body.otherIncidentType, 100) || "other" : rawType
 
-    const payload = {
-      agencyName: cap(body.agencyName, 100),
-      city: cap(body.city, 100),
-      state: cap(body.state, 50),
-      incidentType: resolvedType,
-      incidentSummary: body.incidentSummary != null ? cap(body.incidentSummary, 4500) : undefined,
-      incidentDate: body.incidentDate != null ? cap(body.incidentDate, 20) : undefined,
-      incidentTime: body.incidentTime != null ? cap(body.incidentTime, 20) : undefined,
-      location: body.location != null ? cap(body.location, 200) : undefined,
-      investigationOngoing: Boolean(body.investigationOngoing),
-      persons: Array.isArray(body.persons) ? body.persons.slice(0, 10).map((p: { name?: string; isMinor?: boolean; description?: string }) => ({
-        name: cap(p?.name, 100),
-        isMinor: Boolean(p?.isMinor),
-        description: cap(p?.description, 500),
-      })) : [],
-      entryType: cap(body.entryType, 20) || "none",
-      arrests: Array.isArray(body.arrests) ? body.arrests.slice(0, 10).map((a: { name?: string; details?: string }) => ({
-        name: cap(a?.name, 100),
-        details: cap(a?.details, 500),
-      })) : [],
-      propertyDamage: body.propertyDamage != null ? cap(body.propertyDamage, 500) : undefined,
-      tipLine: body.tipLine != null ? cap(body.tipLine, 100) : undefined,
-      detectiveContact: body.detectiveContact != null ? cap(body.detectiveContact, 200) : undefined,
-      resolutionText: body.resolutionText != null ? cap(body.resolutionText, 500) : undefined,
-      boilerplate: body.boilerplate != null ? cap(body.boilerplate, 1000) : undefined,
-      contactName: cap(body.contactName, 100),
-      contactPhone: cap(body.contactPhone, 30),
-      contactPhone2: body.contactPhone2 != null ? cap(body.contactPhone2, 30) || undefined : undefined,
-      contactEmail: cap(body.contactEmail, 100),
-    }
+    const payload = normalizePressReleasePayload({ ...body, incidentType: resolvedType })
 
-    const result = await generatePressReleaseWithAI(payload)
+    const result = await generateMultiOutput(payload, {
+      pressRelease: true,
+      facebook: false,
+      twitter: false,
+      talkingPoints: false,
+      videoRequest: false,
+    })
     if (!result.ok) {
       console.error("[generate-press-release] AI failed:", result.reason, result.detail ?? "")
       return NextResponse.json(aiErrorPayload(result.reason, result.detail), { status: 503 })
@@ -106,7 +85,10 @@ export async function POST(request: Request) {
       )
     }
 
-    return NextResponse.json({ content: result.data })
+    return NextResponse.json({
+      content: result.data.pressRelease,
+      ...result.data,
+    })
   } catch (e) {
     console.error("Generate press release error:", e)
     return NextResponse.json({ error: "Failed to generate press release." }, { status: 500 })

@@ -20,6 +20,20 @@ export type PioEventTemplate = {
   contentPrefs?: string
   hostingRole?: string
   hostOrganization?: string
+  audience?: string
+  parking?: string
+  registration?: string
+  registrationRequired?: boolean
+  registrationDeadline?: string
+  registrationUrl?: string
+  cost?: string
+  accessibility?: string
+  arrivalInstructions?: string
+  website?: string
+  primaryImage?: string
+  additionalAssets?: string
+  capacityStatus?: string
+  weatherPlan?: string
   createdAt: string
   updatedAt: string
 }
@@ -100,6 +114,22 @@ export function saveEventTemplate(
     contactPhone: input.contactPhone,
     audienceGoals: input.audienceGoals,
     contentPrefs: input.contentPrefs,
+    hostingRole: input.hostingRole,
+    hostOrganization: input.hostOrganization,
+    audience: input.audience,
+    parking: input.parking,
+    registration: input.registration,
+    registrationRequired: input.registrationRequired,
+    registrationDeadline: input.registrationDeadline,
+    registrationUrl: input.registrationUrl,
+    cost: input.cost,
+    accessibility: input.accessibility,
+    arrivalInstructions: input.arrivalInstructions,
+    website: input.website,
+    primaryImage: input.primaryImage,
+    additionalAssets: input.additionalAssets,
+    capacityStatus: input.capacityStatus,
+    weatherPlan: input.weatherPlan,
     createdAt: now,
     updatedAt: now,
   }

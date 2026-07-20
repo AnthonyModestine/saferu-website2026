@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
-import { generateCommunityRequestWithAI } from "@/lib/community-request-ai"
-import { buildCall3UserPayload } from "@/lib/pio-normalized-facts"
+import { generateMultiOutput } from "@/lib/multi-output-ai"
+import { normalizePressReleasePayload } from "@/lib/pio-normalized-facts"
 import { getMemberSession } from "@/lib/member-session"
 import { getIsPaidByEmail } from "@/lib/member-access"
 import { isOnActiveTrial } from "@/lib/pio-trial"
@@ -67,21 +67,34 @@ export async function POST(request: Request) {
     const resolvedType =
       rawType === "other" ? cap(body.otherIncidentType, 100) || "other" : rawType
 
-    const userPayload = buildCall3UserPayload({
+    const userPayload = normalizePressReleasePayload({
       agencyName: cap(body.agencyName, 100),
       incidentType: resolvedType,
       location: body.address != null ? cap(body.address, 200) : undefined,
       incidentDate: body.incidentDate != null ? cap(body.incidentDate, 20) : undefined,
       incidentSummary: body.description != null ? cap(body.description, 4500) : undefined,
+      investigationOngoing: true,
+      persons: [],
+      arrests: [],
+      entryType: "none",
+      contactName: "",
+      contactPhone: "",
+      contactEmail: "",
+      requestFootage: true,
       footageTimeframe: body.footageTimeframe != null ? cap(body.footageTimeframe, 200) : undefined,
       whatToLookFor: body.whatToLookFor != null ? cap(body.whatToLookFor, 500) : undefined,
-      submissionMethods:
-        body.contactDetails != null ? [cap(body.contactDetails, 200)] : undefined,
+      detectiveContact: body.contactDetails != null ? cap(body.contactDetails, 200) : undefined,
       caseNumber: body.caseNumber != null ? cap(body.caseNumber, 50) : undefined,
       tipLine: body.tipLine != null ? cap(body.tipLine, 100) : undefined,
     })
 
-    const result = await generateCommunityRequestWithAI(userPayload)
+    const result = await generateMultiOutput(userPayload, {
+      pressRelease: false,
+      facebook: false,
+      twitter: false,
+      talkingPoints: false,
+      videoRequest: true,
+    })
     if (!result.ok) {
       console.error("[generate-community-request] AI failed:", result.reason, result.detail ?? "")
       return NextResponse.json(aiErrorPayload(result.reason, result.detail), { status: 503 })
@@ -110,7 +123,11 @@ export async function POST(request: Request) {
       incidentType: resolvedType,
     })
 
-    return NextResponse.json({ content: result.data, sessionId })
+    return NextResponse.json({
+      content: result.data.communityRequest || "",
+      ...result.data,
+      sessionId,
+    })
   } catch (e) {
     console.error("Generate video request error:", e)
     return NextResponse.json({ error: "Failed to generate video request." }, { status: 500 })

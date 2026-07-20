@@ -92,8 +92,8 @@ const OUTPUT_OPTIONS: Array<{
   },
   {
     id: "videoRequest",
-    label: "Video Request",
-    hint: "Ask for doorbell / camera footage",
+    label: "Public Assistance Request",
+    hint: "Ask for witnesses, information, or footage",
   },
 ]
 
@@ -171,6 +171,12 @@ export default function NewPressReleasePage() {
   const [generatedTalkingPoints, setGeneratedTalkingPoints] = useState("")
   const [generatedCommunityRequest, setGeneratedCommunityRequest] = useState<string | null>(null)
   const [generatedCommunityRequestSpanish, setGeneratedCommunityRequestSpanish] = useState("")
+  const [qualityStatus, setQualityStatus] = useState<
+    "approved" | "approved_with_revisions" | "needs_human_review" | null
+  >(null)
+  const [statusLabel, setStatusLabel] = useState("Draft")
+  const [detailsToVerify, setDetailsToVerify] = useState<string[]>([])
+  const [humanReviewReason, setHumanReviewReason] = useState("")
   const [communityRequestLangView, setCommunityRequestLangView] = useState<"en" | "es">("en")
   const [translatingCommunityRequest, setTranslatingCommunityRequest] = useState(false)
   const [includesVideoRequest, setIncludesVideoRequest] = useState(false)
@@ -308,6 +314,7 @@ export default function NewPressReleasePage() {
           otherIncidentType: incidentType === "other" ? otherIncidentType.trim() : undefined,
           incidentSummary: incidentSummary.trim(),
           incidentDate: incidentDate || undefined,
+          releaseDate: releaseDate || undefined,
           incidentTime: incidentTime || undefined,
           location: location.trim() || undefined,
           investigationOngoing,
@@ -329,6 +336,7 @@ export default function NewPressReleasePage() {
           footageTimeframe: buildFootageTimeframe() || undefined,
           whatToLookFor: whatToLookFor.trim() || undefined,
           onlineTipsUrl: onlineTipsUrl.trim() || undefined,
+          caseNumber: caseNumber.trim() || undefined,
           agencyType: agencySettings.agencyType,
           departmentType: agencySettings.agencyType,
           departmentOther:
@@ -339,7 +347,15 @@ export default function NewPressReleasePage() {
         }),
       })
       const data = await res.json()
-      if (res.ok && (data.pressRelease || data.facebook || data.twitter || data.talkingPoints || data.communityRequest)) {
+      if (
+        res.ok &&
+        (data.qualityStatus ||
+          data.pressRelease ||
+          data.facebook ||
+          data.twitter ||
+          data.talkingPoints ||
+          data.communityRequest)
+      ) {
         setIncludesVideoRequest(Boolean(selectedOutputs.videoRequest && data.communityRequest))
         setGeneratedRelease(data.pressRelease || "")
         setGeneratedFacebook(data.facebook || "")
@@ -349,6 +365,10 @@ export default function NewPressReleasePage() {
         setGeneratedTwitter(data.twitter || "")
         setGeneratedTalkingPoints(data.talkingPoints || "")
         setGeneratedCommunityRequest(data.communityRequest || null)
+        setQualityStatus(data.qualityStatus || null)
+        setStatusLabel(data.statusLabel || "Draft")
+        setDetailsToVerify(Array.isArray(data.detailsToVerify) ? data.detailsToVerify : [])
+        setHumanReviewReason(data.humanReviewReason || "")
         setGeneratedCommunityRequestSpanish("")
         setCommunityRequestLangView("en")
         setPressReleaseSessionId(data.sessionIds?.pressReleaseSessionId ?? null)
@@ -361,12 +381,14 @@ export default function NewPressReleasePage() {
           data.talkingPoints ||
           data.communityRequest ||
           ""
-        addPioHistoryItem({
-          title: `${incidentType || "Incident"} - Press Release`,
-          type: incidentType || "Incident",
-          format: "Press Release",
-          content: historyContent,
-        })
+        if (historyContent) {
+          addPioHistoryItem({
+            title: `${incidentType || "Incident"} - Press Release`,
+            type: incidentType || "Incident",
+            format: "Press Release",
+            content: historyContent,
+          })
+        }
         setGenerated(true)
         const firstTab = selectedOutputs.pressRelease
           ? "press-release"
@@ -498,6 +520,10 @@ export default function NewPressReleasePage() {
     setGeneratedTalkingPoints("")
     setGeneratedCommunityRequest(null)
     setGeneratedCommunityRequestSpanish("")
+    setQualityStatus(null)
+    setStatusLabel("Draft")
+    setDetailsToVerify([])
+    setHumanReviewReason("")
     setCommunityRequestLangView("en")
     setIncludesVideoRequest(false)
     setPressReleaseSessionId(null)
@@ -1138,6 +1164,33 @@ export default function NewPressReleasePage() {
                 title="Review"
                 description="Only the messages you selected. Edit, copy, or export when ready."
               />
+              <div
+                className={`rounded-xl border p-4 ${
+                  qualityStatus === "needs_human_review"
+                    ? "border-amber-300 bg-amber-50 text-amber-950"
+                    : "border-blue-200 bg-blue-50 text-blue-950"
+                }`}
+              >
+                <p className="text-sm font-semibold">{statusLabel}</p>
+                {qualityStatus === "needs_human_review" && humanReviewReason && (
+                  <p className="mt-1 text-sm">{humanReviewReason}</p>
+                )}
+                {detailsToVerify.length > 0 && (
+                  <div className="mt-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide">
+                      Details requiring verification
+                    </p>
+                    <ul className="mt-1 list-disc space-y-1 pl-5 text-sm">
+                      {detailsToVerify.map((detail, index) => (
+                        <li key={`${detail}-${index}`}>{detail}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <p className="mt-2 text-xs">
+                  SaferU review is not agency approval. Review and authorize content before publication.
+                </p>
+              </div>
               {showFeedback && pressReleaseSessionId && (
                 <GenerationFeedback
                   generationSessionId={pressReleaseSessionId}
@@ -1183,7 +1236,7 @@ export default function NewPressReleasePage() {
                       value="community-request"
                       className="rounded-full px-3 py-1.5 text-xs data-[state=active]:bg-white data-[state=active]:text-[#1D4ED8] data-[state=active]:shadow-sm sm:text-sm"
                     >
-                      Video Request
+                      Assistance Request
                     </TabsTrigger>
                   )}
                 </TabsList>
