@@ -136,7 +136,6 @@ export async function scanNearbyWildfires(opts: {
   serviceZips?: string[]
 }): Promise<ExternalOpportunityInput[]> {
   const locations = await resolveServiceAreaLocations(opts)
-  if (!locations.length) return []
   const state = opts.state
 
   const since = daysAgoIso(10)
@@ -144,23 +143,19 @@ export async function scanNearbyWildfires(opts: {
   const seen = new Set<string>()
   const opportunities: ExternalOpportunityInput[] = []
 
-  for (const location of locations) {
+  function incidentSourceUrl(name: string): string {
     const params = new URLSearchParams({
-      geometry: `${location.longitude},${location.latitude}`,
-      geometryType: "esriGeometryPoint",
-      inSR: "4326",
-      spatialRel: "esriSpatialRelIntersects",
-      distance: "200",
-      units: "esriSRUnit_Kilometer",
-      where: `FireDiscoveryDateTime >= TIMESTAMP '${since} 00:00:00' AND POOState = '${statePrefix}'`,
+      where: `IncidentName = '${name.replace(/'/g, "''")}' AND POOState = '${statePrefix}'`,
       outFields:
         "IncidentName,DiscoveryAcres,FireDiscoveryDateTime,POOCounty,PercentContained,POOState",
-      resultRecordCount: "10",
+      resultRecordCount: "1",
       f: "json",
     })
+    return `${NIFC_INCIDENTS_URL}?${params}`
+  }
 
-    const data = await fetchJson<{ features?: NifcFeature[] }>(`${NIFC_INCIDENTS_URL}?${params}`)
-    for (const feature of data?.features ?? []) {
+  async function appendFeatures(features: NifcFeature[] | undefined) {
+    for (const feature of features ?? []) {
       const attrs = feature.attributes
       const name = attrs?.IncidentName?.trim()
       if (!name || seen.has(name)) continue
@@ -184,7 +179,9 @@ export async function scanNearbyWildfires(opts: {
           ? `Wildfire activity: ${name} in ${county} County`
           : `Recent wildfire: ${name} in ${county} County`,
         summary: `NIFC reports ${name}${acresText} in ${county} County, ${state}. ${
-          isActive ? "The incident may affect air quality, travel, and outdoor activity nearby." : "Residents should stay aware of smoke and changing conditions."
+          isActive
+            ? "The incident may affect air quality, travel, and outdoor activity nearby."
+            : "Residents should stay aware of smoke and changing conditions."
         }`,
         category: "wildfire",
         sourceLabel: "Current Local Opportunity",
@@ -196,7 +193,7 @@ export async function scanNearbyWildfires(opts: {
         priority: isActive && acres >= 100 ? "urgent" : "recommended_today",
         signals: ["wildfire", "fire_weather", "air_quality", "evacuation_ready"],
         sourceName: "National Interagency Fire Center / InciWeb",
-        sourceUrl: "https://inciweb.wildfire.gov/",
+        sourceUrl: incidentSourceUrl(name),
         eventStart: eventDay,
         eventEnd: eventDay,
         verifiedFacts: [
@@ -218,9 +215,56 @@ export async function scanNearbyWildfires(opts: {
       })
       if (opportunities.length >= 2) break
     }
-    if (opportunities.length >= 2) break
   }
 
+  if (!locations.length) {
+    console.warn(
+      `[wildfire] No geocoded locations for ${[opts.city, opts.county, state].filter(Boolean).join(", ")}; using state/county attribute query.`
+    )
+    const county = opts.county?.replace(/\bcounty\b/gi, "").trim()
+    const where = [
+      `FireDiscoveryDateTime >= TIMESTAMP '${since} 00:00:00'`,
+      `POOState = '${statePrefix}'`,
+      county ? `POOCounty = '${county.replace(/'/g, "''")}'` : null,
+    ]
+      .filter(Boolean)
+      .join(" AND ")
+    const params = new URLSearchParams({
+      where,
+      outFields:
+        "IncidentName,DiscoveryAcres,FireDiscoveryDateTime,POOCounty,PercentContained,POOState",
+      resultRecordCount: "10",
+      orderByFields: "FireDiscoveryDateTime DESC",
+      f: "json",
+    })
+    const data = await fetchJson<{ features?: NifcFeature[] }>(`${NIFC_INCIDENTS_URL}?${params}`)
+    await appendFeatures(data?.features)
+  } else {
+    for (const location of locations) {
+      const params = new URLSearchParams({
+        geometry: `${location.longitude},${location.latitude}`,
+        geometryType: "esriGeometryPoint",
+        inSR: "4326",
+        spatialRel: "esriSpatialRelIntersects",
+        distance: "200",
+        units: "esriSRUnit_Kilometer",
+        where: `FireDiscoveryDateTime >= TIMESTAMP '${since} 00:00:00' AND POOState = '${statePrefix}'`,
+        outFields:
+          "IncidentName,DiscoveryAcres,FireDiscoveryDateTime,POOCounty,PercentContained,POOState",
+        resultRecordCount: "10",
+        f: "json",
+      })
+
+      const data = await fetchJson<{ features?: NifcFeature[] }>(`${NIFC_INCIDENTS_URL}?${params}`)
+      await appendFeatures(data?.features)
+      if (opportunities.length >= 2) break
+    }
+  }
+
+  console.info(
+    `[wildfire] Found ${opportunities.length} incident(s) for ${state}: ` +
+      `${opportunities.map((opp) => opp.title).join("; ") || "none"}`
+  )
   return opportunities
 }
 

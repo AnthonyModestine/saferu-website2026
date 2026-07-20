@@ -9,6 +9,11 @@ import {
   agencyTypeLabel as formatAgencyTypeLabel,
   defaultAgencyMessagingAngle,
 } from "@/lib/post-generator/agency-relevance"
+import {
+  CAPTION_BANNED_PHRASES,
+  captionVoiceBrief,
+} from "@/lib/post-generator/caption-voice"
+import { holidayValidationBrief } from "@/lib/post-generator/holiday-validation"
 
 const MODE_INSTRUCTIONS: Record<CustomizeMessageMode, string> = {
   shorten: "Shorten to about 60% of the length while keeping all essential safety facts.",
@@ -28,6 +33,8 @@ function pioSocialVoiceRules(agency: string, place: string, agencyTypeLabel?: st
     ? `You represent a ${agencyTypeLabel} agency writing as the PIO / social media coordinator for ${agency}.`
     : `You are the social media coordinator or public information officer (PIO) for ${agency}.`
 
+  const bannedNote = CAPTION_BANNED_PHRASES.map((p) => `"${p}"`).join(", ")
+
   return `${roleLine} You are talking directly to your community in ${place} — neighbors, families, and residents who follow the department page. This is an OFFICIAL government / public safety page, so every word must sound credible and professional.
 
 Write like a real public safety agency posting on Facebook:
@@ -42,7 +49,7 @@ Write like a real public safety agency posting on Facebook:
 - Do NOT default to a tip list. One practical line is enough when it fits.
 - Prefer community conversation: awareness, shared context, reassurance, or a heads-up — not a lecture.
 - Tailor the framing to this agency's role (police, fire, EMS, emergency management, municipal, etc.).
-- Use plain language. Avoid filler ("we are writing to inform you", "please be advised", "as a reminder", "stay safe out there" as empty closers).
+- Use plain language. Avoid filler and banned phrases: ${bannedNote}.
 - Keep paragraphs short for mobile scanning.
 - JURISDICTION: If the update is in a neighboring town or another agency's project, frame it as a traveler/regional heads-up for YOUR residents. Never write as if ${agency} owns that work. Never say "thank you for your understanding," "our crews," or "we apologize for the inconvenience" about another jurisdiction's project.
 - Do NOT promote community events unless verified facts show this agency is hosting or participating.
@@ -50,7 +57,9 @@ Write like a real public safety agency posting on Facebook:
 - Never invent incidents, statistics, road closures, times, locations, or emergencies.
 - Use only the verified facts provided.
 - Do not mention AI or that the message was generated.
-- Return ONLY the post text — no quotes, labels, or commentary.`
+- Return ONLY the post text — no quotes, labels, or commentary.
+
+${captionVoiceBrief(agency, place)}`
 }
 
 export async function customizeCuratedMessage(
@@ -131,7 +140,9 @@ export async function generateHolidayMessagesBatch(
           role: "system",
           content: `${pioSocialVoiceRules(agency, place)}
 
-For holiday posts: open with a warm seasonal greeting, then add one brief practical safety reminder when appropriate (sober driving, fireworks safety, winter driving). Keep it genuine — not cheesy.`,
+${holidayValidationBrief()}
+
+For holiday posts: open with a warm seasonal greeting tied to the specific named holiday, then add one brief practical safety reminder when appropriate (sober driving, fireworks safety, winter driving). Keep it genuine — not cheesy. Never use vague holiday language.`,
         },
         {
           role: "user",

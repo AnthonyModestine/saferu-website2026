@@ -159,7 +159,27 @@ export async function runStage1Discovery(
   const usable = candidates.filter((candidate) =>
     candidate.evidence.some((record) => record.verificationStatus === "verified" && record.active)
   )
-  if (!usable.length) return { ok: false, reason: "empty_input", detail: "No verified evidence." }
+  if (!usable.length) {
+    const dropped = candidates.map((candidate) => candidate.opportunity.id)
+    console.warn(
+      `[stage-1] empty_input: 0/${candidates.length} candidates had verified evidence` +
+        (dropped.length ? ` (dropped: ${dropped.join(", ")})` : "")
+    )
+    return { ok: false, reason: "empty_input", detail: "No verified evidence." }
+  }
+  if (usable.length < candidates.length) {
+    const dropped = candidates
+      .filter(
+        (candidate) =>
+          !candidate.evidence.some(
+            (record) => record.verificationStatus === "verified" && record.active
+          )
+      )
+      .map((candidate) => candidate.opportunity.id)
+    console.warn(
+      `[stage-1] Proceeding with ${usable.length}/${candidates.length} verified candidates; dropped: ${dropped.join(", ")}`
+    )
+  }
 
   const catalog = buildAgencySourceCatalog({ state: context.state, agencyName: context.agencyName })
   const sourceCatalog = {

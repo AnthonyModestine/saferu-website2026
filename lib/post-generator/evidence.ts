@@ -88,10 +88,18 @@ async function fetchSource(url: string): Promise<{
       return { finalUrl: response.url || url, title: "", searchableText: "", ok: false }
     }
     const text = (await response.text()).slice(0, MAX_SOURCE_BYTES)
+    const searchableText = cleanText(text, 120_000)
+      // Keep JSON attribute values searchable when keys/punctuation otherwise glue tokens.
+      .replace(/["_{}:\[\],]/g, " ")
+      .replace(/([a-zA-Z])(\d)/g, "$1 $2")
+      .replace(/(\d)([a-zA-Z])/g, "$1 $2")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase()
     return {
       finalUrl: response.url || url,
       title: titleFromContent(text, response.headers.get("content-type") || ""),
-      searchableText: cleanText(text, 120_000).toLowerCase(),
+      searchableText,
       ok: true,
     }
   } catch {
@@ -101,18 +109,139 @@ async function fetchSource(url: string): Promise<{
   }
 }
 
-function claimAppearsInSource(claim: string, sourceText: string): boolean {
+/** Common filler words in discovery-authored claims that rarely appear on source pages. */
+const CLAIM_STOPWORDS = new Set([
+  "lists",
+  "listed",
+  "listing",
+  "active",
+  "activity",
+  "report",
+  "reported",
+  "reports",
+  "county",
+  "state",
+  "incident",
+  "fire",
+  "wildland",
+  "wildfire",
+  "acres",
+  "percent",
+  "contained",
+  "containment",
+  "fully",
+  "yet",
+  "with",
+  "from",
+  "that",
+  "this",
+  "near",
+  "area",
+  "local",
+  "official",
+  "officials",
+  "residents",
+  "should",
+  "monitor",
+  "about",
+  "after",
+  "before",
+  "during",
+  "while",
+  "their",
+  "there",
+  "these",
+  "those",
+  "have",
+  "been",
+  "were",
+  "was",
+  "are",
+  "may",
+  "affect",
+  "nearby",
+  "public",
+  "safety",
+  "update",
+  "updates",
+  "source",
+  "sources",
+  "available",
+  "current",
+  "recent",
+  "today",
+  "nifc",
+  "inciweb",
+  "national",
+  "interagency",
+  "center",
+])
+
+export function claimTokens(claim: string): string[] {
+  return [
+    ...new Set(
+      claim
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, " ")
+        .split(/\s+/)
+        .filter((token) => token.length >= 4)
+    ),
+  ]
+}
+
+export function distinctiveClaimTokens(claim: string): string[] {
+  return claimTokens(claim).filter((token) => !CLAIM_STOPWORDS.has(token) && !/^\d+$/.test(token))
+}
+
+/**
+ * Returns true when enough claim tokens appear in retrieved source text.
+ * softOfficial: for NIFC/NWS/Watch Duty-class sources, require distinctive
+ * identity tokens (incident/place names) rather than brittle 50% filler match.
+ */
+export function claimAppearsInSource(
+  claim: string,
+  sourceText: string,
+  options?: { softOfficial?: boolean }
+): boolean {
   if (!sourceText) return false
-  const tokens = [...new Set(
-    claim
-      .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, " ")
-      .split(/\s+/)
-      .filter((token) => token.length >= 4)
-  )]
+  const tokens = claimTokens(claim)
   if (tokens.length === 0) return false
   const matched = tokens.filter((token) => sourceText.includes(token)).length
-  return matched / tokens.length >= 0.5
+  const ratio = matched / tokens.length
+  if (ratio >= 0.5) return true
+
+  if (!options?.softOfficial) return false
+
+  const distinctive = distinctiveClaimTokens(claim)
+  if (distinctive.length === 0) return ratio >= 0.35
+  const distMatched = distinctive.filter((token) => sourceText.includes(token)).length
+  if (distinctive.length <= 2) return distMatched === distinctive.length && ratio >= 0.25
+  return distMatched / distinctive.length >= 0.6 && ratio >= 0.3
+}
+
+export function allowsSoftOfficialClaimMatch(sourceClass: SourceClass, registryId?: string): boolean {
+  if (
+    sourceClass === "official_operational_authority" ||
+    sourceClass === "trusted_operational_intelligence"
+  ) {
+    return true
+  }
+  return Boolean(
+    registryId &&
+      [
+        "nifc",
+        "nifc_wfigs",
+        "inciweb",
+        "wildfire_gov",
+        "nws",
+        "noaa",
+        "watch_duty",
+        "usgs",
+        "ic3",
+        "fbi",
+        "ncmec",
+      ].includes(registryId)
+  )
 }
 
 /**
@@ -175,10 +304,42 @@ export async function verifyOpportunityEvidence(
     180
   )
   const sourceClass = registryRecord?.sourceClass || fallbackSourceClass(fetched.finalUrl)
+  const softOfficial = allowsSoftOfficialClaimMatch(sourceClass, registryRecord?.id)
   const retrievedAt = new Date().toISOString()
-  const supportedClaims = fetched.ok
-    ? claims.filter((claim) => claimAppearsInSource(claim, fetched.searchableText))
+
+  let supportedClaims = fetched.ok
+    ? claims.filter((claim) =>
+        claimAppearsInSource(claim, fetched.searchableText, { softOfficial })
+      )
     : []
+
+  // Official/trusted feeds often paraphrase discovery claims. If the retrieved
+  // source still matches the opportunity identity, keep the discovery claims
+  // rather than wiping Stage 1 input and collapsing to SaferU curated fill.
+  if (fetched.ok && supportedClaims.length === 0 && softOfficial) {
+    const identity = `${opportunity.title} ${opportunity.summary || ""}`
+    if (claimAppearsInSource(identity, fetched.searchableText, { softOfficial: true })) {
+      supportedClaims = claims
+      console.info(
+        `[evidence] Accepted paraphrased official claims for ${opportunity.id} via identity match (${registryRecord?.id || sourceClass})`
+      )
+    }
+  }
+
+  const verificationStatus: VerifiedEvidenceRecord["verificationStatus"] =
+    fetched.ok && supportedClaims.length > 0
+      ? "verified"
+      : fetched.ok
+        ? "unverified"
+        : "fetch_failed"
+
+  if (verificationStatus !== "verified") {
+    console.warn(
+      `[evidence] Dropped ${opportunity.id} (${opportunity.category || "unknown"}): ` +
+        `${verificationStatus}; source=${fetched.finalUrl || sourceUrl}; ` +
+        `claims=${claims.length}; softOfficial=${softOfficial}`
+    )
+  }
 
   return [
     {
@@ -197,17 +358,12 @@ export async function verifyOpportunityEvidence(
       location: "",
       geometry: null,
       jurisdictionMatch: jurisdictionStatus(opportunity.jurisdictionFit),
-      active: fetched.ok && supportedClaims.length > 0,
+      active: verificationStatus === "verified",
       facts: supportedClaims.map((claim, index) => ({
         factId: factId(fetched.finalUrl, claim, index),
         claim,
       })),
-      verificationStatus:
-        fetched.ok && supportedClaims.length > 0
-          ? "verified"
-          : fetched.ok
-            ? "unverified"
-            : "fetch_failed",
+      verificationStatus,
     },
   ]
 }

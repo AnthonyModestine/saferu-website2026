@@ -119,6 +119,7 @@ export default function PostGeneratorPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isDemo, setIsDemo] = useState(false)
+  const [saferuFallbackOnly, setSaferuFallbackOnly] = useState(false)
   const [generatingId, setGeneratingId] = useState<string | null>(null)
   const autoLoadedRef = useRef(false)
 
@@ -231,6 +232,7 @@ export default function PostGeneratorPage() {
     setResult({ ...demo })
     cacheOpportunityResult(flat, demo.generatedAt)
     setIsDemo(true)
+    setSaferuFallbackOnly(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     settings.agencyName,
@@ -273,6 +275,7 @@ export default function PostGeneratorPage() {
         const opportunities = [...history.lastResult!.opportunities]
         await hydrateOpportunityGraphics(opportunities)
         setResult(resultFromCached(opportunities, history.lastResult!.generatedAt))
+        setSaferuFallbackOnly(false)
       })()
       return
     }
@@ -381,6 +384,10 @@ export default function PostGeneratorPage() {
       setResult(next)
       cacheOpportunityResult(opportunities, next.generatedAt)
       setIsDemo(Boolean(data.demo))
+      setSaferuFallbackOnly(Boolean(data.saferuFallbackOnly))
+      if (data.pipelineDiagnostics) {
+        console.info("[AI Post Generator] pipelineDiagnostics", data.pipelineDiagnostics)
+      }
     } catch (err) {
       console.error("Load opportunities failed:", err)
       setError("Something went wrong. Try Generate again.")
@@ -544,6 +551,14 @@ export default function PostGeneratorPage() {
       {isDemo && hasAny && (
         <p className="text-xs font-medium text-[#7a8ab0]">
           Sample briefing — sign in for live analysis tied to your area.
+        </p>
+      )}
+
+      {saferuFallbackOnly && hasAny && !isDemo && (
+        <p className="rounded-xl border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-sm text-[#92400e]">
+          Live local recommendations could not be verified this run, so SaferU safety content is
+          shown instead. Try Generate again, or check that your service area in Agency Settings is
+          complete.
         </p>
       )}
 

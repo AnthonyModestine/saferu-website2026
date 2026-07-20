@@ -24,6 +24,9 @@ import {
   buildSourceCatalogPrompt,
   getDiscoverySearchHints,
 } from "./source-catalog"
+import { eventExclusionBrief } from "./event-exclusion"
+import { jurisdictionRulesBrief } from "./jurisdiction"
+import { currentnessBrief, sourceStandardsBrief } from "./source-standards"
 import { formatServiceAreaLabel, resolveServiceAreaLocations } from "./geo-utils"
 
 function safeUrl(value: unknown): string | undefined {
@@ -124,7 +127,15 @@ Rules:
 - Do not include rumors, crime incidents involving private victims, opinion pieces, generic seasonal advice, or evergreen safety tips.
 - Do not duplicate excluded titles.
 - Use only facts explicitly supported by the cited source.
-- If reliable results are unavailable, return fewer items rather than inventing anything.`,
+- If reliable results are unavailable, return fewer items rather than inventing anything.
+
+${eventExclusionBrief()}
+
+${sourceStandardsBrief()}
+
+${currentnessBrief()}
+
+${jurisdictionRulesBrief(opts.agencyType)}`,
         },
         {
           role: "user",

@@ -4,6 +4,7 @@ import type { AiResult } from "@/lib/ai-result"
 import { parseModelJson } from "@/lib/parse-model-json"
 import { formatServiceAreaLabel, resolveServiceAreaLocations } from "./geo-utils"
 import { buildSourceCatalogPrompt, getDiscoverySearchHints } from "./source-catalog"
+import { weatherGateBrief } from "./weather-gates"
 import type { ExternalOpportunityInput } from "./types"
 
 /** Local and national outlets the weather-media pass is instructed to search. */
@@ -162,7 +163,9 @@ Rules:
 - Do not invent warnings NWS has not issued — frame TV forecasts as "forecast" or "expected" unless the cited source quotes an official warning.
 - Prefer facts from the last 24–48 hours.
 - Do not duplicate excluded titles.
-- Return fewer topics rather than inventing data.`,
+- Return fewer topics rather than inventing data.
+
+${weatherGateBrief()}`,
         },
         {
           role: "user",

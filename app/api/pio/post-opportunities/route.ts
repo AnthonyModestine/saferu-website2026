@@ -18,6 +18,8 @@ import { discoverLocalCurrentEventsWithAI } from "@/lib/post-generator/current-e
 import { discoverExpandedPublicSafetyTopics } from "@/lib/post-generator/citizen-safety-discovery"
 import { discoverLocalWeatherMediaTopics } from "@/lib/post-generator/weather-media-discovery"
 import { getActiveCalendarEntries } from "@/lib/post-generator/calendar"
+import { isValidHolidayRecommendation } from "@/lib/post-generator/holiday-validation"
+import { normalizeCandidates } from "@/lib/post-generator/candidate-normalize"
 import {
   hasRecommendablePost,
   hasTopRecommended,
@@ -44,6 +46,19 @@ function calendarHolidayCandidates(todayIso: string): ExternalOpportunityInput[]
   const year = date.getFullYear()
   return getActiveCalendarEntries(date)
     .filter((entry) => entry.category === "holiday_safety" && entry.month && entry.day)
+    .filter((entry) =>
+      isValidHolidayRecommendation(
+        {
+          id: entry.id,
+          label: entry.label,
+          month: entry.month,
+          day: entry.day,
+          category: entry.category,
+        },
+        todayIso,
+        7
+      ).ok
+    )
     .slice(0, 2)
     .map((entry) => {
       const eventDate = `${year}-${String(entry.month).padStart(2, "0")}-${String(entry.day).padStart(2, "0")}`
@@ -383,6 +398,14 @@ export async function POST(request: Request) {
       }
     }
 
+    const normalizedPreview = normalizeCandidates(candidates)
+    console.info(
+      "[post-opportunities] normalized candidates",
+      Object.fromEntries(
+        [...normalizedPreview.reduce((m, c) => m.set(c.sourceType, (m.get(c.sourceType) || 0) + 1), new Map())]
+      )
+    )
+
     let ranked = rankAndGateExternalOpportunities(candidates, {
       agencyType,
       agencyName,
@@ -395,11 +418,10 @@ export async function POST(request: Request) {
       requireTrustedSource: !useDemo,
     })
 
-    // Always hunt hard for at least one Top recommended post via scoring.
-    // Extra deep-search passes; results still go through the same ranking method (never force-promoted).
-    if (!useDemo && !hasTopRecommended(ranked)) {
+    // Deep search only when ranking produced zero candidates — empty is valid; do not hunt filler.
+    if (!useDemo && ranked.length === 0) {
       console.info(
-        "[post-opportunities] No Top recommended post yet — starting deep search passes."
+        "[post-opportunities] No ranked recommendations — starting deep search passes."
       )
       const deep = await discoverStrongRecommendedTopics({
         state,
@@ -447,6 +469,7 @@ export async function POST(request: Request) {
     // Production architecture: retrieved evidence -> strategy -> writer -> quality gate.
     // This path is intentionally fail-closed. Demo fixtures remain deterministic.
     let pipelineSummary
+    let pipelineDiagnostics
     const typeLabel = agencyTypeLabel(agencyType, agencyTypeOther)
     const pipelineContext = {
       agencyName: agencyName || "the public safety agency",
@@ -498,8 +521,17 @@ export async function POST(request: Request) {
       const pipeline = await runProductionPostPipeline(pipelineContext, ranked)
       ranked = pipeline.approved
       pipelineSummary = pipeline.stage1Summary
+      pipelineDiagnostics = pipeline.diagnostics
+      if (pipeline.diagnostics.usedDeterministicFallback) {
+        console.warn(
+          "[post-opportunities] Pipeline used deterministic verified fallback:",
+          pipeline.diagnostics.fallbackReason,
+          `approved=${pipeline.diagnostics.approvedCount}`
+        )
+      }
     }
 
+    const rankedBeforeSaferuFill = ranked.length
     const externalOpportunities: ExternalOpportunityInput[] = ranked.map(
       ({ internalScores: _scores, ...rest }) => rest
     )
@@ -607,6 +639,13 @@ export async function POST(request: Request) {
       demo: useDemo,
       pipelineVersion: "three-stage-v1",
       pipelineSummary,
+      pipelineDiagnostics,
+      saferuFallbackOnly:
+        !useDemo &&
+        rankedBeforeSaferuFill === 0 &&
+        result.fromSaferU.length > 0 &&
+        result.topRecommended.length === 0 &&
+        result.couldPost.length === 0,
     })
   } catch (e) {
     console.error("Post opportunities error:", e)

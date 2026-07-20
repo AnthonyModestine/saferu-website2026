@@ -87,7 +87,7 @@ const HOLIDAYS: CalendarEntry[] = [
   { id: "thanksgiving", label: "Thanksgiving cooking safety", month: 11, day: 27, signals: ["cooking_safety", "travel_safety"], category: "holiday_safety", priority: "plan_ahead" },
   { id: "hanukkah", label: "Hanukkah", month: 12, day: 15, signals: ["candle_safety", "heating_safety"], category: "holiday_safety", priority: "plan_ahead" },
   { id: "holiday-shopping", label: "Holiday shopping season", month: 12, day: 1, signals: ["package_theft", "scams", "parking_lot_safety"], category: "crime_prevention", priority: "recommended_today" },
-  { id: "christmas", label: "Winter holidays", month: 12, day: 25, signals: ["carbon_monoxide", "heating_safety", "travel_safety"], category: "holiday_safety", priority: "plan_ahead" },
+  { id: "christmas", label: "Christmas", month: 12, day: 25, signals: ["carbon_monoxide", "heating_safety", "travel_safety"], category: "holiday_safety", priority: "plan_ahead" },
   { id: "kwanzaa", label: "Kwanzaa", month: 12, day: 26, signals: ["candle_safety", "community_engagement"], category: "holiday_safety", priority: "plan_ahead" },
 ]
 
@@ -143,7 +143,9 @@ export function getActiveCalendarEntries(date: Date): CalendarEntry[] {
       return isInWeekContaining(date, m, d)
     }
     if (entry.month && entry.day) {
-      return isNear(date, entry.month, entry.day, entry.durationDays ? 21 : 14)
+      const windowDays =
+        entry.category === "holiday_safety" && entry.day ? 7 : entry.durationDays ? 21 : 14
+      return isNear(date, entry.month, entry.day, windowDays)
     }
     if (entry.month) {
       return entry.month === month

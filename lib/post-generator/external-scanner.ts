@@ -79,7 +79,8 @@ function heatSignals(maxTemp: number, forecastText: string): string[] {
 function buildHeatOpportunity(
   locationKey: string,
   locationLabel: string,
-  hotPeriods: NwsPeriod[]
+  hotPeriods: NwsPeriod[],
+  forecastUrl?: string
 ): ExternalOpportunityInput | null {
   if (hotPeriods.length === 0) return null
   const maxTemp = Math.max(...hotPeriods.map((p) => p.temperature ?? 0))
@@ -106,7 +107,7 @@ function buildHeatOpportunity(
     priority: "recommended_today",
     signals: heatSignals(maxTemp, forecastText),
     sourceName: "National Weather Service forecast",
-    sourceUrl: "https://www.weather.gov/",
+    sourceUrl: forecastUrl || "https://api.weather.gov/",
     eventStart: hotPeriods[0]?.startTime,
     eventEnd: hotPeriods[hotPeriods.length - 1]?.endTime,
     verifiedFacts: [
@@ -206,7 +207,7 @@ async function scanWeatherForLocation(
   )
 
   const locationLabel = location.label
-  const heat = buildHeatOpportunity(locationKey, locationLabel, hotPeriods)
+  const heat = buildHeatOpportunity(locationKey, locationLabel, hotPeriods, forecastUrl)
 
   const alerts = await fetchJson<{ features?: NwsAlertFeature[] }>(
     `https://api.weather.gov/alerts/active?point=${location.latitude},${location.longitude}`

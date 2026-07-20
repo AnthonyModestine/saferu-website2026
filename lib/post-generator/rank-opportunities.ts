@@ -13,11 +13,18 @@ import {
   jurisdictionMessagingGuidance,
   type JurisdictionFit,
 } from "./jurisdiction"
+import { shouldExcludeUnverifiedEvent } from "./event-exclusion"
+import {
+  containsVagueHolidayLanguage,
+  isValidHolidayRecommendation,
+} from "./holiday-validation"
 import {
   isNationalValueSource,
   isTrustedSourceUrl,
   scoreSourceTrust,
 } from "./trusted-sources"
+import { isLikelyHomepageUrl } from "./source-standards"
+import { shouldRejectOrdinaryWeather } from "./weather-gates"
 import type {
   ExternalOpportunityInput,
   OpportunityPriority,
@@ -103,7 +110,7 @@ export function opportunityFingerprint(input: {
 /** Collapse related signals into one topic family so heat/storm/scam variants never double-post. */
 const TOPIC_FAMILIES: Array<{ family: string; match: RegExp }> = [
   { family: "heat", match: /\b(heat|hot_vehicle|heat_illness|hydration|extreme_heat)\b/ },
-  { family: "severe_weather", match: /\b(severe_storm|thunderstorm|tornado|high_wind|wind_advisory|hail)\b/ },
+  { family: "severe_weather", match: /\b(severe_storms?|thunderstorm|tornado|high_winds?|wind_advisory|hail)\b/ },
   { family: "flood", match: /\b(flood|flash_flood)\b/ },
   { family: "winter", match: /\b(winter|ice_safety|snow|freeze|cold_exposure)\b/ },
   { family: "air_quality", match: /\b(air_quality|aqi|respiratory|smoke)\b/ },
@@ -388,8 +395,88 @@ function finalPioGate(input: ExternalOpportunityInput, dims: {
   if (dims.sourceTrust < 50) return false
   const text = `${input.title} ${input.summary} ${input.whyItMatters}`.toLowerCase()
   if (/celebrity|political debate|opinion piece|clickbait/i.test(text)) return false
+  const why = (input.whyItMatters || "").trim()
+  if (why.length < 20 || /might be interesting|fun fact/i.test(why)) return false
   if (!input.verifiedFacts?.length && input.sourceLabel !== "Weather Alert") return false
   return true
+}
+
+const LOCAL_COMMUTE_IMPACT =
+  /commuter|affects (local|our)|travel (impact|through)|major (highway|route)|residents (who|may) travel|shared (route|road)/i
+
+function shouldRejectNeighboringRoadWithoutImpact(
+  input: ExternalOpportunityInput,
+  jurisdictionFit: JurisdictionFit
+): boolean {
+  const key = topicKey(input)
+  const category = (input.category || "").toLowerCase()
+  const signals = (input.signals ?? []).map((s) => s.toLowerCase())
+  const isRoadClosure =
+    key === "traffic" || category.includes("road_closure") || signals.includes("road_closure")
+  if (!isRoadClosure) return false
+
+  const text = `${input.title} ${input.summary} ${input.whyItMatters} ${input.suggestedMessage || ""}`
+  const hasImpact = LOCAL_COMMUTE_IMPACT.test(text)
+  if (hasImpact) return false
+
+  const distance = input.distanceMiles
+  if (
+    key === "traffic" &&
+    (jurisdictionFit === "nearby" || jurisdictionFit === "regional") &&
+    typeof distance === "number" &&
+    distance > 15
+  ) {
+    return true
+  }
+  if (
+    jurisdictionFit === "nearby" &&
+    typeof distance === "number" &&
+    distance >= 20 &&
+    (category.includes("road_closure") || signals.includes("road_closure"))
+  ) {
+    return true
+  }
+  return false
+}
+
+function shouldRejectHolidayCandidate(
+  input: ExternalOpportunityInput,
+  todayIso: string
+): boolean {
+  const category = (input.category || "").toLowerCase()
+  const isHoliday =
+    category === "holiday_safety" || input.sourceLabel === "Seasonal Recommendation"
+  if (!isHoliday) return false
+
+  const text = `${input.title} ${input.summary} ${input.whyItMatters} ${input.suggestedMessage || ""}`
+  if (containsVagueHolidayLanguage(text)) return true
+  if (/^(winter holidays|holiday shopping|the holidays|holiday season)$/i.test(input.title.trim())) {
+    return true
+  }
+  if (!input.eventStart) return true
+
+  const days = daysFromToday(input.eventStart, todayIso)
+  if (days == null || days < -1 || days > 7) return true
+
+  if (input.id.startsWith("calendar-")) {
+    const holidayId = input.id.slice("calendar-".length)
+    const dayPart = (input.eventStart || "").slice(0, 10)
+    const [, m, d] = dayPart.split("-").map(Number)
+    const result = isValidHolidayRecommendation(
+      {
+        id: holidayId,
+        label: input.title,
+        category: input.category,
+        month: m,
+        day: d,
+      },
+      todayIso,
+      7
+    )
+    if (!result.ok) return true
+  }
+
+  return false
 }
 
 function assignRecommendationTier(
@@ -421,12 +508,26 @@ export function scoreExternalOpportunity(
   }
 
   // Do not recommend community events unless the agency is clearly involved.
-  if (isUnconfirmedCommunityEvent(input)) return null
+  if (shouldExcludeUnverifiedEvent(input)) return null
+
+  if (shouldRejectOrdinaryWeather(input)) return null
+
+  const combinedText = `${input.title} ${input.summary} ${input.whyItMatters} ${input.suggestedMessage || ""}`
+  if (containsVagueHolidayLanguage(combinedText)) return null
+  if (shouldRejectHolidayCandidate(input, ctx.todayIso)) return null
 
   const requireTrusted = ctx.requireTrustedSource !== false
   if (requireTrusted && input.sourceUrl && !isTrustedSourceUrl(input.sourceUrl, input.sourceName)) {
     // Allow medium-confidence local civic sources only when sourceName looks official.
     if (scoreSourceTrust(input.sourceUrl, input.sourceName) < 70) return null
+  }
+  if (
+    requireTrusted &&
+    input.sourceUrl &&
+    isLikelyHomepageUrl(input.sourceUrl) &&
+    input.sourceLabel !== "Weather Alert"
+  ) {
+    return null
   }
 
   const freshness = scoreFreshness(input, ctx.todayIso)
@@ -446,6 +547,8 @@ export function scoreExternalOpportunity(
       signals: input.signals,
       distanceMiles: input.distanceMiles,
     })
+
+  if (shouldRejectNeighboringRoadWithoutImpact(input, jurisdictionFit)) return null
 
   const agency = scoreAgencyRelevance(input.signals ?? [], input.category, ctx.agencyType)
   let geographicRelevance = scoreGeographic(input)
@@ -551,28 +654,6 @@ export function scoreExternalOpportunity(
       messagingAngle,
     },
   }
-}
-
-function isUnconfirmedCommunityEvent(input: ExternalOpportunityInput): boolean {
-  const label = input.sourceLabel
-  const category = (input.category || "").toLowerCase()
-  const text = `${input.title} ${input.summary} ${input.whyItMatters}`.toLowerCase()
-  const looksLikeEvent =
-    label === "Upcoming Event" ||
-    category.includes("community_event") ||
-    /\b(community night|open house|festival|fair|parade|ribbon.?cutting|fun run|concert|movie night)\b/i.test(
-      text
-    )
-  if (!looksLikeEvent) return false
-
-  const agencyInvolved =
-    /\b(our department|hosted by|co-?hosted|agency.?hosted|police.?night|fire.?open.?house|department.?open.?house)\b/i.test(
-      text
-    ) ||
-    /\b(police|fire|ems|sheriff|emergency management)\b/i.test(
-      `${input.sourceName || ""} ${input.title}`
-    )
-  return !agencyInvolved
 }
 
 function areNearDuplicates(a: ExternalOpportunityInput, b: ExternalOpportunityInput): boolean {

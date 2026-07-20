@@ -3,6 +3,12 @@ import "server-only"
 import type { AiResult } from "@/lib/ai-result"
 import { parseModelJson } from "@/lib/parse-model-json"
 import { agencyRoleBrief, agencyTypeLabel } from "./agency-relevance"
+import { captionVoiceBrief } from "./caption-voice"
+import {
+  preventativeFollowupBrief,
+  sourceSupportsPluralTrend,
+  suggestsManufacturedTrend,
+} from "./preventative-followup"
 import type { ExternalOpportunityInput, RecentAgencyContent } from "./types"
 
 type Followup = {
@@ -68,6 +74,10 @@ Agency: ${agency} (${typeLabel})
 Community: ${place}
 Role: ${role}
 
+${preventativeFollowupBrief()}
+
+${captionVoiceBrief(agency, place)}
+
 For each press release, video request, or event campaign, decide whether it creates a timely educational or preventative follow-up opportunity.
 
 Examples:
@@ -124,6 +134,14 @@ Return ONLY JSON:
         : []
       if (!source || !title || !whyItMatters || !recommendedAction || !signals.length) continue
 
+      const followupText = `${title} ${followup.summary || ""} ${whyItMatters} ${recommendedAction}`
+      if (
+        suggestsManufacturedTrend(followupText) &&
+        !sourceSupportsPluralTrend(source.content)
+      ) {
+        continue
+      }
+
       opportunities.push({
         id: `saferu-followup-${source.id}-${slug(title)}`,
         title,
@@ -145,7 +163,10 @@ Return ONLY JSON:
         doNotClaim: [
           "Do not repeat private incident details from the original content.",
           "Do not imply a broader crime trend unless the original content explicitly confirms one.",
+          "Do not use trend language (increase, pattern, multiple reports, uptick) unless the source explicitly supports it.",
         ],
+        whyNow: "The agency recently communicated about this topic; a timely prevention reminder helps while residents are still paying attention.",
+        whyThisAgency: `${agency} is the natural voice for prevention and safety education tied to this recent communication.`,
         confidenceLevel: "high",
         jurisdictionFit: "own",
       })

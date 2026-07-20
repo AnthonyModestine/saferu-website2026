@@ -70,6 +70,13 @@ export const MASTER_SOURCE_REGISTRY: SourceRegistryRecord[] = [
     conflictPriority: 85,
   }),
   source("nifc", "National Interagency Fire Center", ["nifc.gov"], "wildfire", "official_operational_authority"),
+  source(
+    "nifc_wfigs",
+    "NIFC WFIGS Incident Locations",
+    ["services3.arcgis.com"],
+    "wildfire",
+    "official_operational_authority"
+  ),
   source("inciweb", "InciWeb", ["inciweb.wildfire.gov"], "wildfire", "official_operational_authority"),
   source("wildfire_gov", "Wildfire.gov", ["wildfire.gov"], "wildfire", "official_operational_authority"),
   source("nasa_firms", "NASA FIRMS", ["firms.modaps.eosdis.nasa.gov"], "wildfire_detection", "authoritative_data", {
