@@ -11,6 +11,8 @@ import {
 import { isLocalPreviewServer } from "@/lib/local-preview-server"
 import type { CustomizeMessageMode } from "@/lib/post-generator/types"
 
+export const maxDuration = 30
+
 const CUSTOMIZE_MODES: CustomizeMessageMode[] = [
   "shorten",
   "conversational",
@@ -46,6 +48,11 @@ export async function POST(request: Request) {
     const action = String(body.action || "customize")
 
     if (action === "generate") {
+      const fitRaw = String(body.jurisdictionFit || "")
+      const jurisdictionFit =
+        fitRaw === "own" || fitRaw === "nearby" || fitRaw === "regional" || fitRaw === "unknown"
+          ? fitRaw
+          : undefined
       const result = await generateMessageFromOpportunity(
         String(body.title || ""),
         String(body.whyItMatters || ""),
@@ -60,7 +67,8 @@ export async function POST(request: Request) {
         String(body.sourceLabel || ""),
         String(body.agencyType || body.departmentType || ""),
         String(body.agencyTypeOther || body.departmentOther || ""),
-        String(body.messagingAngle || "")
+        String(body.messagingAngle || body.whyThisAgency || ""),
+        jurisdictionFit
       )
       if (!result.ok) {
         return NextResponse.json(aiErrorPayload(result.reason, result.detail), { status: 503 })
@@ -73,10 +81,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid customize mode." }, { status: 400 })
     }
 
+    const verifiedFactsRaw = Array.isArray(body.verifiedFacts) ? body.verifiedFacts.map(String) : []
+    const verifiedFacts = verifiedFactsRaw.map((text, index) => ({
+      id: `fact-${index + 1}`,
+      text,
+    }))
+
     const result = await customizeCuratedMessage(
       String(body.message || ""),
       mode,
-      String(body.agencyName || "")
+      String(body.agencyName || ""),
+      {
+        city: String(body.city || ""),
+        state: String(body.state || ""),
+      },
+      {
+        agencyType: String(body.agencyType || body.departmentType || ""),
+        verifiedFacts,
+      }
     )
     if (!result.ok) {
       return NextResponse.json(aiErrorPayload(result.reason, result.detail), { status: 503 })

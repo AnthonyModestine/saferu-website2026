@@ -11,6 +11,15 @@ import type {
 } from "./types"
 import { indexCuratedPosts, type IndexedCuratedPost } from "./content-index"
 import { buildGeneratorContext, rankCuratedPosts } from "./scoring"
+import { isNationalValueSource } from "./trusted-sources"
+
+const GENERIC_CURATED_SIGNALS = new Set([
+  "public_safety",
+  "safety",
+  "community",
+  "community_engagement",
+  "awareness",
+])
 
 function toCuratedRef(post: IndexedCuratedPost, matchReason: string): CuratedContentRef {
   return {
@@ -91,22 +100,62 @@ function isOfficialAlertTemplateTopic(input: ExternalOpportunityInput): boolean 
   )
 }
 
+function meaningfulSignalOverlap(
+  input: ExternalOpportunityInput,
+  match: { post: IndexedCuratedPost }
+): string[] {
+  const targets = new Set(input.signals ?? [])
+  return match.post.signals.filter(
+    (signal) => targets.has(signal) && !GENERIC_CURATED_SIGNALS.has(signal)
+  )
+}
+
+/**
+ * Prefer no SaferU library graphic over a weakly matched / random one.
+ * National/federal posts without local distance need a strong multi-signal match.
+ */
+function shouldAttachSaferuLibraryGraphic(
+  input: ExternalOpportunityInput,
+  match: { post: IndexedCuratedPost; score: number } | undefined
+): boolean {
+  if (!match?.post.hasGraphic || isPlaceholderGraphic(match.post.graphicUrl)) return false
+  if (isOfficialAlertTemplateTopic(input)) return false
+
+  const overlap = meaningfulSignalOverlap(input, match)
+  const hasLocalDistance =
+    typeof input.distanceMiles === "number" && Number.isFinite(input.distanceMiles)
+  const nationalWithoutLocal =
+    (input.sourceLabel === "National Safety Alert" ||
+      input.sourceLabel === "Federal Advisory" ||
+      isNationalValueSource(input.sourceUrl, input.sourceName)) &&
+    !hasLocalDistance
+
+  if (nationalWithoutLocal) {
+    return match.score >= 70 && overlap.length >= 2
+  }
+  return match.score >= 55 && overlap.length >= 1
+}
+
 function buildExternalFromInput(
   input: ExternalOpportunityInput,
   match: { post: IndexedCuratedPost; score: number; matchReason: string } | undefined,
   allowGraphic: boolean
 ): PostOpportunity {
   const now = new Date().toISOString()
-  const curated = match ? toCuratedRef(match.post, match.matchReason) : undefined
-  const externalGraphic = allowGraphic ? input.graphicUrl : undefined
-  const externalThumbnail = allowGraphic ? input.graphicThumbnailUrl : undefined
+  const attachLibrary = shouldAttachSaferuLibraryGraphic(input, match)
+  const curated = attachLibrary && match ? toCuratedRef(match.post, match.matchReason) : undefined
 
   // Official alerts use the premade Weather Alert / public-info canvas template
-  // (client-side). Do not invent or attach unrelated SaferU safety graphics.
-  // For all other topics, only attach real SaferU library images (never placeholders).
+  // (client-side). Do not invent or attach unrelated SaferU safety graphics,
+  // and do not keep external stock photos that would block the canvas template.
   const useAlertTemplate = isOfficialAlertTemplateTopic(input)
+  const externalGraphic =
+    allowGraphic && !useAlertTemplate ? input.graphicUrl : undefined
+  const externalThumbnail =
+    allowGraphic && !useAlertTemplate ? input.graphicThumbnailUrl : undefined
   const libraryGraphic =
     !useAlertTemplate &&
+    attachLibrary &&
     match?.post.graphicUrl &&
     match.post.hasGraphic &&
     !isPlaceholderGraphic(match.post.graphicUrl)
@@ -170,12 +219,12 @@ function buildExternalFromInput(
       input.internalScores?.actionability ?? (input.publicCallToAction?.length ? 90 : 75),
     sourceReliabilityScore:
       input.internalScores?.sourceTrust ?? (input.sourceName ? 85 : 70),
-    curatedMatchScore: useAlertTemplate ? 0 : match?.score ?? 0,
+    curatedMatchScore: useAlertTemplate ? 0 : attachLibrary ? match?.score ?? 0 : 0,
     freshnessScore: input.internalScores?.freshness ?? 85,
     totalScore:
       input.internalScores?.composite ??
       ((input.priority === "urgent" ? 95 : input.priority === "recommended_today" ? 82 : 65) +
-        (!useAlertTemplate && match ? 20 : 0)),
+        (!useAlertTemplate && attachLibrary && match ? 20 : 0)),
     confidenceLevel: input.confidenceLevel ?? "medium",
     discoveredAt: now,
     updatedAt: now,
@@ -216,13 +265,15 @@ export function generatePostOpportunities(req: GeneratorRequest): GeneratorResul
     (a, b) => b.totalScore - a.totalScore
   )
 
+  const dailyLimit = Math.max(3, Math.min(req.dailyLimit ?? 5, 8))
+
   // Quality over quantity: only scored 4–5 star opportunities reach this stage.
   const topRecommended = cleaned
     .filter((opp) => (opp.recommendationTier || "top_recommended") === "top_recommended")
-    .slice(0, 4)
+    .slice(0, dailyLimit)
   const couldPost = cleaned
     .filter((opp) => opp.recommendationTier === "could_post")
-    .slice(0, 4)
+    .slice(0, dailyLimit)
   const uncertain: PostOpportunity[] = []
 
   // Legacy priority buckets still used by older UI paths.
@@ -237,17 +288,17 @@ export function generatePostOpportunities(req: GeneratorRequest): GeneratorResul
       opp.opportunitySource !== "saferu_curated"
   )
 
-  // Curated graphics attach to scored recommendations above. If nothing scored
-  // high enough, always surface SaferU safety content so the briefing is never empty.
+  // Curated graphics attach to scored recommendations above. When nothing local
+  // surfaced, offer SaferU library content as a clearly marked fallback only.
   let saferuSet: PostOpportunity[] = []
   if (dailySet.length === 0) {
-    const curatedFallback = rankCuratedPosts(posts, ctx, ctx.signals, used, 2, false)
+    const curatedFallback = rankCuratedPosts(posts, ctx, ctx.signals, used, 3, false)
     saferuSet = curatedFallback.map((scored) =>
       buildCuratedOpportunity(
         scored,
         ctx,
         scored.matchReason,
-        "Optional — share when it supports your agency’s communication calendar."
+        "SaferU library recommendation — optional evergreen content for your calendar."
       )
     )
   }

@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { useAgency } from "@/lib/agency-context"
 import { useMemberSession } from "@/lib/use-member-session"
+import { useSubscription } from "@/lib/use-subscription"
 import { isLocalGuestPreviewClient } from "@/lib/local-preview"
 import type { PostOpportunity } from "@/lib/post-generator/types"
 import {
@@ -52,13 +53,18 @@ const CUSTOMIZE_OPTIONS = [
 export default function UsePostPage() {
   const router = useRouter()
   const { settings } = useAgency()
-  const { member } = useMemberSession()
-  const guest = isLocalGuestPreviewClient() || !member
+  const { member, isLoading: sessionLoading } = useMemberSession()
+  const { isSubscribed, isLoading: subLoading } = useSubscription()
+  const guestPreview = isLocalGuestPreviewClient()
+  const canCustomize =
+    !guestPreview && !sessionLoading && !subLoading && Boolean(member && (member.paid || isSubscribed))
 
   const [opp, setOpp] = useState<PostOpportunity | null>(null)
   const [message, setMessage] = useState("")
   const [originalMessage, setOriginalMessage] = useState("")
-  const [customizing, setCustomizing] = useState(false)
+  const [customizing, setCustomizing] = useState<string | null>(null)
+  const [customizeError, setCustomizeError] = useState<string | null>(null)
+  const [customizeNotice, setCustomizeNotice] = useState<string | null>(null)
   const [translating, setTranslating] = useState(false)
   const [copied, setCopied] = useState(false)
   const [markedPosted, setMarkedPosted] = useState(false)
@@ -124,28 +130,61 @@ export default function UsePostPage() {
   }, [graphic])
 
   async function handleCustomize(mode: string) {
-    if (!message.trim() || guest) return
-    setCustomizing(true)
+    setCustomizeError(null)
+    setCustomizeNotice(null)
+    if (!message.trim()) {
+      setCustomizeError("Add a message before customizing.")
+      return
+    }
+    if (!canCustomize) {
+      setCustomizeError("Sign in with an active Press Center subscription to customize posts.")
+      return
+    }
+    setCustomizing(mode)
     try {
       const res = await fetch("/api/pio/customize-message", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify({
           action: "customize",
           mode,
           message,
           agencyName: settings.agencyName,
+          agencyType: settings.agencyType,
+          city: settings.city,
+          state: settings.state,
+          verifiedFacts: opp?.verifiedFacts ?? [],
         }),
       })
-      const data = await res.json()
-      if (res.ok && data.message) setMessage(data.message)
+      let data: { message?: string; error?: string; code?: string } = {}
+      try {
+        data = (await res.json()) as typeof data
+      } catch {
+        setCustomizeError("Could not read the server response. Try again.")
+        return
+      }
+      if (!res.ok) {
+        setCustomizeError(data.error || "Could not customize this message. Try again.")
+        return
+      }
+      const next = data.message?.trim()
+      if (!next) {
+        setCustomizeError("AI returned an empty response. Try again.")
+        return
+      }
+      setMessage(next)
+      setCustomizeNotice("Message updated.")
+      window.setTimeout(() => setCustomizeNotice(null), 2500)
+    } catch {
+      setCustomizeError("Network error — check your connection and try again.")
     } finally {
-      setCustomizing(false)
+      setCustomizing(null)
     }
   }
 
   async function handleTranslate() {
-    if (!message.trim() || guest) return
+    if (!message.trim() || !canCustomize) return
     setTranslating(true)
     try {
       const res = await fetch("/api/pio/translate", {
@@ -300,13 +339,13 @@ export default function UsePostPage() {
                 </>
               )}
             </Button>
-            {!guest && (
+            {!guestPreview && (
               <>
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
-                  disabled={translating}
+                  disabled={translating || !canCustomize}
                   onClick={() => void handleTranslate()}
                 >
                   {translating ? (
@@ -327,9 +366,15 @@ export default function UsePostPage() {
             )}
           </div>
 
-          {!guest && (
+          {canCustomize && (
             <div className="mt-4 border-t border-[#e2e8f5] pt-4">
               <p className="mb-2 text-xs font-semibold text-[#64748B]">Customize with AI</p>
+              {customizeError && (
+                <p className="mb-2 text-xs font-medium text-[#DC2626]">{customizeError}</p>
+              )}
+              {customizeNotice && (
+                <p className="mb-2 text-xs font-medium text-[#059669]">{customizeNotice}</p>
+              )}
               <div className="flex flex-wrap gap-2">
                 {CUSTOMIZE_OPTIONS.map((opt) => (
                   <Button
@@ -337,10 +382,10 @@ export default function UsePostPage() {
                     type="button"
                     size="sm"
                     variant="outline"
-                    disabled={customizing}
+                    disabled={Boolean(customizing) || !message.trim()}
                     onClick={() => void handleCustomize(opt.mode)}
                   >
-                    {customizing ? (
+                    {customizing === opt.mode ? (
                       <Loader2 className="mr-1 h-3 w-3 animate-spin" />
                     ) : (
                       <Sparkles className="mr-1 h-3 w-3" />

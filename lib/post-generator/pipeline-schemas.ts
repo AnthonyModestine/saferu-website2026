@@ -102,7 +102,7 @@ export const stage1ResultSchema = z
 
 export const stage2DraftSchema = z
   .object({
-    status: z.enum(["approved", "needs_human_review"]),
+    status: z.enum(["ready", "needs_human_review"]),
     postText: z.string(),
     usedFactIds: z.array(z.string()),
     sourceAttribution: z.string(),
@@ -112,18 +112,18 @@ export const stage2DraftSchema = z
 
 export const stage3DecisionSchema = z
   .object({
-    status: z.enum(["approved", "approved_with_revision", "needs_human_review", "rejected"]),
+    status: z.enum(["approved", "edited", "needs_human_review"]),
     finalPostText: z.string(),
+    changed: z.boolean(),
+    changeReasons: z.array(z.string()),
     checks: z
       .object({
         factsSupported: z.boolean(),
-        attributionCorrect: z.boolean(),
-        jurisdictionCorrect: z.boolean(),
-        agencyRoleCorrect: z.boolean(),
-        residentValueStrong: z.boolean(),
-        relationshipValueStrong: z.boolean(),
-        humanVoiceStrong: z.boolean(),
-        privacySafe: z.boolean(),
+        statusAndUrgencyPreserved: z.boolean(),
+        agencyPerspectiveCorrect: z.boolean(),
+        publicActionClear: z.boolean(),
+        naturalPioVoice: z.boolean(),
+        safeToPublish: z.boolean(),
       })
       .strict(),
     changesMade: z.array(z.string()),
@@ -281,7 +281,7 @@ export const STAGE_2_RESPONSE_FORMAT = {
       additionalProperties: false,
       required: ["status", "postText", "usedFactIds", "sourceAttribution", "humanReviewReason"],
       properties: {
-        status: { type: "string", enum: ["approved", "needs_human_review"] },
+        status: { type: "string", enum: ["ready", "needs_human_review"] },
         postText: { type: "string" },
         usedFactIds: stringArray,
         sourceAttribution: { type: "string" },
@@ -302,6 +302,8 @@ export const STAGE_3_RESPONSE_FORMAT = {
       required: [
         "status",
         "finalPostText",
+        "changed",
+        "changeReasons",
         "checks",
         "changesMade",
         "flags",
@@ -310,31 +312,29 @@ export const STAGE_3_RESPONSE_FORMAT = {
       properties: {
         status: {
           type: "string",
-          enum: ["approved", "approved_with_revision", "needs_human_review", "rejected"],
+          enum: ["approved", "edited", "needs_human_review"],
         },
         finalPostText: { type: "string" },
+        changed: { type: "boolean" },
+        changeReasons: stringArray,
         checks: {
           type: "object",
           additionalProperties: false,
           required: [
             "factsSupported",
-            "attributionCorrect",
-            "jurisdictionCorrect",
-            "agencyRoleCorrect",
-            "residentValueStrong",
-            "relationshipValueStrong",
-            "humanVoiceStrong",
-            "privacySafe",
+            "statusAndUrgencyPreserved",
+            "agencyPerspectiveCorrect",
+            "publicActionClear",
+            "naturalPioVoice",
+            "safeToPublish",
           ],
           properties: {
             factsSupported: { type: "boolean" },
-            attributionCorrect: { type: "boolean" },
-            jurisdictionCorrect: { type: "boolean" },
-            agencyRoleCorrect: { type: "boolean" },
-            residentValueStrong: { type: "boolean" },
-            relationshipValueStrong: { type: "boolean" },
-            humanVoiceStrong: { type: "boolean" },
-            privacySafe: { type: "boolean" },
+            statusAndUrgencyPreserved: { type: "boolean" },
+            agencyPerspectiveCorrect: { type: "boolean" },
+            publicActionClear: { type: "boolean" },
+            naturalPioVoice: { type: "boolean" },
+            safeToPublish: { type: "boolean" },
           },
         },
         changesMade: stringArray,

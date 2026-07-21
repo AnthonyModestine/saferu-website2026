@@ -28,6 +28,7 @@ import {
 import type { ExternalOpportunityInput } from "./types"
 import { normalizeCandidates } from "./candidate-normalize"
 import { isLikelyHomepageUrl } from "./source-standards"
+import { isKeepableWithoutPerfectEvidence } from "./source-retention"
 
 function baseOpp(
   overrides: Partial<ExternalOpportunityInput> & Pick<ExternalOpportunityInput, "id" | "title">
@@ -378,5 +379,94 @@ describe("Normalization and source URL helpers", () => {
       isLikelyHomepageUrl("https://alerts.weather.gov/search?zone=XYZ"),
       false
     )
+  })
+})
+
+describe("National IC3 filler demotion", () => {
+  it("scores naked IC3/FBI national alerts far below local weather", () => {
+    const weather = scoreExternalOpportunity(
+      baseOpp({
+        id: "nws-1",
+        title: "Flash Flood Warning",
+        summary: "NWS warns of flash flooding in the county this evening.",
+        category: "weather",
+        sourceLabel: "Weather Alert",
+        signals: ["flooding", "severe_storms"],
+        sourceName: "National Weather Service",
+        sourceUrl: "https://api.weather.gov/alerts/urn:oid:1.2.3",
+        priority: "urgent",
+        verifiedFacts: ["NWS Flash Flood Warning for the county."],
+      }),
+      {
+        agencyType: "police",
+        agencyName: "Memphis PD",
+        city: "Memphis",
+        todayIso: "2026-07-20",
+        requireTrustedSource: false,
+      }
+    )
+    const ic3 = scoreExternalOpportunity(
+      baseOpp({
+        id: "ic3-1",
+        title: "Romance scam alert",
+        summary: "The FBI Internet Crime Complaint Center issued a public alert.",
+        category: "scams",
+        sourceLabel: "National Safety Alert",
+        signals: ["scams", "fraud"],
+        sourceName: "FBI Internet Crime Complaint Center (IC3)",
+        sourceUrl: "https://www.ic3.gov/Media/Y2026/PSA260101",
+        priority: "optional",
+        confidenceLevel: "medium",
+        verifiedFacts: ["FBI IC3 published a romance scam alert."],
+      }),
+      {
+        agencyType: "police",
+        agencyName: "Memphis PD",
+        city: "Memphis",
+        todayIso: "2026-07-20",
+        requireTrustedSource: false,
+      }
+    )
+
+    assert.ok(weather, "weather opportunity should score")
+    assert.ok(ic3, "ic3 opportunity should still be scorable when explicitly provided")
+    assert.ok(
+      (weather!.internalScores?.geographicRelevance ?? 0) >= 90,
+      "weather should keep high geographic relevance"
+    )
+    assert.ok(
+      (ic3!.internalScores?.geographicRelevance ?? 100) <= 45,
+      "naked national IC3 must not score like local weather"
+    )
+  })
+
+  it("does not provisional-keep demoted IC3 national filler", () => {
+    const keep = isKeepableWithoutPerfectEvidence({
+      ...baseOpp({
+        id: "ic3-keep-1",
+        title: "Tech support scam PSA",
+        category: "scams",
+        sourceLabel: "National Safety Alert",
+        sourceName: "FBI Internet Crime Complaint Center (IC3)",
+        sourceUrl: "https://www.ic3.gov/Media/Y2026/PSA260102",
+        priority: "optional",
+        confidenceLevel: "high",
+        verifiedFacts: ["IC3 published a tech support scam alert."],
+      }),
+      internalScores: {
+        agencyRelevance: 70,
+        geographicRelevance: 38,
+        residentValue: 70,
+        actionability: 70,
+        urgency: 40,
+        sourceTrust: 95,
+        seasonalRelevance: 50,
+        engagementPotential: 50,
+        freshness: 80,
+        composite: 60,
+        pioRating: 3,
+      },
+    })
+    assert.equal(keep, false)
   })
 })

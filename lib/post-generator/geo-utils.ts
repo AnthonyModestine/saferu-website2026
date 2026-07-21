@@ -162,8 +162,10 @@ export async function resolveServiceAreaLocations(opts: {
   if (!state) return []
 
   const type = opts.serviceAreaType || (opts.county && !opts.city ? "county" : "city")
+  // Open-Meteo returns empty results for comma-containing `name` queries
+  // (e.g. "Memphis, TN" → no results). Prefer place-name-only lookups and
+  // filter by admin1/state — never accept a cross-state first hit.
   const queries: string[] = []
-
   const stateFull = US_STATE_NAMES[state.toLowerCase()] || state
 
   if (type === "state") {
@@ -172,33 +174,29 @@ export async function resolveServiceAreaLocations(opts: {
   } else if (type === "county") {
     const county = opts.county?.trim()
     if (county) {
-      queries.push(`${county}, ${stateFull}`)
-      queries.push(`${normalizePlaceQuery(county)} County, ${stateFull}`)
-      if (stateFull !== state) {
-        queries.push(`${county}, ${state}`)
-        queries.push(`${normalizePlaceQuery(county)} County, ${state}`)
-      }
+      const countyCore = normalizePlaceQuery(county)
+      queries.push(`${countyCore} County`)
+      queries.push(countyCore)
+      if (county !== countyCore) queries.push(county)
     }
   } else {
     const city = opts.city?.trim()
     const county = opts.county?.trim()
-    if (city && county) {
-      queries.push(`${city}, ${normalizePlaceQuery(county)} County, ${stateFull}`)
-      if (stateFull !== state) {
-        queries.push(`${city}, ${normalizePlaceQuery(county)} County, ${state}`)
+    const countyCore = county ? normalizePlaceQuery(county) : ""
+    if (city) {
+      queries.push(city)
+      if (countyCore) {
+        queries.push(`${city} ${countyCore} County`)
+        queries.push(`${city} ${countyCore}`)
       }
     }
-    if (city) {
-      queries.push(`${city}, ${stateFull}`)
-      if (stateFull !== state) queries.push(`${city}, ${state}`)
-    }
-    if (county) {
-      queries.push(`${county}, ${stateFull}`)
-      if (stateFull !== state) queries.push(`${county}, ${state}`)
+    if (countyCore) {
+      queries.push(`${countyCore} County`)
+      queries.push(countyCore)
     }
   }
 
-  for (const query of queries) {
+  for (const query of [...new Set(queries.filter(Boolean))]) {
     const location = await geocodePlace(query, state)
     if (location) return [location]
   }
@@ -210,7 +208,7 @@ async function geocodePlace(query: string, state: string): Promise<ServiceAreaLo
   try {
     const url = new URL("https://geocoding-api.open-meteo.com/v1/search")
     url.searchParams.set("name", query)
-    url.searchParams.set("count", "5")
+    url.searchParams.set("count", "10")
     url.searchParams.set("language", "en")
     url.searchParams.set("format", "json")
     url.searchParams.set("countryCode", "US")
@@ -229,16 +227,14 @@ async function geocodePlace(query: string, state: string): Promise<ServiceAreaLo
         longitude?: number
       }>
     }
-    const match =
-      data.results?.find(
-        (item) =>
-          typeof item.latitude === "number" &&
-          typeof item.longitude === "number" &&
-          stateMatchesAdmin1(state, item.admin1 || "")
-      ) ||
-      data.results?.find(
-        (item) => typeof item.latitude === "number" && typeof item.longitude === "number"
-      )
+    // When state is known, require an admin1 match — do not fall back to a
+    // random first result from another state.
+    const match = data.results?.find(
+      (item) =>
+        typeof item.latitude === "number" &&
+        typeof item.longitude === "number" &&
+        stateMatchesAdmin1(state, item.admin1 || "")
+    )
 
     if (
       !match ||

@@ -6,12 +6,17 @@ import {
   isKeepableWithoutPerfectEvidence,
   provisionalEvidenceFromOpportunity,
 } from "@/lib/post-generator/source-retention"
+import { withPioAgencyAttribution } from "@/lib/post-generator/caption-voice"
+import { isWeatherAlertOpportunity } from "@/lib/post-generator/weather-alert-message"
+import { resolveOpportunityMessage } from "@/lib/post-generator/opportunity-message-ai"
 import type {
   PipelineAgencyContext,
   Stage1Recommendation,
   VerifiedEvidenceRecord,
 } from "@/lib/post-generator/pipeline-types"
 import type { RankedExternalOpportunity } from "@/lib/post-generator/types"
+
+const TARGET_APPROVED = 5
 
 export interface PipelineDiagnostics {
   rankedIn: number
@@ -48,6 +53,13 @@ function priorityFor(recommendation: Stage1Recommendation): RankedExternalOpport
   return "recommended_today"
 }
 
+function qualityGateStatusForApi(
+  status: "approved" | "edited" | "needs_human_review"
+): RankedExternalOpportunity["qualityGateStatus"] {
+  if (status === "edited") return "approved_with_revision"
+  return status
+}
+
 function jurisdictionFor(
   recommendation: Stage1Recommendation
 ): RankedExternalOpportunity["jurisdictionFit"] {
@@ -66,20 +78,38 @@ function hasVerifiedEvidence(evidence: VerifiedEvidenceRecord[]): boolean {
   return evidence.some((record) => record.verificationStatus === "verified" && record.active)
 }
 
-function deterministicMessage(opportunity: RankedExternalOpportunity): string {
-  if (opportunity.suggestedMessage?.trim()) return opportunity.suggestedMessage.trim()
-  const actions = (opportunity.publicCallToAction ?? []).slice(0, 2)
-  return [opportunity.summary, ...actions].filter(Boolean).join("\n\n")
+function attributionContext(
+  opportunity: RankedExternalOpportunity
+): {
+  title: string
+  sourceName?: string
+  issuingAuthority?: string
+  sourceLabel?: string
+} {
+  return {
+    title: opportunity.title,
+    sourceName: opportunity.sourceName,
+    issuingAuthority: opportunity.issuingAuthority,
+    sourceLabel: opportunity.sourceLabel,
+  }
 }
 
-/**
- * Keep already-ranked, evidence-verified opportunities when the AI stages fail.
- * Uses only discovery-time verified facts — does not invent new incident details.
- */
-function buildDeterministicApproved(
+async function deterministicMessage(
   opportunity: RankedExternalOpportunity,
-  evidence: VerifiedEvidenceRecord[]
-): RankedExternalOpportunity {
+  context: PipelineAgencyContext
+): Promise<string> {
+  if (opportunity.suggestedMessage?.trim() && !isWeatherAlertOpportunity(opportunity)) {
+    const ctx = attributionContext(opportunity)
+    return withPioAgencyAttribution(opportunity.suggestedMessage, context.agencyName, ctx)
+  }
+  return resolveOpportunityMessage(opportunity, context)
+}
+
+async function buildDeterministicApproved(
+  opportunity: RankedExternalOpportunity,
+  evidence: VerifiedEvidenceRecord[],
+  context: PipelineAgencyContext
+): Promise<RankedExternalOpportunity> {
   const facts = evidence.flatMap((record) => record.facts.map((fact) => fact.claim))
   const primary = evidence.find((record) => record.verificationStatus === "verified")
   return {
@@ -89,10 +119,29 @@ function buildDeterministicApproved(
     verifiedFacts: facts.length ? facts : opportunity.verifiedFacts,
     issuingAuthority:
       primary?.issuingAuthority || opportunity.issuingAuthority || opportunity.sourceName,
-    suggestedMessage: deterministicMessage(opportunity),
+    suggestedMessage: await deterministicMessage(opportunity, context),
     qualityGateStatus: "approved",
     confidenceLevel: opportunity.confidenceLevel === "low" ? "medium" : opportunity.confidenceLevel,
   }
+}
+
+async function fillApprovedToTarget(
+  approved: RankedExternalOpportunity[],
+  verified: Array<{ opportunity: RankedExternalOpportunity; evidence: VerifiedEvidenceRecord[] }>,
+  context: PipelineAgencyContext
+): Promise<RankedExternalOpportunity[]> {
+  if (approved.length >= TARGET_APPROVED) return approved
+  const seen = new Set(approved.map((item) => item.id))
+  const next = [...approved]
+  for (const candidate of verified) {
+    if (next.length >= TARGET_APPROVED) break
+    if (seen.has(candidate.opportunity.id)) continue
+    next.push(
+      await buildDeterministicApproved(candidate.opportunity, candidate.evidence, context)
+    )
+    seen.add(candidate.opportunity.id)
+  }
+  return next
 }
 
 /**
@@ -158,11 +207,14 @@ export async function runProductionPostPipeline(
       `verifiedEvidence=${verified.length}`
     )
     if (verified.length > 0) {
-      const approved = verified
-        .slice(0, 4)
-        .map((candidate) =>
-          buildDeterministicApproved(candidate.opportunity, candidate.evidence)
-        )
+      let approved = await Promise.all(
+        verified
+          .slice(0, TARGET_APPROVED)
+          .map((candidate) =>
+            buildDeterministicApproved(candidate.opportunity, candidate.evidence, context)
+          )
+      )
+      approved = await fillApprovedToTarget(approved, verified, context)
       console.warn(
         `[production-pipeline] Keeping ${approved.length} verified ranked item(s) after Stage 1 failure (${stage1.reason}).`
       )
@@ -196,39 +248,48 @@ export async function runProductionPostPipeline(
   }
 
   const sourceById = new Map(ranked.map((opportunity) => [opportunity.id, opportunity]))
+  const evidenceById = new Map(
+    enriched.map((candidate) => [candidate.opportunity.id, candidate.evidence])
+  )
   const approved: RankedExternalOpportunity[] = []
   for (const recommendation of stage1.data.recommendations) {
     if (recommendation.status === "needs_human_review") continue
     const source = sourceById.get(recommendation.id)
     if (!source) continue
 
-    const stage2 = await runStage2Writer(context, recommendation)
-    if (!stage2.ok || stage2.data.status !== "approved" || !stage2.data.postText.trim()) {
+    const stage2 = await runStage2Writer(context, recommendation, source)
+    if (!stage2.ok || stage2.data.status !== "ready" || !stage2.data.postText.trim()) {
       console.warn(
         `[production-pipeline] Stage 2 rejected ${recommendation.id}:`,
         stage2.ok ? stage2.data.humanReviewReason : stage2.reason
       )
+      const evidence = evidenceById.get(source.id) ?? []
+      approved.push(await buildDeterministicApproved(source, evidence, context))
       continue
     }
 
-    const stage3 = await runStage3QualityGate(context, recommendation, stage2.data)
+    const stage3 = await runStage3QualityGate(context, recommendation, stage2.data, source)
     if (!stage3.ok) {
       console.warn(
         `[production-pipeline] Stage 3 failed ${recommendation.id}:`,
         stage3.reason,
         stage3.detail || ""
       )
+      const evidence = evidenceById.get(source.id) ?? []
+      approved.push(await buildDeterministicApproved(source, evidence, context))
       continue
     }
     const qualityGate = stage3.data
     if (
-      (qualityGate.status !== "approved" && qualityGate.status !== "approved_with_revision") ||
+      (qualityGate.status !== "approved" && qualityGate.status !== "edited") ||
       !qualityGate.finalPostText.trim()
     ) {
       console.warn(
         `[production-pipeline] Stage 3 rejected ${recommendation.id}:`,
         qualityGate.humanReviewReason
       )
+      const evidence = evidenceById.get(source.id) ?? []
+      approved.push(await buildDeterministicApproved(source, evidence, context))
       continue
     }
 
@@ -257,25 +318,31 @@ export async function runProductionPostPipeline(
       relationshipValue: recommendation.relationshipValue,
       issuingAuthority: recommendation.issuingAuthority,
       supportingSources: recommendation.supportingSources,
-      qualityGateStatus: qualityGate.status,
+      qualityGateStatus: qualityGateStatusForApi(qualityGate.status),
       confidenceLevel: recommendation.sourceConfidence,
     })
   }
 
-  if (approved.length === 0 && verified.length > 0) {
-    const fallback = verified
-      .slice(0, 4)
-      .map((candidate) => buildDeterministicApproved(candidate.opportunity, candidate.evidence))
+  let finalApproved = await fillApprovedToTarget(approved, verified, context)
+
+  if (finalApproved.length === 0 && verified.length > 0) {
+    finalApproved = await Promise.all(
+      verified
+        .slice(0, TARGET_APPROVED)
+        .map((candidate) =>
+          buildDeterministicApproved(candidate.opportunity, candidate.evidence, context)
+        )
+    )
     console.warn(
-      `[production-pipeline] AI stages approved 0; keeping ${fallback.length} verified ranked item(s).`
+      `[production-pipeline] AI stages approved 0; keeping ${finalApproved.length} verified ranked item(s).`
     )
     return {
-      approved: fallback,
-      rejectedCount: ranked.length - fallback.length,
+      approved: finalApproved,
+      rejectedCount: ranked.length - finalApproved.length,
       diagnostics: emptyDiagnostics({
         verifiedEvidence: verified.length,
         droppedAtEvidence,
-        approvedCount: fallback.length,
+        approvedCount: finalApproved.length,
         usedDeterministicFallback: true,
         fallbackReason: "ai_stages_empty_verified_kept",
       }),
@@ -284,13 +351,15 @@ export async function runProductionPostPipeline(
   }
 
   return {
-    approved,
-    rejectedCount: ranked.length - approved.length,
+    approved: finalApproved,
+    rejectedCount: ranked.length - finalApproved.length,
     diagnostics: emptyDiagnostics({
       verifiedEvidence: verified.length,
       droppedAtEvidence,
-      approvedCount: approved.length,
-      usedDeterministicFallback: false,
+      approvedCount: finalApproved.length,
+      usedDeterministicFallback: finalApproved.length > approved.length,
+      fallbackReason:
+        finalApproved.length > approved.length ? "filled_to_target_from_verified" : undefined,
     }),
     stage1Summary: stage1.data.runSummary,
   }

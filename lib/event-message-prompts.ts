@@ -111,7 +111,9 @@ When hostOrganization is provided, name it accurately. Do not invent a host or i
 Follow these rules:
 - Do not invent activities, registration requirements, costs, parking details, sponsors, weather information, or other facts.
 - Omit information that was not provided.
-- Use a professional, approachable, and community-focused tone.
+- Use a professional, approachable, and community-focused PIO tone.
+- Name {organizationName} when inviting or addressing the community. Prefer first-person plural from that organization ("We at {organizationName}…", "{organizationName} invites…").
+- Never substitute generic stand-ins such as "our local police," "our department," or "our officers" for {organizationName}.
 - Make the message easy to scan and understand.
 - Avoid sounding corporate or overly promotional.
 - Do not repeat the same opening used in earlier campaign messages.

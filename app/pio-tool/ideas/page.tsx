@@ -14,6 +14,7 @@ import { generatePostOpportunities, flattenOpportunities } from "@/lib/post-gene
 import { demoExternalOpportunities } from "@/lib/post-generator/external-scanner"
 import { rankAndGateExternalOpportunities } from "@/lib/post-generator/rank-opportunities"
 import { attachWeatherAlertGraphics } from "@/lib/pio-weather-graphic"
+import { buildOpportunityFallbackMessage } from "@/lib/post-generator/caption-voice"
 import {
   applyHolidayAiContent,
   attachHolidayGraphics,
@@ -29,12 +30,17 @@ import { getPioHistoryItems } from "@/lib/pio-history-store"
 import { getPioEvents } from "@/lib/pio-events-store"
 import {
   cacheOpportunityResult,
+  BRIEFING_CACHE_EVENT,
   dismissOpportunity,
   isResultFromToday,
   loadDailyOpportunityHistory,
   saveOpportunityForLater,
   stashOpportunityForUse,
 } from "@/lib/post-generator/opportunity-store"
+import {
+  isUsableCachedBriefing,
+  prefetchPostOpportunities,
+} from "@/lib/post-generator/prefetch-briefing"
 
 const EMPTY_RESULT: GeneratorResult = {
   urgent: [],
@@ -129,6 +135,24 @@ export default function PostGeneratorPage() {
 
   const agencyName = settings.agencyName || "Your Agency"
 
+  async function applyCachedBriefing(): Promise<boolean> {
+    const history = loadDailyOpportunityHistory()
+    const cached = history.lastResult
+    if (
+      !cached ||
+      !isResultFromToday(cached.generatedAt) ||
+      !isUsableCachedBriefing(cached.opportunities)
+    ) {
+      return false
+    }
+    const opportunities = [...cached.opportunities]
+    await hydrateOpportunityGraphics(opportunities)
+    setResult(resultFromCached(opportunities, cached.generatedAt))
+    setSaferuFallbackOnly(false)
+    setIsDemo(false)
+    return true
+  }
+
   async function hydrateOpportunityGraphics(opportunities: PostOpportunity[]) {
     await attachWeatherAlertGraphics(opportunities, {
       logoUrl: settings.logoUrl,
@@ -213,11 +237,15 @@ export default function PostGeneratorPage() {
     const flat = flattenOpportunities(demo)
     for (const opportunity of flat) {
       if (opportunity.curatedMessage) continue
-      opportunity.curatedMessage = [
-        `Community update: ${opportunity.title}.`,
-        ...(opportunity.verifiedFacts ?? []),
-        ...(opportunity.publicCallToAction ?? []),
-      ].join(" ")
+      opportunity.curatedMessage = buildOpportunityFallbackMessage(
+        opportunity,
+        agencyName,
+        {
+          city: settings.city,
+          county: settings.county,
+          state: settings.state,
+        }
+      )
     }
     await hydrateOpportunityGraphics(flat)
     setResult({ ...demo })
@@ -248,31 +276,28 @@ export default function PostGeneratorPage() {
     if (!locationReady) return
 
     autoLoadedRef.current = true
-    const history = loadDailyOpportunityHistory()
-    if (
-      history.lastResult &&
-      isResultFromToday(history.lastResult.generatedAt) &&
-      history.lastResult.opportunities.length > 0 &&
-      history.lastResult.opportunities.length <= 20 &&
-      history.lastResult.opportunities.every(
-        (opp) =>
-          opp.opportunitySource === "saferu_curated" ||
-          (!opp.id.startsWith("ext-") &&
-            Boolean(opp.surfacedReason) &&
-            Boolean(opp.curatedMessage))
-      )
-    ) {
-      void (async () => {
-        const opportunities = [...history.lastResult!.opportunities]
-        await hydrateOpportunityGraphics(opportunities)
-        setResult(resultFromCached(opportunities, history.lastResult!.generatedAt))
-        setSaferuFallbackOnly(false)
-      })()
-      return
-    }
-    void loadOpportunities()
+    void (async () => {
+      if (await applyCachedBriefing()) return
+      setLoading(true)
+      const count = await prefetchPostOpportunities({ settings, isPaid: true })
+      if (count > 0 && (await applyCachedBriefing())) {
+        setLoading(false)
+        return
+      }
+      void loadOpportunities()
+    })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionLoading, guest, locationReady])
+
+  useEffect(() => {
+    if (guest) return
+    const onCacheUpdated = () => {
+      void applyCachedBriefing()
+    }
+    window.addEventListener(BRIEFING_CACHE_EVENT, onCacheUpdated)
+    return () => window.removeEventListener(BRIEFING_CACHE_EVENT, onCacheUpdated)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [guest])
 
   async function loadOpportunities() {
     if (!locationReady) {
@@ -359,15 +384,24 @@ export default function PostGeneratorPage() {
       }
 
       const opportunities = (data.opportunities as PostOpportunity[]) || []
+      // Canvas weather/public-works graphics must hydrate onto the same objects the
+      // UI renders. API buckets are separate JSON clones of `opportunities`.
       await hydrateOpportunityGraphics(opportunities)
+      const byId = new Map(opportunities.map((opp) => [opp.id, opp]))
+      const withGraphics = (list: PostOpportunity[] | undefined) =>
+        (list ?? []).map((opp) => byId.get(opp.id) ?? opp)
       const next: GeneratorResult = {
-        urgent: (data.urgent as PostOpportunity[]) || [],
-        recommendedToday: (data.recommendedToday as PostOpportunity[]) || [],
-        planAhead: (data.planAhead as PostOpportunity[]) || [],
-        topRecommended: (data.topRecommended as PostOpportunity[]) || [],
-        couldPost: (data.couldPost as PostOpportunity[]) || [],
+        urgent: withGraphics(data.urgent as PostOpportunity[] | undefined),
+        recommendedToday: withGraphics(
+          data.recommendedToday as PostOpportunity[] | undefined
+        ),
+        planAhead: withGraphics(data.planAhead as PostOpportunity[] | undefined),
+        topRecommended: withGraphics(
+          data.topRecommended as PostOpportunity[] | undefined
+        ),
+        couldPost: withGraphics(data.couldPost as PostOpportunity[] | undefined),
         uncertain: [],
-        fromSaferU: (data.fromSaferU as PostOpportunity[]) || [],
+        fromSaferU: withGraphics(data.fromSaferU as PostOpportunity[] | undefined),
         emptyState: Boolean(data.emptyState),
         demo: Boolean(data.demo),
         generatedAt: String(data.generatedAt || new Date().toISOString()),
@@ -414,6 +448,8 @@ export default function PostGeneratorPage() {
           agencyTypeOther: settings.agencyTypeOther,
           city: settings.city,
           state: settings.state,
+          messagingAngle: opp.whyThisAgency || opp.residentValue || "",
+          jurisdictionFit: opp.jurisdictionFit,
         }),
       })
       const data = await res.json()

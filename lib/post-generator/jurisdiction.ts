@@ -128,7 +128,7 @@ export function jurisdictionMessagingGuidance(
     return `This appears to be in ${agency}'s home community (${home}). You may speak as the local agency when facts support it. Still do not invent ownership of another agency's project.`
   }
   if (fit === "nearby") {
-    return `This appears to be in a NEIGHBORING community near ${home}, not clearly inside ${agency}'s own jurisdiction. Frame as a traveler / regional heads-up for your residents. Do NOT say "thank you for your understanding," "our crews," "we apologize for the inconvenience," or imply ${agency} owns or is performing the work.`
+    return `This appears to be in a NEIGHBORING community near ${home}, not clearly inside ${agency}'s own jurisdiction. Frame as a traveler / regional heads-up for your residents. Do NOT say "thank you for your understanding," "our crews," "we apologize for the inconvenience," or imply ${agency} owns or is performing the work. Name ${agency} when sharing the heads-up; never say "our local police" or similar generic stand-ins.`
   }
   if (fit === "regional") {
     return `This is a broader regional update. Share only as awareness for residents who may travel through the area. Do not claim local jurisdiction or operational ownership.`

@@ -7,6 +7,7 @@ import {
   agencyLocationMissing,
   isAgencyLocationReady,
 } from "@/lib/agency-location"
+import { prefetchPostOpportunities } from "@/lib/post-generator/prefetch-briefing"
 
 const STORAGE_KEY = "pio_agency_settings"
 
@@ -160,6 +161,7 @@ const AgencyContext = createContext<AgencyContextType | null>(null)
 export function AgencyProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<AgencySettings>(defaultSettings)
   const [settingsHydrated, setSettingsHydrated] = useState(false)
+  const [memberPaid, setMemberPaid] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -174,9 +176,13 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         const sessionData = sessionRes.ok ? await sessionRes.json() : null
         const member = sessionData?.member
         if (!member) {
-          if (!cancelled) setSettingsHydrated(true)
+          if (!cancelled) {
+            setMemberPaid(false)
+            setSettingsHydrated(true)
+          }
           return
         }
+        if (!cancelled) setMemberPaid(Boolean(member.paid))
 
         // Prefer account-backed service area when available.
         const remoteRes = await fetch("/api/pio/agency-settings")
@@ -215,6 +221,24 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const locationReady = isAgencyLocationReady(settings)
+
+  useEffect(() => {
+    if (!settingsHydrated || !memberPaid || !locationReady) return
+    void prefetchPostOpportunities({ settings, isPaid: memberPaid })
+  }, [
+    settingsHydrated,
+    memberPaid,
+    locationReady,
+    settings.agencyName,
+    settings.agencyType,
+    settings.agencyTypeOther,
+    settings.serviceAreaType,
+    settings.city,
+    settings.county,
+    settings.state,
+  ])
+
   const updateSettings = (newSettings: Partial<AgencySettings>) => {
     setSettings((prev) => {
       const next = { ...prev, ...newSettings }
@@ -241,7 +265,6 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const locationReady = isAgencyLocationReady(settings)
   const locationMissing = agencyLocationMissing(settings)
 
   return (

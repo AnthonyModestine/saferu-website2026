@@ -30,6 +30,7 @@ import {
 import { discoverStrongRecommendedTopics } from "@/lib/post-generator/deep-recommended-search"
 import { discoverCreatedContentFollowups } from "@/lib/post-generator/content-followup-ai"
 import { runProductionPostPipeline } from "@/lib/post-generator/production-pipeline"
+import { prepareWeatherOpportunityForPipeline } from "@/lib/post-generator/weather-message-ai"
 import { agencyRoleBrief, agencyTypeLabel } from "@/lib/post-generator/agency-relevance"
 import { buildAndSaveAgencySourceCatalog } from "@/lib/post-generator/agency-source-catalog"
 import {
@@ -498,7 +499,7 @@ export async function POST(request: Request) {
       agencyType,
       agencyTypeOther,
       agencyRoleProfile: agencyRoleBrief(agencyType),
-      agencyVoiceProfile: `${typeLabel}: calm, credible, clear, professional, community-oriented, and appropriate to the agency's public-safety role.`,
+      agencyVoiceProfile: `${typeLabel}: calm, credible, clear, professional, community-oriented PIO voice. Always name "${agencyName || "the agency"}" when speaking to residents; never use generic stand-ins like "our local police" or "our department."`,
       agencyServices: Array.isArray(body.agencyServices)
         ? body.agencyServices.map(String).slice(0, 30)
         : [],
@@ -547,6 +548,7 @@ export async function POST(request: Request) {
       ],
     }
     const rankedBeforePipeline = ranked.length
+    ranked = ranked.map((opp) => prepareWeatherOpportunityForPipeline(opp, pipelineContext))
     if (!useDemo && ranked.length > 0) {
       const pipeline = await runProductionPostPipeline(pipelineContext, ranked)
       ranked = pipeline.approved

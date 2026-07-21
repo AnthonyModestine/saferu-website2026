@@ -189,7 +189,8 @@ function buildHeatOpportunity(
 
 function buildWeatherAlertOpportunity(
   alert: NwsAlertFeature,
-  locationKey: string
+  locationKey: string,
+  communityLabel?: string
 ): ExternalOpportunityInput | null {
   const props = alert.properties
   const event = props?.event?.trim()
@@ -223,11 +224,12 @@ function buildWeatherAlertOpportunity(
   return {
     id: `weather-alert-${locationKey}-${eventLower.replace(/[^a-z0-9]+/g, "-")}`,
     title: event,
-    summary:
-      headline ||
-      (area
-        ? `${event} is in effect for ${area}.`
-        : `${event} is active for part of the service area.`),
+    summary: communityLabel
+      ? `${event} is in effect for ${communityLabel}.`
+      : headline ||
+        (area
+          ? `${event} is in effect for ${area}.`
+          : `${event} is active for part of the service area.`),
     category: severeSignals[0] ?? "weather",
     sourceLabel: "Weather Alert",
     whyItMatters:
@@ -238,13 +240,15 @@ function buildWeatherAlertOpportunity(
     priority,
     signals: severeSignals,
     sourceName: "National Weather Service alert",
+    issuingAuthority: "National Weather Service",
     sourceUrl,
     eventStart: props?.effective,
     eventEnd: props?.ends || props?.expires,
     expiresAt: props?.expires,
     verifiedFacts: compact([
-      headline,
-      area ? `Affected area: ${area}` : null,
+      communityLabel ? `Community focus: ${communityLabel}` : null,
+      headline && !communityLabel ? headline : null,
+      area && !communityLabel ? `Affected area: ${area}` : null,
       description ? `NWS details: ${description}` : null,
       event ? `National Weather Service ${event}` : null,
     ]),
@@ -297,7 +301,7 @@ async function scanWeatherForLocation(
     `https://api.weather.gov/alerts/active?point=${location.latitude},${location.longitude}`
   )
   const alertOpps = (alerts?.features ?? [])
-    .map((feature) => buildWeatherAlertOpportunity(feature, locationKey))
+    .map((feature) => buildWeatherAlertOpportunity(feature, locationKey, locationLabel))
     .filter((opp): opp is ExternalOpportunityInput => Boolean(opp))
     .slice(0, 3)
 

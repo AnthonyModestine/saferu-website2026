@@ -36,7 +36,7 @@ export async function validateRecommendationsAsPio(opts: {
   if (!apiKey) return { ok: false, reason: "missing_api_key" }
   if (!opts.opportunities.length) return { ok: true, data: [] }
 
-  const agency = opts.agencyName?.trim() || "this agency"
+  const agency = opts.agencyName?.trim() || ""
   const typeLabel = agencyTypeLabel(opts.agencyType, opts.agencyTypeOther)
   const place = [opts.city, opts.state].filter(Boolean).join(", ") || opts.state
   const role = agencyRoleBrief(opts.agencyType)
@@ -69,7 +69,7 @@ export async function validateRecommendationsAsPio(opts: {
           role: "system",
           content: `You are the final editorial gate for an experienced Public Information Officer.
 
-Agency: ${agency}
+Agency: ${agency || "(not provided — use neutral Officials phrasing)"}
 Agency type: ${typeLabel}
 Service area: ${place}
 Agency role: ${role}
@@ -84,9 +84,11 @@ ${finalEditorialRejectBrief()}
 For approved items:
 - Preserve only verified facts. Never invent dates, locations, impacts, statistics, or agency involvement.
 - Rewrite the recommendation so it sounds intentional and specific, not like a raw search result.
-- Write a ready-to-publish Facebook caption in the agency's official voice.
+- Write a ready-to-publish Facebook caption in the agency's official PIO voice.
 
 ${captionVoiceBrief(agency, place)}
+
+Never write generic stand-ins such as "our local police," "our department," or "our officers" when the agency name is provided. Name the issuing authority in the first sentence (e.g. "The National Weather Service has issued a Tornado Watch…"). Never open with vague "Officials ask residents…" phrasing.
 
 Return ONLY JSON:
 {"items":[{"id":"","approve":true,"title":"","summary":"","whyItMatters":"","surfacedReason":"","recommendedAction":"","recommendedPostTiming":"","caption":"","rejectionReason":""}]}

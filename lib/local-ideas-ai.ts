@@ -40,16 +40,20 @@ Rules:
 - Do NOT invent specific incidents, road closures, crimes, or named local businesses unless they are universal/public holidays or seasonal norms.
 - Weather ideas should be seasonal/general for that region and time of year — not fake live forecasts.
 - Holiday ideas: U.S. public / widely observed holidays near today, or seasonal observances.
+- Each draftPost must sound like a PIO writing for the named agency to that community: clear, authoritative, helpful, first-person plural from the agency.
+- When an agency name is provided, name it at least once (e.g. "[Agency] asks residents…"). Never use generic stand-ins like "our local police," "our department," or "our officers."
+- When no agency name is provided, name the issuing authority in the first sentence (e.g. "The National Weather Service has issued…") — do not invent a department type or use vague "Officials ask residents…" phrasing.
 - Each draftPost must be short, professional, and ready to edit before posting.
 - Return ONLY valid JSON.`
 
 function buildUserPrompt(req: LocalIdeasRequest): string {
   const today = req.todayIso || new Date().toISOString().slice(0, 10)
   const zips = req.serviceZips.join(", ")
+  const agency = req.agencyName?.trim() || ""
   return `Generate 4 local post ideas for a public safety agency.
 
 TODAY (ISO): ${today}
-Agency: ${req.agencyName?.trim() || "Public Safety Agency"}
+Agency: ${agency || "(not provided — use neutral Officials phrasing)"}
 City: ${req.city?.trim() || "(not set)"}
 State: ${req.state.trim()}
 Service ZIP codes: ${zips}
@@ -61,7 +65,7 @@ Return JSON:
       "category": "weather" | "holiday" | "seasonal" | "community" | "safety_tip",
       "title": "short label",
       "whyNow": "one sentence why this is relevant today/this week for THIS location",
-      "draftPost": "ready-to-edit Facebook-length post",
+      "draftPost": "ready-to-edit Facebook-length post in PIO voice${agency ? ` naming ${agency}` : ""}",
       "channelHint": "Facebook" | "X" | "Either"
     }
   ]
@@ -117,6 +121,10 @@ export function demoLocalIdeas(req: LocalIdeasRequest): LocalIdea[] {
     req.serviceZips.length > 0
       ? `ZIP ${req.serviceZips.slice(0, 2).join(" / ")}`
       : place
+  const agency = req.agencyName?.trim()
+  const lead = agency
+    ? `${agency} asks residents in ${place}`
+    : `The National Weather Service and local public safety partners remind residents in ${place}`
 
   return [
     {
@@ -124,7 +132,7 @@ export function demoLocalIdeas(req: LocalIdeasRequest): LocalIdea[] {
       category: "weather",
       title: "Heat / seasonal weather check-in",
       whyNow: `Seasonal conditions matter for residents around ${zipNote}.`,
-      draftPost: `A quick reminder for neighbors in ${place}: check on older adults and pets during today’s weather, stay hydrated, and never leave kids or animals in a parked vehicle. If you see someone in distress, call 911.`,
+      draftPost: `${lead}: check on older adults and pets during today’s weather, stay hydrated, and never leave kids or animals in a parked vehicle. If you see someone in distress, call 911.`,
       channelHint: "Facebook",
     },
     {
@@ -132,7 +140,7 @@ export function demoLocalIdeas(req: LocalIdeasRequest): LocalIdea[] {
       category: "holiday",
       title: "Upcoming observance tip",
       whyNow: "A nearby holiday or seasonal observance is a natural time to share one safety tip.",
-      draftPost: `As we head into the next community observance in ${place}, a simple tip: lock vehicles, take valuables inside, and report suspicious activity. We’re here if you need us — non-emergency line is listed on our page.`,
+      draftPost: `${agency ? `${agency} reminder` : "Community reminder"} for ${place}: as we head into the next observance, lock vehicles, take valuables inside, and report suspicious activity. We’re here if you need us — non-emergency line is listed on our page.`,
       channelHint: "Either",
     },
     {
@@ -140,7 +148,7 @@ export function demoLocalIdeas(req: LocalIdeasRequest): LocalIdea[] {
       category: "seasonal",
       title: "Seasonal home safety",
       whyNow: `Practical seasonal prep for households in ${place}.`,
-      draftPost: `Seasonal safety for ${place}: test smoke alarms, clear exits, and keep house numbers visible for responders. Small steps make a big difference if we need to find you quickly.`,
+      draftPost: `${agency ? `${agency} seasonal safety note` : "Seasonal safety note"} for ${place}: test smoke alarms, clear exits, and keep house numbers visible for responders. Small steps make a big difference if we need to find you quickly.`,
       channelHint: "Facebook",
     },
     {
@@ -148,7 +156,7 @@ export function demoLocalIdeas(req: LocalIdeasRequest): LocalIdea[] {
       category: "community",
       title: "Know your neighbors",
       whyNow: "Community connection posts perform well and build trust year-round.",
-      draftPost: `Strong communities look out for each other. If you spot something that doesn’t look right in ${place}, trust your instincts and call it in. Together we keep ${place} safer.`,
+      draftPost: `${agency ? `${agency} works with neighbors` : "Strong communities look out for each other"} in ${place}. If you spot something that doesn’t look right, trust your instincts and call it in. Together we keep ${place} safer.`,
       channelHint: "Facebook",
     },
   ]

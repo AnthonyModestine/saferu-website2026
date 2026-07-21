@@ -35,6 +35,8 @@ export type SourceLabel =
   | "Upcoming Event"
   | "SaferU Curated Content"
   | "Seasonal Recommendation"
+  | "National Safety Alert"
+  | "Federal Advisory"
 
 export type ConfidenceLevel = "high" | "medium" | "low"
 

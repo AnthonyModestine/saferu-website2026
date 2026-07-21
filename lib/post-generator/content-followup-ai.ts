@@ -46,7 +46,7 @@ export async function discoverCreatedContentFollowups(opts: {
   if (!apiKey) return { ok: false, reason: "missing_api_key" }
   if (!opts.content.length) return { ok: true, data: [] }
 
-  const agency = opts.agencyName || "this agency"
+  const agency = opts.agencyName?.trim() || ""
   const typeLabel = agencyTypeLabel(opts.agencyType, opts.agencyTypeOther)
   const role = agencyRoleBrief(opts.agencyType)
   const place = [opts.city, opts.state].filter(Boolean).join(", ")
@@ -70,7 +70,7 @@ export async function discoverCreatedContentFollowups(opts: {
           role: "system",
           content: `You are an experienced PIO reviewing content recently created inside SaferU.
 
-Agency: ${agency} (${typeLabel})
+Agency: ${agency || "(not provided — use neutral Officials phrasing)"} (${typeLabel})
 Community: ${place}
 Role: ${role}
 

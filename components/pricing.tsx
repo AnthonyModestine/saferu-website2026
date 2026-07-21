@@ -365,30 +365,6 @@ export function Pricing() {
               </ul>
             </div>
           </div>
-
-          <div className="mt-8 grid gap-4 text-sm leading-relaxed text-[#42536e] sm:grid-cols-3">
-            <div className="rounded-xl border border-[#E2E8F5] bg-white p-5">
-              <p className="font-semibold text-[#1a365d]">Failed generations</p>
-              <p className="mt-1.5">
-                If a generation fails because of a SaferU or provider error, the associated usage
-                is returned automatically.
-              </p>
-            </div>
-            <div className="rounded-xl border border-[#E2E8F5] bg-white p-5">
-              <p className="font-semibold text-[#1a365d]">Monthly reset</p>
-              <p className="mt-1.5">
-                Monthly AI usage resets on your renewal date. Annual subscribers receive a new
-                100,000-token allowance each month. Unused monthly tokens do not roll over.
-              </p>
-            </div>
-            <div className="rounded-xl border border-[#E2E8F5] bg-white p-5">
-              <p className="font-semibold text-[#1a365d]">Need additional AI usage?</p>
-              <p className="mt-1.5">
-                Contact SaferU or purchase more from your account. Purchased add-on tokens remain
-                available until used.
-              </p>
-            </div>
-          </div>
         </div>
       </section>
 

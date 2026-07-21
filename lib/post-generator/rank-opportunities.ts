@@ -184,9 +184,20 @@ function scoreGeographic(input: ExternalOpportunityInput): number {
   if (label === "Weather Alert") return 98
   if (/road|closure|detour|outage|local|zip|county|township|city/i.test(text)) return 92
   if (label === "Upcoming Event") return 82
-  // National value is judged by resident usefulness, not physical distance.
-  if (isNationalValueSource(input.sourceUrl, input.sourceName)) return 84
-  if (/national|nationwide|across the country/i.test(text) && !isNationalValueSource(input.sourceUrl, input.sourceName)) {
+  // National/federal sources without distance are not local-weather-tier.
+  // Prefer local impact language; naked IC3/FBI PSAs score much lower.
+  if (isNationalValueSource(input.sourceUrl, input.sourceName)) {
+    if (label === "National Safety Alert" || label === "Federal Advisory") return 38
+    if (
+      /service area|affects residents|statewide|regional|evacuation|air quality|in your area/i.test(
+        text
+      )
+    ) {
+      return 58
+    }
+    return 42
+  }
+  if (/national|nationwide|across the country/i.test(text)) {
     return 35
   }
   return 70

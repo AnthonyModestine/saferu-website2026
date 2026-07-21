@@ -20,6 +20,12 @@ import {
 import { useSubscription } from "@/lib/use-subscription"
 import { useMemberSession } from "@/lib/use-member-session"
 import { useAgency } from "@/lib/agency-context"
+import { BRIEFING_CACHE_EVENT } from "@/lib/post-generator/opportunity-store"
+import {
+  countCachedBriefingOpportunities,
+  loadCachedBriefingPreview,
+  prefetchPostOpportunities,
+} from "@/lib/post-generator/prefetch-briefing"
 import { startHostedCheckoutSession } from "@/app/actions/stripe"
 import { pressCenterSignInUrl, pressCenterSignUpUrl } from "@/lib/press-center-routes"
 import {
@@ -29,7 +35,6 @@ import {
   getUpcomingPioEvents,
   type PioEvent,
 } from "@/lib/pio-events-store"
-import { generatePostOpportunities, flattenOpportunities } from "@/lib/post-generator/engine"
 
 const MONTHLY_PRODUCT = "pio-tool-monthly"
 
@@ -172,7 +177,7 @@ function addDaysIso(days: number): string {
 
 export default function PIODashboardPage() {
   const router = useRouter()
-  const { settings } = useAgency()
+  const { settings, locationReady } = useAgency()
   const { member, isLoading: sessionLoading } = useMemberSession()
   const { isSubscribed, isLoading: subLoading } = useSubscription()
   const [genStatus, setGenStatus] = useState<GenerationStatus | null>(null)
@@ -281,37 +286,43 @@ export default function PIODashboardPage() {
     return href
   }
 
-  const ideaPreview = useMemo(() => {
-    // Guests see curated demo ideas that match Upcoming Events / Posts to Share
-    if (!member) return [...DEMO_AREA_IDEAS]
+  const [briefingCount, setBriefingCount] = useState(0)
 
-    const state = settings.state?.trim() || ""
-    const city = settings.city || ""
-    const county = settings.county?.trim() || ""
-    const areaReady =
-      Boolean(state) &&
-      (settings.serviceAreaType === "state" ||
-        (settings.serviceAreaType === "county" && county) ||
-        ((settings.serviceAreaType === "city" || !settings.serviceAreaType) &&
-          city &&
-          county))
-    if (!areaReady) return []
-    const result = generatePostOpportunities({
-      agencyName: settings.agencyName,
-      city,
-      county,
-      state,
-      serviceZips: [],
+  useEffect(() => {
+    const refresh = () => setBriefingCount(countCachedBriefingOpportunities())
+    refresh()
+    window.addEventListener(BRIEFING_CACHE_EVENT, refresh)
+    return () => window.removeEventListener(BRIEFING_CACHE_EVENT, refresh)
+  }, [])
+
+  useEffect(() => {
+    if (!member || !isSubscribed || !locationReady) return
+    void prefetchPostOpportunities({ settings, isPaid: true }).then((count) => {
+      if (count > 0) setBriefingCount(count)
     })
-    return flattenOpportunities(result).slice(0, 3)
   }, [
+    member,
+    isSubscribed,
+    locationReady,
     settings.agencyName,
+    settings.agencyType,
+    settings.agencyTypeOther,
+    settings.serviceAreaType,
     settings.city,
     settings.county,
     settings.state,
-    settings.serviceAreaType,
-    member,
   ])
+
+  const ideaPreview = useMemo(() => {
+    if (!member) return [...DEMO_AREA_IDEAS]
+    if (!locationReady) return []
+    const cached = loadCachedBriefingPreview(5)
+    if (cached.length > 0) return cached
+    return Array.from({ length: Math.min(briefingCount, 5) }, (_, i) => ({
+      id: `cached-${i}`,
+      title: "Loading recommendations…",
+    }))
+  }, [member, locationReady, briefingCount])
 
   const briefingStats = useMemo(() => {
     if (!member) {
@@ -356,12 +367,12 @@ export default function PIODashboardPage() {
     if (settings.serviceAreaType === "state") return state
     if (settings.serviceAreaType === "county") {
       const county = settings.county?.trim()
-      if (county && state) return `${county}, ${state}`
+      if (county) return `${county}, ${state}`
       return null
     }
     const city = settings.city?.trim()
     const county = settings.county?.trim()
-    if (city && county && state) return `${city}, ${county}, ${state}`
+    if (city) return county ? `${city}, ${county}, ${state}` : `${city}, ${state}`
     return null
   }, [settings.city, settings.county, settings.state, settings.serviceAreaType, member])
 

@@ -80,7 +80,10 @@ function stateToUsPrefix(state: string): string {
   return code.startsWith("US-") ? code : `US-${code}`
 }
 
-/** FBI IC3 scam and fraud PSAs (RSS). National campaigns PIOs can share locally. */
+/**
+ * FBI IC3 scam/fraud PSAs (RSS). National-only — not included in the default
+ * scan bundle. Call only when a local scam/fraud signal justifies surfacing.
+ */
 export async function scanFbiIc3ScamAlerts(maxItems = 2): Promise<ExternalOpportunityInput[]> {
   const xml = await fetchText(IC3_RSS_URL)
   if (!xml) return []
@@ -98,13 +101,13 @@ export async function scanFbiIc3ScamAlerts(maxItems = 2): Promise<ExternalOpport
       title: item.title,
       summary: `The FBI Internet Crime Complaint Center (IC3) issued a new public alert: ${item.title}.`,
       category: "scams",
-      sourceLabel: "Current Local Opportunity",
+      sourceLabel: "National Safety Alert",
       whyItMatters:
         "FBI IC3 alerts highlight scams actively targeting the public. Sharing verified warnings helps residents recognize fraud before they lose money or personal information.",
       recommendedAction:
         "Share the IC3 warning with a short, practical tip on how residents can verify requests and report suspected fraud.",
-      recommendedPostTiming: "Post this week while the alert is current.",
-      priority: "recommended_today",
+      recommendedPostTiming: "Optional — share when a local scam or fraud concern makes this relevant.",
+      priority: "optional",
       signals: ["scams", "fraud", "cyber_security", "fbi_alert"],
       sourceName: "FBI Internet Crime Complaint Center (IC3)",
       sourceUrl: item.link,
@@ -121,8 +124,9 @@ export async function scanFbiIc3ScamAlerts(maxItems = 2): Promise<ExternalOpport
       doNotClaim: [
         "Do not claim a specific local victim count unless confirmed.",
         "Do not add scam details not stated in the IC3 alert.",
+        "Do not present this national alert as a local incident.",
       ],
-      confidenceLevel: "high",
+      confidenceLevel: "medium",
     } satisfies ExternalOpportunityInput
   })
 }
@@ -356,7 +360,11 @@ export async function scanNcmecPostersForState(state: string): Promise<ExternalO
   return opportunities
 }
 
-/** FBI IC3 scams, NIFC wildfires, and optional NCMEC posters for the service area. */
+/**
+ * Geo-filtered national safety alerts for the service area.
+ * FBI IC3 national fillers are intentionally excluded — they dominate when
+ * local weather/hazards fail and falsely appear as "local" opportunities.
+ */
 export async function scanNationalSafetyAlerts(opts: {
   serviceAreaType?: string
   city?: string
@@ -364,14 +372,13 @@ export async function scanNationalSafetyAlerts(opts: {
   state: string
   serviceZips?: string[]
 }): Promise<ExternalOpportunityInput[]> {
-  const [scams, wildfires, ncmec] = await Promise.all([
-    scanFbiIc3ScamAlerts(1),
+  const [wildfires, ncmec] = await Promise.all([
     scanNearbyWildfires(opts),
     scanNcmecPostersForState(opts.state),
   ])
 
   const seen = new Set<string>()
-  return [...wildfires, ...ncmec, ...scams].filter((opp) => {
+  return [...wildfires, ...ncmec].filter((opp) => {
     const key = `${opp.category}:${opp.title}`.toLowerCase()
     if (seen.has(key)) return false
     seen.add(key)

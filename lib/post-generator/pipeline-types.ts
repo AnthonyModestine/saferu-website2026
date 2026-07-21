@@ -154,7 +154,7 @@ export interface Stage1Result {
 }
 
 export interface Stage2Draft {
-  status: "approved" | "needs_human_review"
+  status: "ready" | "needs_human_review"
   postText: string
   usedFactIds: string[]
   sourceAttribution: string
@@ -162,19 +162,21 @@ export interface Stage2Draft {
 }
 
 export interface Stage3Decision {
-  status: "approved" | "approved_with_revision" | "needs_human_review" | "rejected"
+  status: "approved" | "edited" | "needs_human_review"
   finalPostText: string
+  changed: boolean
+  changeReasons: string[]
   checks: {
     factsSupported: boolean
-    attributionCorrect: boolean
-    jurisdictionCorrect: boolean
-    agencyRoleCorrect: boolean
-    residentValueStrong: boolean
-    relationshipValueStrong: boolean
-    humanVoiceStrong: boolean
-    privacySafe: boolean
+    statusAndUrgencyPreserved: boolean
+    agencyPerspectiveCorrect: boolean
+    publicActionClear: boolean
+    naturalPioVoice: boolean
+    safeToPublish: boolean
   }
+  /** @deprecated Use changeReasons */
   changesMade: string[]
+  /** @deprecated Use changeReasons when changed */
   flags: string[]
   humanReviewReason: string
 }

@@ -43,7 +43,10 @@ const PUBLIC_WORKS_TEXT_RE =
 export function alertGraphicKind(
   opp: Pick<PostOpportunity, "sourceLabel" | "category" | "title">
 ): AlertGraphicKind | null {
-  if (opp.sourceLabel === "Weather Alert") return "weather"
+  // Keep in sync with engine `isOfficialAlertTemplateTopic` weather labels.
+  if (opp.sourceLabel === "Weather Alert" || opp.sourceLabel === "Weather Analysis") {
+    return "weather"
+  }
   const haystack = alertHaystack(opp)
   if (PUBLIC_WORKS_CATEGORY_RE.test(opp.category) || PUBLIC_WORKS_TEXT_RE.test(haystack)) {
     return "public_works"
@@ -69,9 +72,13 @@ export function weatherAlertHeadline(
   // ----- Weather -----
   if (/tornado warning/.test(haystack)) return "TORNADO WARNING"
   if (/tornado watch/.test(haystack)) return "TORNADO WATCH"
-  if (/severe thunderstorm warning|thunderstorm warning/.test(haystack)) return "STORM WARNING"
-  if (/severe thunderstorm watch|thunderstorm watch/.test(haystack)) return "STORM WATCH"
-  if (/severe thunderstorm|thunderstorm/.test(haystack)) return "STORM ALERT"
+  if (/severe thunderstorm warning|thunderstorm warning/.test(haystack)) {
+    return "THUNDERSTORM WARNING"
+  }
+  if (/severe thunderstorm watch|thunderstorm watch/.test(haystack)) {
+    return "THUNDERSTORM WATCH"
+  }
+  if (/severe thunderstorm|thunderstorm/.test(haystack)) return "THUNDERSTORM ALERT"
   if (/winter storm warning/.test(haystack)) return "WINTER STORM WARNING"
   if (/winter weather advisory|winter storm watch|ice storm|blizzard/.test(haystack)) {
     return "WINTER WEATHER ALERT"

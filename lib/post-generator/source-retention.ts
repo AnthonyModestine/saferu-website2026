@@ -5,8 +5,36 @@
  */
 
 import { isLikelyHomepageUrl } from "./source-standards"
+import { isNationalValueSource } from "./trusted-sources"
 import type { RankedExternalOpportunity } from "./types"
 import type { VerifiedEvidenceRecord } from "./pipeline-types"
+
+/** Naked national IC3/FBI filler must not occupy slots via provisional keep. */
+function isNakedNationalFiller(opportunity: RankedExternalOpportunity): boolean {
+  if (typeof opportunity.distanceMiles === "number" && Number.isFinite(opportunity.distanceMiles)) {
+    return false
+  }
+  if (
+    opportunity.sourceLabel === "Weather Alert" ||
+    opportunity.sourceLabel === "Weather Analysis"
+  ) {
+    return false
+  }
+
+  const name = (opportunity.sourceName || "").toLowerCase()
+  if (/\bic3\b|internet crime complaint/.test(name)) return true
+
+  if (
+    (opportunity.sourceLabel === "National Safety Alert" ||
+      opportunity.sourceLabel === "Federal Advisory") &&
+    isNationalValueSource(opportunity.sourceUrl, opportunity.sourceName) &&
+    (opportunity.priority === "optional" || opportunity.priority === "plan_ahead")
+  ) {
+    return true
+  }
+
+  return false
+}
 
 export function isKeepableWithoutPerfectEvidence(
   opportunity: RankedExternalOpportunity
@@ -14,14 +42,27 @@ export function isKeepableWithoutPerfectEvidence(
   const url = opportunity.sourceUrl?.trim()
   if (!url || isLikelyHomepageUrl(url)) return false
 
-  if (opportunity.confidenceLevel === "high") return true
+  // Demoted national fillers must not resurrect as top_recommended via
+  // high-confidence provisional evidence when local weather exists (or not).
+  if (isNakedNationalFiller(opportunity)) return false
+
   if (
     opportunity.sourceLabel === "Weather Alert" ||
     opportunity.sourceLabel === "Federal Advisory" ||
     opportunity.sourceLabel === "National Safety Alert"
   ) {
+    // Label-based keep is for geo-relevant federal/weather items only —
+    // optional national PSAs already excluded above.
+    if (
+      opportunity.sourceLabel === "National Safety Alert" &&
+      (opportunity.priority === "optional" || opportunity.priority === "plan_ahead")
+    ) {
+      return false
+    }
     return true
   }
+
+  if (opportunity.confidenceLevel === "high") return true
 
   const trust = opportunity.internalScores?.sourceTrust ?? 0
   const composite = opportunity.internalScores?.composite ?? 0
@@ -45,12 +86,15 @@ export function provisionalEvidenceFromOpportunity(
     .filter(Boolean)
     .slice(0, 8)
   if (!sourceUrl || claims.length === 0) return []
+  if (isNakedNationalFiller(opportunity)) return []
 
   const official =
     opportunity.sourceLabel === "Weather Alert" ||
     opportunity.sourceLabel === "Federal Advisory" ||
-    opportunity.sourceLabel === "National Safety Alert" ||
-    opportunity.confidenceLevel === "high"
+    (opportunity.sourceLabel === "National Safety Alert" &&
+      opportunity.priority !== "optional" &&
+      opportunity.priority !== "plan_ahead") ||
+    (opportunity.confidenceLevel === "high" && !isNakedNationalFiller(opportunity))
 
   return [
     {

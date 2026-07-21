@@ -3,47 +3,51 @@
  */
 
 import type { AiResult } from "@/lib/ai-result"
-import type { CustomizeMessageMode } from "@/lib/post-generator/types"
+import type { CustomizeMessageMode, RankedExternalOpportunity } from "@/lib/post-generator/types"
+import { buildWriterBriefFromOpportunity } from "@/lib/post-generator/build-writer-brief"
+import { customizePioFacebookPost } from "@/lib/post-generator/customize-pio-facebook-post"
+import { reviewPioFacebookPost } from "@/lib/post-generator/review-pio-facebook-post"
+import { writePioFacebookPost } from "@/lib/post-generator/write-pio-facebook-post"
+import type { WriterFact } from "@/lib/post-generator/pio-writer-types"
 import {
   agencyRoleBrief,
   agencyTypeLabel as formatAgencyTypeLabel,
-  defaultAgencyMessagingAngle,
 } from "@/lib/post-generator/agency-relevance"
 import {
   CAPTION_BANNED_PHRASES,
+  agencyNamingBrief,
   captionVoiceBrief,
+  hasRealAgencyName,
+  resolveAgencyDisplayName,
 } from "@/lib/post-generator/caption-voice"
 import { holidayValidationBrief } from "@/lib/post-generator/holiday-validation"
 
-const MODE_INSTRUCTIONS: Record<CustomizeMessageMode, string> = {
-  shorten: "Shorten to about 60% of the length while keeping all essential safety facts.",
-  conversational:
-    "Make slightly more conversational and approachable — like a PIO talking with neighbors — while staying professional.",
-  formal: "Make more formal and official in tone, as a department spokesperson would.",
-  facebook:
-    "Optimize for Facebook: clear short paragraphs, friendly professional PIO tone, suitable length for a community page.",
-  instagram: "Optimize for Instagram: strong opening line, short line breaks, still sound like a PIO.",
-  twitter: "Optimize for X (Twitter): under 280 characters, direct and scannable.",
-  add_emojis: "Add a few relevant emojis sparingly (1-3) where appropriate for social media.",
-  remove_emojis: "Remove all emojis and keep plain professional text.",
-}
-
 function pioSocialVoiceRules(agency: string, place: string, agencyTypeLabel?: string): string {
+  const display = resolveAgencyDisplayName(agency)
+  const named = hasRealAgencyName(agency)
   const roleLine = agencyTypeLabel
-    ? `You represent a ${agencyTypeLabel} agency writing as the PIO / social media coordinator for ${agency}.`
-    : `You are the social media coordinator or public information officer (PIO) for ${agency}.`
+    ? `You represent a ${agencyTypeLabel} agency writing as the PIO / social media coordinator for ${display}.`
+    : `You are the social media coordinator or public information officer (PIO) for ${display}.`
 
   const bannedNote = CAPTION_BANNED_PHRASES.map((p) => `"${p}"`).join(", ")
+  const agencyExamples = named
+    ? `"${display} is advising…", "We're sharing this National Weather Service alert…"`
+    : `"The National Weather Service has issued…", "The Health Department reports…"`
+  const contactExample = named
+    ? `and contact ${display} with concerns`
+    : `and contact officials with concerns`
 
-  return `${roleLine} You are talking directly to your community in ${place} — neighbors, families, and residents who follow the department page. This is an OFFICIAL government / public safety page, so every word must sound credible and professional.
+  return `${roleLine} You are talking directly to the community in ${place} — neighbors, families, and residents who follow this agency's page. This is an OFFICIAL government / public safety page, so every word must sound credible and professional.
 
-Write like a real public safety agency posting on Facebook:
-- Speak as "we" from the department to "you" in the community.
-- ATTRIBUTE THE SOURCE of any alert or official information. Name who issued it (e.g., "The National Weather Service has issued…", "${agency} is advising…", "According to the county Office of Emergency Management…", "The Health Department reports…"). Never present an alert as if it came from nowhere.
-- If a DIFFERENT authority issued the alert, credit that authority and have ${agency} relay it ("We're sharing this alert from…"). Only speak as the source when ${agency} is actually the one issuing it.
-- Sound official and trustworthy: calm, clear, and professional. No hype, clickbait, slang, or exclamation-point spam. Lead with the key facts (what/where/when/who issued it).
+${agencyNamingBrief(named ? agency.trim() : "")}
+
+Write like a real public safety PIO posting on Facebook:
+- Speak as "we" from the agency to "you" in the community (first-person plural from the agency).
+- ATTRIBUTE THE SOURCE of any alert or official information. Name who issued it (e.g., "The National Weather Service has issued…", ${agencyExamples}, "According to the county Office of Emergency Management…", "The Health Department reports…"). Never present an alert as if it came from nowhere.
+- If a DIFFERENT authority issued the alert, credit that authority and have ${display} relay it. Only speak as the source when ${display} is actually the one issuing it.
+- Sound official and trustworthy: calm, clear, authoritative, and helpful. No hype, clickbait, slang, or exclamation-point spam. Lead with the key facts (what/where/when/who issued it).
 - ALWAYS answer: why is THIS agency posting about this? Residents should understand the public-safety or community reason — not just hear a news headline restated.
-- Example: if meters are being replaced, a police department should say residents may see workers in yards / lots of activity, verify who is at the door, and call the department with concerns — not only "meters are being replaced."
+- Example: if meters are being replaced, a police agency should say residents may see workers in yards / lots of activity, verify who is at the door, ${contactExample} — not only "meters are being replaced."
 - Talk about what people will notice, what it means for them, and the one useful next step when natural.
 - Sound human, local, and calm. Not corporate. Not a PSA brochure.
 - Do NOT default to a tip list. One practical line is enough when it fits.
@@ -51,7 +55,7 @@ Write like a real public safety agency posting on Facebook:
 - Tailor the framing to this agency's role (police, fire, EMS, emergency management, municipal, etc.).
 - Use plain language. Avoid filler and banned phrases: ${bannedNote}.
 - Keep paragraphs short for mobile scanning.
-- JURISDICTION: If the update is in a neighboring town or another agency's project, frame it as a traveler/regional heads-up for YOUR residents. Never write as if ${agency} owns that work. Never say "thank you for your understanding," "our crews," or "we apologize for the inconvenience" about another jurisdiction's project.
+- JURISDICTION: If the update is in a neighboring town or another agency's project, frame it as a traveler/regional heads-up for YOUR residents. Never write as if ${display} owns that work. Never say "thank you for your understanding," "our crews," or "we apologize for the inconvenience" about another jurisdiction's project.
 - Do NOT promote community events unless verified facts show this agency is hosting or participating.
 - Use 0-2 emojis only when they help scanning. No hashtags unless essential.
 - Never invent incidents, statistics, road closures, times, locations, or emergencies.
@@ -65,45 +69,42 @@ ${captionVoiceBrief(agency, place)}`
 export async function customizeCuratedMessage(
   originalMessage: string,
   mode: CustomizeMessageMode,
-  agencyName?: string
+  agencyName?: string,
+  location?: { city?: string; state?: string },
+  opts?: {
+    agencyType?: string
+    verifiedFacts?: WriterFact[]
+    voiceProfile?: string
+  }
 ): Promise<AiResult<string>> {
   const trimmed = originalMessage.trim()
   if (!trimmed) return { ok: false, reason: "empty_input" }
 
-  const apiKey = process.env.OPENAI_API_KEY?.trim()
-  if (!apiKey) return { ok: false, reason: "missing_api_key" }
+  const place =
+    [location?.city, location?.state].filter(Boolean).join(", ") || "the community"
+  const verifiedFacts =
+    opts?.verifiedFacts?.length
+      ? opts.verifiedFacts
+      : [{ id: "fact-1", text: trimmed }]
 
-  const instruction = MODE_INSTRUCTIONS[mode]
-  const agency = agencyName?.trim() || "the public safety agency"
-
-  try {
-    const { default: OpenAI } = await import("openai")
-    const openai = new OpenAI({ apiKey })
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: `${pioSocialVoiceRules(agency, "the community")}
-
-You are editing an existing post. Preserve every verified fact and safety guidance from the original.`,
-        },
-        {
-          role: "user",
-          content: `${instruction}\n\nOriginal message:\n${trimmed}`,
-        },
-      ],
-      max_tokens: 800,
-      temperature: 0.4,
-    })
-    const result = completion.choices?.[0]?.message?.content?.trim()
-    if (!result) return { ok: false, reason: "empty_response" }
-    return { ok: true, data: result }
-  } catch (err) {
-    const detail = err instanceof Error ? err.message : String(err)
-    console.error("[post-generator-ai] customize error:", detail)
-    return { ok: false, reason: "openai_error", detail }
+  const result = await customizePioFacebookPost({
+    originalMessage: trimmed,
+    mode,
+    agencyName: agencyName || "",
+    agencyType: opts?.agencyType || "public safety",
+    serviceArea: place,
+    voiceProfile: opts?.voiceProfile,
+    verifiedFacts,
+  })
+  if (!result.ok) return result
+  if (result.data.status !== "ready" || !result.data.postText.trim()) {
+    return {
+      ok: false,
+      reason: "empty_response",
+      detail: result.data.humanReviewReason || undefined,
+    }
   }
+  return { ok: true, data: result.data.postText }
 }
 
 export type HolidayMessageInput = {
@@ -124,7 +125,8 @@ export async function generateHolidayMessagesBatch(
   if (!apiKey) return { ok: false, reason: "missing_api_key" }
 
   const place = [city, state].filter(Boolean).join(", ") || "the community"
-  const agency = agencyName?.trim() || "our department"
+  const agency = resolveAgencyDisplayName(agencyName)
+  const agencyForRules = hasRealAgencyName(agencyName) ? agencyName!.trim() : ""
 
   const holidayList = holidays
     .map((h) => `- id: "${h.id}" | holiday: ${h.label} | greeting: ${h.slogan}`)
@@ -138,7 +140,7 @@ export async function generateHolidayMessagesBatch(
       messages: [
         {
           role: "system",
-          content: `${pioSocialVoiceRules(agency, place)}
+          content: `${pioSocialVoiceRules(agencyForRules || agency, place)}
 
 ${holidayValidationBrief()}
 
@@ -146,7 +148,9 @@ For holiday posts: open with a warm seasonal greeting tied to the specific named
         },
         {
           role: "user",
-          content: `Write a ready-to-post Facebook message for each holiday for residents in ${place}.
+          content: `Write a ready-to-post Facebook message for each holiday for residents in ${place}${
+            hasRealAgencyName(agencyName) ? ` from ${agency}` : ""
+          }.
 
 Holidays:
 ${holidayList}`,
@@ -199,69 +203,71 @@ export async function generateMessageFromOpportunity(
   messagingAngle?: string,
   jurisdictionFit?: "own" | "nearby" | "regional" | "unknown"
 ): Promise<AiResult<string>> {
-  const apiKey = process.env.OPENAI_API_KEY?.trim()
-  if (!apiKey) return { ok: false, reason: "missing_api_key" }
-
-  const place = [city, state].filter(Boolean).join(", ") || "the community"
-  const agency = agencyName?.trim() || "our department"
-  const postType = sourceLabel?.trim() || "community update"
-  const agencyTypeLabel = formatAgencyTypeLabel(agencyType, agencyTypeOther)
-  const resolvedAngle =
-    messagingAngle?.trim() || defaultAgencyMessagingAngle(agencyType)
-  const roleBrief = agencyRoleBrief(agencyType)
-  const fit = jurisdictionFit || "unknown"
-  const jurisdictionLine =
-    fit === "nearby"
-      ? `Jurisdiction: NEIGHBORING area near ${place}. Write a heads-up for ${agency}'s residents who may travel through — do NOT claim ${agency} owns or is managing this.`
-      : fit === "regional"
-        ? `Jurisdiction: REGIONAL update. Awareness only for ${agency}'s community.`
-        : fit === "own"
-          ? `Jurisdiction: appears to be in ${agency}'s home community (${place}).`
-          : `Jurisdiction: unclear — stay neutral; do not claim ownership.`
-
-  try {
-    const { default: OpenAI } = await import("openai")
-    const openai = new OpenAI({ apiKey })
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: pioSocialVoiceRules(agency, place, agencyTypeLabel),
-        },
-        {
-          role: "user",
-          content: `Write a ready-to-publish Facebook post from ${agency} to residents in ${place}.
-
-Agency name: ${agency}
-Agency type: ${agencyTypeLabel}
-Why this type of agency posts: ${roleBrief}
-Service area: ${place}
-${jurisdictionLine}
-Post type: ${postType}
-Topic: ${title}
-${summary ? `Summary: ${summary}` : ""}
-Community context: ${whyItMatters}
-Agency-specific angle (REQUIRED — weave this in so the post is clearly from this agency's perspective): ${resolvedAngle}
-Verified facts (use only these): ${verifiedFacts.join("; ") || "Do not invent a local incident."}
-Attribution (REQUIRED): Name who issued this alert/information near the top. If the source is "${postType}" or another authority (e.g., National Weather Service, county Emergency Management, Health Department), credit them and have ${agency} relay it. Only speak as the issuing authority if ${agency} is actually the source.
-Optional guidance (use lightly if it fits — do not turn the post into a tip list): ${recommendedAction || "none"}
-Optional calls to action (at most one short line if natural): ${publicCallToAction.slice(0, 1).join("; ") || "none"}
-Do NOT claim or imply: ${doNotClaim.join("; ") || "Anything beyond the verified facts above."}
-
-CRITICAL: Do not just restate the news. Explain why ${agency} (${agencyTypeLabel}) is sharing this and what residents should know from that agency's role — e.g. unexpected activity, how to verify workers, who to call with concerns, what responders are watching for.
-Goal: public safety talking to its community about this update — not a tip sheet, not an event flyer, and not a bare utility announcement.
-2-3 short paragraphs.`,
-        },
-      ],
-      max_tokens: 600,
-      temperature: 0.45,
-    })
-    const result = completion.choices?.[0]?.message?.content?.trim()
-    if (!result) return { ok: false, reason: "empty_response" }
-    return { ok: true, data: result }
-  } catch (err) {
-    const detail = err instanceof Error ? err.message : String(err)
-    return { ok: false, reason: "openai_error", detail }
+  const opportunity: RankedExternalOpportunity = {
+    id: "generate-post",
+    title,
+    summary: summary || whyItMatters,
+    category: sourceLabel?.trim() || "informational",
+    sourceLabel: (sourceLabel as RankedExternalOpportunity["sourceLabel"]) || "Current Local Opportunity",
+    whyItMatters,
+    recommendedAction,
+    recommendedPostTiming: "today",
+    priority: "recommended_today",
+    signals: [],
+    verifiedFacts,
+    publicCallToAction,
+    doNotClaim,
+    whyThisAgency: messagingAngle,
+    jurisdictionFit,
+    internalScores: {
+      agencyRelevance: 4,
+      geographicRelevance: 4,
+      residentValue: 4,
+      actionability: 4,
+      urgency: 3,
+      sourceTrust: 4,
+      seasonalRelevance: 3,
+      engagementPotential: 3,
+      freshness: 4,
+      composite: 4,
+      pioRating: 4,
+      messagingAngle,
+    },
   }
+
+  const context = {
+    agencyName: agencyName || "",
+    agencyType: formatAgencyTypeLabel(agencyType, agencyTypeOther),
+    agencyRoleProfile: agencyRoleBrief(agencyType),
+    agencyVoiceProfile: "",
+    city: city || "",
+    county: "",
+    state: state || "",
+  }
+
+  const writerBrief = buildWriterBriefFromOpportunity(opportunity, context)
+  const draft = await writePioFacebookPost(writerBrief)
+  if (!draft.ok) return draft
+  if (draft.data.status !== "ready" || !draft.data.postText.trim()) {
+    return {
+      ok: false,
+      reason: "empty_response",
+      detail: draft.data.humanReviewReason || undefined,
+    }
+  }
+
+  const reviewed = await reviewPioFacebookPost(writerBrief, draft.data)
+  if (!reviewed.ok) return reviewed
+  if (
+    reviewed.data.status === "needs_human_review" ||
+    !reviewed.data.finalPostText.trim()
+  ) {
+    return {
+      ok: false,
+      reason: "empty_response",
+      detail: reviewed.data.humanReviewReason || undefined,
+    }
+  }
+
+  return { ok: true, data: reviewed.data.finalPostText.trim() }
 }

@@ -138,7 +138,7 @@ TIMING
 Use meaningful timing labels: post_immediately, post_before_morning_commute, post_before_evening_commute, post_before_conditions_begin, post_when_agency_confirms, post_today, post_within_48_hours, schedule_this_week, align_with_event_campaign. Do not claim engagement benefits without agency performance data.
 
 OUTPUT
-Return only valid JSON matching the required schema. Return no more than five recommendations. Choose quality over quantity. At least one recommendation should be proactive when no urgent item exists and a strong nonduplicative proactive need fits the agency and provides real resident value.
+Return only valid JSON matching the required schema. Return three to five recommendations when distinct verified opportunities exist. Prefer a useful daily mix (urgent + timely + educational) over a single item. At least one recommendation should be proactive when no urgent item exists and a strong nonduplicative proactive need fits the agency and provides real resident value.
 Never return low-confidence recommendations as approved.
 Use needs_human_review when sources materially conflict, the issuing authority cannot be identified for a mandatory instruction, involvement is unclear, a sensitive operational fact needs confirmation, or a local trend cannot be fully established.`
 
@@ -282,7 +282,7 @@ ${boundedJson(evidencePayload, 32_000)}
 
 Evaluate all supplied evidence. Find the strongest things this agency should communicate today or this week. Do not limit selection to breaking news. Include proactive educational, preventative, preparedness, service-explainer, or relationship-building communication when it provides more value than another current-events post. Do not return filler simply to reach a target number.
 
-Use each candidateId unchanged as the recommendation id. Copy every selected factId, claim, sourceName, and sourceUrl exactly from the supplied evidence; do not rewrite evidence fields. Return up to five recommendations using the required JSON schema.`
+Use each candidateId unchanged as the recommendation id. Copy every selected factId, claim, sourceName, and sourceUrl exactly from the supplied evidence; do not rewrite evidence fields. Return three to five recommendations when evidence supports distinct topics.`
 
   try {
     const { default: OpenAI } = await import("openai")
