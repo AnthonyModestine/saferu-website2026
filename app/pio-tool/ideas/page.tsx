@@ -293,7 +293,11 @@ export default function PostGeneratorPage() {
 
   async function loadOpportunities() {
     if (!locationReady) {
-      setError("Set your state and a city or county in Agency Settings first.")
+      setError(
+        `Finish Agency Settings first${
+          locationMissing.length ? ` — still needed: ${locationMissing.join(", ")}` : ""
+        }.`
+      )
       return
     }
 
@@ -376,24 +380,26 @@ export default function PostGeneratorPage() {
       }
 
       const opportunities = (data.opportunities as PostOpportunity[]) || []
-      // Canvas weather/public-works graphics must hydrate onto the same objects the
-      // UI renders. API buckets are separate JSON clones of `opportunities`.
-      await hydrateOpportunityGraphics(opportunities)
+      try {
+        await hydrateOpportunityGraphics(opportunities)
+      } catch (err) {
+        console.warn("Graphic hydration failed:", err)
+      }
       const byId = new Map(opportunities.map((opp) => [opp.id, opp]))
-      const withGraphics = (list: PostOpportunity[] | undefined) =>
-        (list ?? []).map((opp) => byId.get(opp.id) ?? opp)
+      const mergeList = (list: PostOpportunity[] | undefined) =>
+        (list ?? []).map((opp) => ({ ...(byId.get(opp.id) ?? opp) }))
       const next: GeneratorResult = {
-        urgent: withGraphics(data.urgent as PostOpportunity[] | undefined),
-        recommendedToday: withGraphics(
+        urgent: mergeList(data.urgent as PostOpportunity[] | undefined),
+        recommendedToday: mergeList(
           data.recommendedToday as PostOpportunity[] | undefined
         ),
-        planAhead: withGraphics(data.planAhead as PostOpportunity[] | undefined),
-        topRecommended: withGraphics(
+        planAhead: mergeList(data.planAhead as PostOpportunity[] | undefined),
+        topRecommended: mergeList(
           data.topRecommended as PostOpportunity[] | undefined
         ),
-        couldPost: withGraphics(data.couldPost as PostOpportunity[] | undefined),
+        couldPost: mergeList(data.couldPost as PostOpportunity[] | undefined),
         uncertain: [],
-        fromSaferU: withGraphics(data.fromSaferU as PostOpportunity[] | undefined),
+        fromSaferU: mergeList(data.fromSaferU as PostOpportunity[] | undefined),
         emptyState: Boolean(data.emptyState),
         noRecommendationReason:
           typeof data.noRecommendationReason === "string" ? data.noRecommendationReason : null,
@@ -461,10 +467,16 @@ export default function PostGeneratorPage() {
         }),
       })
       const data = await res.json()
-      if (res.ok && data.message) {
+      if (!res.ok) {
+        setError(String(data.error || "Could not generate caption."))
+        return
+      }
+      if (data.message) {
         const withMessage = { ...opp, curatedMessage: data.message }
         stashOpportunityForUse(withMessage)
         router.push("/pio-tool/ideas/use")
+      } else {
+        setError("No caption was returned. Try again.")
       }
     } finally {
       setGeneratingId(null)
@@ -569,7 +581,7 @@ export default function PostGeneratorPage() {
               type="button"
               size="sm"
               variant="outline"
-              disabled={loading || !locationReady}
+              disabled={loading}
               onClick={() => void loadOpportunities()}
               className="border-[#C4B5FD] bg-white"
             >
@@ -620,19 +632,23 @@ export default function PostGeneratorPage() {
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 
+      {loading && (
+        <div className="rounded-xl border border-[#c7d2fe] bg-[#f5f3ff] px-4 py-3 text-sm text-[#4338ca]">
+          <span className="inline-flex items-center gap-2 font-medium">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Searching weather, traffic, laws, and federal sources for your area…
+          </span>
+          <span className="mt-1 block text-xs text-[#6366f1]">This usually takes up to a minute.</span>
+        </div>
+      )}
+
       {isDemo && hasLive && (
         <p className="text-xs font-medium text-[#7a8ab0]">
           Sample briefing — sign in for live analysis tied to your area.
         </p>
       )}
 
-      {loading ? (
-        <div className="rounded-3xl border border-dashed border-[#c7d2fe] bg-gradient-to-br from-[#EFF6FF] to-[#F5F3FF] px-6 py-12 text-center">
-          <Loader2 className="mx-auto h-10 w-10 animate-spin text-[#7C5CFC]" />
-          <p className="mt-3 text-base font-semibold text-[#0f1c3f]">Finding something useful…</p>
-          <p className="mt-1 text-sm text-[#7a8ab0]">This can take about a minute.</p>
-        </div>
-      ) : (
+      {loading ? null : (
         <>
           <section className="space-y-4">
             <div>

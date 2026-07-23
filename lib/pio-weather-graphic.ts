@@ -60,6 +60,18 @@ export function isWeatherAlertOpportunity(
   return alertGraphicKind(opp) !== null
 }
 
+/** Live community cards without a real graphic get the branded alert template. */
+export function needsAlertTemplateGraphic(opp: PostOpportunity): boolean {
+  if (opp.opportunitySource === "saferu_curated") return false
+  const existing = opp.graphicUrl || opp.graphicThumbnailUrl || opp.curated?.graphicUrl
+  if (existing?.startsWith("data:")) return false
+  if (existing && !/placeholder-\d+\.jpg/i.test(existing)) return false
+  return (
+    opp.opportunitySource === "external" ||
+    opp.opportunitySource === "external_with_saferu_match"
+  )
+}
+
 /**
  * Short, standardized headline text for the graphic. Sizing/color are fixed by
  * the template; only this label changes per alert type.
@@ -97,6 +109,11 @@ export function weatherAlertHeadline(
     return "ROAD CLOSURE"
   }
   if (/traffic/.test(haystack)) return "TRAFFIC ADVISORY"
+  if (/scam|fraud|phish|ic3|impersonation/.test(haystack)) return "SCAM ALERT"
+  if (/law|ordinance|legislation|statute/.test(haystack)) return "COMMUNITY NOTICE"
+  if (opp.sourceLabel === "National Safety Alert" || opp.sourceLabel === "Federal Advisory") {
+    return "PUBLIC SAFETY ALERT"
+  }
 
   // ----- Fallbacks -----
   if (alertGraphicKind(opp) === "public_works") return "PUBLIC WORKS NOTICE"
@@ -236,21 +253,18 @@ export async function createWeatherAlertImage(
   const headlineLines = wrapLines(ctx, headline, leftMaxWidth)
 
   const headlineLineHeight = headlineSize * 1.04
-  const subtitle = (opts.subtitle ?? "").trim()
-  const subtitleSize = Math.round(H * 0.038)
-  let subtitleLines: string[] = []
-  if (subtitle) {
-    ctx.font = `500 ${subtitleSize}px ${FONT_STACK}`
-    setLetterSpacing(ctx, "0px")
-    subtitleLines = wrapLines(ctx, subtitle, leftMaxWidth).slice(0, 2)
-  }
+  const name = (opts.agencyName ?? "").trim()
+  const nameSize = Math.round(H * 0.042)
+  ctx.font = `600 ${nameSize}px ${FONT_STACK}`
+  setLetterSpacing(ctx, "0px")
+  const nameLines = name ? wrapLines(ctx, name, leftMaxWidth).slice(0, 2) : []
+  const nameLineHeight = nameSize * 1.28
+  const nameGap = nameLines.length ? Math.round(H * 0.035) : 0
 
-  const subtitleGap = subtitle ? Math.round(H * 0.05) : 0
-  const subtitleLineHeight = subtitleSize * 1.28
   const blockHeight =
     headlineLines.length * headlineLineHeight +
-    subtitleGap +
-    subtitleLines.length * subtitleLineHeight
+    nameGap +
+    nameLines.length * nameLineHeight
   let cursorY = (H - blockHeight) / 2 + headlineSize
 
   ctx.textAlign = "left"
@@ -258,7 +272,6 @@ export async function createWeatherAlertImage(
   ctx.fillStyle = "#FFFFFF"
   ctx.font = `800 ${headlineSize}px ${FONT_STACK}`
   setLetterSpacing(ctx, `${Math.max(1, Math.round(headlineSize * 0.01))}px`)
-  // Soft shadow for legibility over the background.
   ctx.shadowColor = "rgba(0,0,0,0.45)"
   ctx.shadowBlur = Math.round(H * 0.02)
   ctx.shadowOffsetY = Math.round(H * 0.004)
@@ -270,14 +283,14 @@ export async function createWeatherAlertImage(
   ctx.shadowBlur = 0
   ctx.shadowOffsetY = 0
 
-  if (subtitleLines.length) {
-    cursorY += subtitleGap - headlineLineHeight + headlineSize * 0.15
-    ctx.font = `500 ${subtitleSize}px ${FONT_STACK}`
-    setLetterSpacing(ctx, "0px")
-    ctx.fillStyle = "rgba(255,255,255,0.82)"
-    subtitleLines.forEach((line) => {
+  if (nameLines.length) {
+    cursorY += nameGap - headlineLineHeight + headlineSize * 0.12
+    ctx.font = `600 ${nameSize}px ${FONT_STACK}`
+    setLetterSpacing(ctx, "1px")
+    ctx.fillStyle = accent
+    nameLines.forEach((line) => {
       ctx.fillText(line, padding, cursorY)
-      cursorY += subtitleLineHeight
+      cursorY += nameLineHeight
     })
   }
 
@@ -285,35 +298,15 @@ export async function createWeatherAlertImage(
   ctx.fillStyle = "rgba(255,255,255,0.22)"
   ctx.fillRect(dividerX, padding, Math.max(2, Math.round(W * 0.0015)), H - padding * 2)
 
-  // ----- Right: agency identity lockup -----
+  // ----- Right: agency logo -----
   const rightPad = Math.round(W * 0.03)
   const rightLeft = dividerX + rightPad
   const rightRight = W - rightPad
   const rightWidth = rightRight - rightLeft
   const rightCenterX = (rightLeft + rightRight) / 2
 
-  const labelSize = Math.round(H * 0.05)
-  const nameSize = Math.round(H * 0.032)
-  const name = (opts.agencyName ?? "").trim()
+  const logoMax = Math.min(rightWidth, Math.round(H * 0.5))
 
-  // Measure the text block so the logo + text group is vertically centered.
-  ctx.font = `700 ${labelSize}px ${FONT_STACK}`
-  const labelLineHeight = labelSize * 1.12
-  const labelLines = ["PUBLIC", "INFORMATION"]
-  ctx.font = `600 ${nameSize}px ${FONT_STACK}`
-  setLetterSpacing(ctx, "0px")
-  const nameLines = name ? wrapLines(ctx, name.toUpperCase(), rightWidth).slice(0, 2) : []
-  const nameLineHeight = nameSize * 1.25
-
-  const logoMax = Math.min(rightWidth, Math.round(H * 0.42))
-  const logoGap = Math.round(H * 0.05)
-  const labelGap = Math.round(H * 0.03)
-
-  const textBlockHeight =
-    labelLines.length * labelLineHeight +
-    (nameLines.length ? labelGap + nameLines.length * nameLineHeight : 0)
-
-  // Determine logo draw size first (needs the image).
   let logo: HTMLImageElement | null = null
   if (opts.logoUrl) {
     try {
@@ -334,16 +327,14 @@ export async function createWeatherAlertImage(
     logoDrawH = logoMax * 0.8
   }
 
-  const groupHeight = logoDrawH + logoGap + textBlockHeight
-  let groupY = (H - groupHeight) / 2
+  const logoY = (H - logoDrawH) / 2
 
-  // Logo / badge.
   if (logo) {
-    ctx.drawImage(logo, rightCenterX - logoDrawW / 2, groupY, logoDrawW, logoDrawH)
+    ctx.drawImage(logo, rightCenterX - logoDrawW / 2, logoY, logoDrawW, logoDrawH)
   } else {
     const r = logoDrawH / 2
     const cx = rightCenterX
-    const cy = groupY + r
+    const cy = logoY + r
     ctx.beginPath()
     ctx.arc(cx, cy, r, 0, Math.PI * 2)
     ctx.fillStyle = "rgba(255,255,255,0.06)"
@@ -366,38 +357,13 @@ export async function createWeatherAlertImage(
     ctx.fillText(initials || "PIO", cx, cy)
   }
 
-  // "PUBLIC INFORMATION" label.
-  let textY = groupY + logoDrawH + logoGap + labelSize
-  ctx.textAlign = "center"
-  ctx.textBaseline = "alphabetic"
-  ctx.fillStyle = "#FFFFFF"
-  ctx.font = `700 ${labelSize}px ${FONT_STACK}`
-  setLetterSpacing(ctx, `${Math.max(1, Math.round(labelSize * 0.04))}px`)
-  labelLines.forEach((line) => {
-    ctx.fillText(line, rightCenterX, textY)
-    textY += labelLineHeight
-  })
-
-  // Agency name (accent color).
-  if (nameLines.length) {
-    textY += labelGap - labelLineHeight + labelSize * 0.2
-    ctx.font = `600 ${nameSize}px ${FONT_STACK}`
-    setLetterSpacing(ctx, "1px")
-    ctx.fillStyle = accent
-    nameLines.forEach((line) => {
-      ctx.fillText(line, rightCenterX, textY)
-      textY += nameLineHeight
-    })
-  }
-
   setLetterSpacing(ctx, "0px")
   return canvas.toDataURL("image/png")
 }
 
 /**
- * Attaches a standardized generated graphic to any weather alert or public
- * works opportunity (road closure, boil water advisory, etc.) that does not
- * already carry a self-contained (data URL) graphic.
+ * Attaches a standardized generated graphic to live community opportunities
+ * that do not already carry a self-contained (data URL) graphic.
  * Mutates and returns the same array for convenience.
  */
 export async function attachWeatherAlertGraphics(
@@ -406,24 +372,27 @@ export async function attachWeatherAlertGraphics(
 ): Promise<PostOpportunity[]> {
   await Promise.all(
     opportunities.map(async (opp) => {
-      if (!isWeatherAlertOpportunity(opp)) return
-      const hasLocalGraphic = opp.graphicUrl?.startsWith("data:")
-      if (hasLocalGraphic) return
-      const headline = weatherAlertHeadline(opp)
-      const dataUrl = await createWeatherAlertImage({
-        logoUrl: opts.logoUrl,
-        agencyName: opts.agencyName,
-        headline,
-        subtitle: opp.title,
-      })
-      if (!dataUrl) return
-      opp.graphicUrl = dataUrl
-      opp.graphicThumbnailUrl = dataUrl
-      opp.graphicAltText = `${headline} public information graphic${
-        opts.agencyName ? ` for ${opts.agencyName}` : ""
-      }`
-      opp.graphicSourceName = undefined
-      opp.graphicSourceUrl = undefined
+      if (!needsAlertTemplateGraphic(opp)) return
+      try {
+        const hasLocalGraphic = opp.graphicUrl?.startsWith("data:")
+        if (hasLocalGraphic) return
+        const headline = weatherAlertHeadline(opp)
+        const dataUrl = await createWeatherAlertImage({
+          logoUrl: opts.logoUrl,
+          agencyName: opts.agencyName,
+          headline,
+        })
+        if (!dataUrl) return
+        opp.graphicUrl = dataUrl
+        opp.graphicThumbnailUrl = dataUrl
+        opp.graphicAltText = `${headline} public information graphic${
+          opts.agencyName ? ` for ${opts.agencyName}` : ""
+        }`
+        opp.graphicSourceName = undefined
+        opp.graphicSourceUrl = undefined
+      } catch (err) {
+        console.warn("[attachWeatherAlertGraphics] skipped graphic for", opp.id, err)
+      }
     })
   )
   return opportunities
