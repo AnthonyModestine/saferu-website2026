@@ -409,9 +409,9 @@ function finalPioGate(input: ExternalOpportunityInput, dims: {
   sourceTrust: number
 }): boolean {
   if (dims.agencyRelevance < 40) return false
-  if (dims.residentValue < 55) return false
-  if (dims.actionability < 55) return false
-  if (dims.sourceTrust < 50) return false
+  if (dims.residentValue < 50) return false
+  if (dims.actionability < 45) return false
+  if (dims.sourceTrust < 45) return false
   const text = `${input.title} ${input.summary} ${input.whyItMatters}`.toLowerCase()
   if (/celebrity|political debate|opinion piece|clickbait/i.test(text)) return false
   const why = (input.whyItMatters || "").trim()

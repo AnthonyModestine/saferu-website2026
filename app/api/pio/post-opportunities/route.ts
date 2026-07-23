@@ -28,7 +28,7 @@ import {
   topicKey,
 } from "@/lib/post-generator/rank-opportunities"
 import { discoverStrongRecommendedTopics } from "@/lib/post-generator/deep-recommended-search"
-import { rescueOfficialRankedCandidates } from "@/lib/post-generator/official-rescue"
+import { rescueOfficialRankedCandidates, promoteDiscoveryCandidates } from "@/lib/post-generator/official-rescue"
 import { discoverCreatedContentFollowups } from "@/lib/post-generator/content-followup-ai"
 import { runProductionPostPipeline } from "@/lib/post-generator/production-pipeline"
 import { prepareWeatherOpportunityForPipeline } from "@/lib/post-generator/weather-message-ai"
@@ -408,6 +408,32 @@ export async function POST(request: Request) {
           )
         }
       }
+
+      if (uniqueExisting.size < 5) {
+        const boost = await discoverStrongRecommendedTopics({
+          state,
+          city,
+          county,
+          serviceAreaType,
+          serviceZips,
+          agencyType,
+          agencyName,
+          todayIso,
+          needed: 5,
+          excludeTitles: [...uniqueExisting.values()].map((opp) => opp.title),
+          activeSignals: [...usedTopicFamilies],
+        })
+        if (boost.ok) {
+          for (const opportunity of boost.data) addCandidate(opportunity)
+          candidates = [...uniqueExisting.values()]
+        } else {
+          console.warn(
+            "[post-opportunities] Boost discovery unavailable:",
+            boost.reason,
+            boost.detail || ""
+          )
+        }
+      }
     }
 
     const normalizedPreview = normalizeCandidates(candidates)
@@ -643,6 +669,31 @@ export async function POST(request: Request) {
           fallbackReason: `${
             pipelineDiagnostics?.fallbackReason || "pipeline_empty"
           };official_rescue`,
+        }
+      }
+    }
+
+    if (!useDemo && ranked.length === 0 && candidates.length > 0) {
+      const promoted = promoteDiscoveryCandidates(candidates)
+      if (promoted.length > 0) {
+        console.warn(
+          `[post-opportunities] Discovery promotion surfaced ${promoted.length} verified item(s) that failed strict ranking.`
+        )
+        ranked = promoted
+        pipelineNoRecommendationReason = null
+        pipelineSelectionSummary =
+          "Surfaced verified items from official discovery sources for your area."
+        pipelineDiagnostics = {
+          ...(pipelineDiagnostics ?? {
+            rankedIn: 0,
+            verifiedEvidence: promoted.length,
+            droppedAtEvidence: [],
+            approvedCount: promoted.length,
+            usedDeterministicFallback: true,
+          }),
+          approvedCount: promoted.length,
+          usedDeterministicFallback: true,
+          fallbackReason: "discovery_promotion",
         }
       }
     }
