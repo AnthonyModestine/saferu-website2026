@@ -1,7 +1,10 @@
 import type { PipelineAgencyContext } from "@/lib/post-generator/pipeline-types"
 import type { RankedExternalOpportunity } from "@/lib/post-generator/types"
 import { buildWriterBriefFromOpportunity } from "@/lib/post-generator/build-writer-brief"
-import { writePioFacebookPost } from "@/lib/post-generator/write-pio-facebook-post"
+import {
+  buildPostMessageInputFromOpportunity,
+  generatePostMessage,
+} from "@/lib/post-generator/post-message"
 import { withPioAgencyAttribution } from "./caption-voice"
 import { isWeatherAlertOpportunity } from "./weather-alert-message"
 import { resolveWeatherOpportunityMessage } from "./weather-message-ai"
@@ -72,8 +75,12 @@ export async function resolveOpportunityMessage(
     return resolveWeatherOpportunityMessage(opportunity, context)
   }
 
-  const writerBrief = buildWriterBriefFromOpportunity(opportunity, context)
-  const ai = await writePioFacebookPost(writerBrief)
+  const input = buildPostMessageInputFromOpportunity(opportunity, context)
+  const ai = await generatePostMessage(input, {
+    city: context.city,
+    county: context.county,
+    state: context.state,
+  })
   if (ai.ok && ai.data.status === "ready" && ai.data.postText.trim()) {
     return ai.data.postText.trim()
   }

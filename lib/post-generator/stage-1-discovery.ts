@@ -1,5 +1,6 @@
 import type { AiResult } from "@/lib/ai-result"
 import { agencyRoleBrief } from "@/lib/post-generator/agency-relevance"
+import { buildAgencyGeographicProfile } from "@/lib/post-generator/recommendation"
 import { buildAgencySourceCatalog } from "@/lib/post-generator/source-registry"
 import { STAGE_1_RESPONSE_FORMAT, stage1ResultSchema } from "@/lib/post-generator/pipeline-schemas"
 import type {
@@ -138,7 +139,11 @@ TIMING
 Use meaningful timing labels: post_immediately, post_before_morning_commute, post_before_evening_commute, post_before_conditions_begin, post_when_agency_confirms, post_today, post_within_48_hours, schedule_this_week, align_with_event_campaign. Do not claim engagement benefits without agency performance data.
 
 OUTPUT
-Return only valid JSON matching the required schema. Return three to five recommendations when distinct verified opportunities exist. Prefer a useful daily mix (urgent + timely + educational) over a single item. At least one recommendation should be proactive when no urgent item exists and a strong nonduplicative proactive need fits the agency and provides real resident value.
+Return only valid JSON matching the required schema. Select no more than four recommendations. You may select fewer than four. You may select zero when nothing meets the quality bar.
+Never select weak content merely to fill a recommendation slot. Weak, generic, stale or irrelevant recommendations are worse than returning none.
+Every selected recommendation must answer specifically: "Why should this agency post this today?"
+Do not generate captions or post text. Recommendations only.
+Prefer a useful mix (urgent + timely + educational) when evidence supports it, but never force diversity over an urgent local hazard.
 Never return low-confidence recommendations as approved.
 Use needs_human_review when sources materially conflict, the issuing authority cannot be identified for a mandatory instruction, involvement is unclear, a sensitive operational fact needs confirmation, or a local trend cannot be fully established.`
 
@@ -181,6 +186,7 @@ export async function runStage1Discovery(
     )
   }
 
+  const geographicProfile = buildAgencyGeographicProfile(context)
   const catalog = buildAgencySourceCatalog({ state: context.state, agencyName: context.agencyName })
   const sourceCatalog = {
     agencyOfficialSources: catalog.agencyOfficialSources,
@@ -223,6 +229,9 @@ ${context.agencyRoleProfile || agencyRoleBrief(context.agencyType)}
 Agency services and approved responsibilities:
 ${boundedJson(context.agencyServices)}
 
+Agency geographic profile (use ZIP codes with city, county and state together in relevance judgments):
+${boundedJson(geographicProfile)}
+
 Service-area label: ${[context.city, context.county, context.state].filter(Boolean).join(", ")}
 
 Service-area cities and municipalities:
@@ -233,7 +242,7 @@ ${boundedJson(context.county ? [context.county] : [])}
 
 State: ${context.state}
 
-ZIP codes:
+ZIP codes (important for hyperlocal weather, outages, closures, advisories):
 ${boundedJson(context.serviceZips)}
 
 Service-area boundary or polygon:
@@ -282,7 +291,7 @@ ${boundedJson(evidencePayload, 32_000)}
 
 Evaluate all supplied evidence. Find the strongest things this agency should communicate today or this week. Do not limit selection to breaking news. Include proactive educational, preventative, preparedness, service-explainer, or relationship-building communication when it provides more value than another current-events post. Do not return filler simply to reach a target number.
 
-Use each candidateId unchanged as the recommendation id. Copy every selected factId, claim, sourceName, and sourceUrl exactly from the supplied evidence; do not rewrite evidence fields. Return three to five recommendations when evidence supports distinct topics.`
+Use each candidateId unchanged as the recommendation id. Copy every selected factId, claim, sourceName, and sourceUrl exactly from the supplied evidence; do not rewrite evidence fields. Return up to four recommendations when evidence supports distinct topics worth communicating today. Return fewer when quality is weak.`
 
   try {
     const { default: OpenAI } = await import("openai")

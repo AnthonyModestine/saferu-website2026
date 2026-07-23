@@ -146,7 +146,7 @@ export const STAGE_1_RESPONSE_FORMAT = {
       properties: {
         recommendations: {
           type: "array",
-          maxItems: 5,
+          maxItems: 4,
           items: {
             type: "object",
             additionalProperties: false,

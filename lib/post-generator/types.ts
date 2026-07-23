@@ -87,6 +87,10 @@ export interface PostOpportunity {
   whyItMatters: string
   /** AI-written explanation of why this was surfaced now for this agency/community. */
   surfacedReason?: string
+  /** Why communicating today is valuable — specific PIO timing rationale. */
+  whyToday?: string
+  /** Internal 0–100 PIO recommendation score when available. */
+  recommendationScore?: number
   recommendedAction: string
   recommendedPostTiming: string
   opportunitySource: OpportunitySource
@@ -180,6 +184,8 @@ export interface GeneratorRequest {
   dailyLimit?: number
 }
 
+export const DEFAULT_DAILY_RECOMMENDATION_LIMIT = 4
+
 /** Recent content created inside SaferU, supplied for preventative follow-up analysis. */
 export interface RecentAgencyContent {
   id: string
@@ -203,6 +209,9 @@ export interface GeneratorResult {
   uncertain: PostOpportunity[]
   fromSaferU: PostOpportunity[]
   emptyState: boolean
+  noRecommendationReason?: string | null
+  selectionSummary?: string
+  rejectedCandidateCount?: number
   demo: boolean
   generatedAt: string
 }

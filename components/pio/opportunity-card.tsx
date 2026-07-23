@@ -50,9 +50,12 @@ export function OpportunityCard({
   onDismiss,
   compact,
 }: OpportunityCardProps) {
-  const hasCurated = Boolean(opp.curatedMessage || opp.curated)
+  const isLibrary = opp.opportunitySource === "saferu_curated"
+  const hasReadyMessage = Boolean(opp.curatedMessage?.trim() || opp.curated?.message?.trim())
+  const showUse = isLibrary && hasReadyMessage && onUse
   const graphic = opp.graphicThumbnailUrl || opp.graphicUrl || opp.curated?.graphicUrl
   const overview = (opp.surfacedReason || opp.summary || opp.whyItMatters || "").trim()
+  const whyToday = (opp.whyToday || opp.whyNow || "").trim()
   const whenToPost = (opp.recommendedPostTiming || "").trim()
   const sourceName =
     opp.sourceName?.trim() ||
@@ -78,6 +81,15 @@ export function OpportunityCard({
           <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>{whenToPost}</span>
         </p>
+      )}
+
+      {whyToday && (
+        <div className="mt-3 rounded-xl border border-[#DBEAFE] bg-[#EFF6FF] p-3">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-[#1D4ED8]">
+            Why post today
+          </p>
+          <p className="mt-1 text-sm leading-relaxed text-[#1E3A8A] line-clamp-3">{whyToday}</p>
+        </div>
       )}
 
       {overview && (
@@ -128,12 +140,12 @@ export function OpportunityCard({
 
       {!compact && (
         <div className="mt-4 flex flex-wrap gap-2">
-          {hasCurated && onUse ? (
+          {showUse ? (
             <Button
               type="button"
               size="sm"
               className="bg-[#7C5CFC] hover:bg-[#6D28D9]"
-              onClick={() => onUse(opp)}
+              onClick={() => onUse!(opp)}
             >
               <Sparkles className="mr-1.5 h-3.5 w-3.5" />
               Use This Post

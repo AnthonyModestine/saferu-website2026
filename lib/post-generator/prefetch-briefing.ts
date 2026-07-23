@@ -87,7 +87,7 @@ export function isUsableCachedBriefing(opportunities: PostOpportunity[]): boolea
   return opportunities.every(
     (opp) =>
       Boolean(opp.title?.trim()) &&
-      Boolean(opp.curatedMessage?.trim() || opp.summary?.trim())
+      Boolean(opp.summary?.trim() || opp.whyItMatters?.trim())
   )
 }
 

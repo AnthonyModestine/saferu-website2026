@@ -148,6 +148,29 @@ function isPlaceholderImage(url?: string): boolean {
 /** Demo posts when CMS library is empty (local dev / guest preview). */
 export const DEMO_INDEXED_POSTS: IndexedCuratedPost[] = [
   {
+    contentId: "demo::hurricane-prep",
+    postId: "demo-hurricane",
+    categoryId: "weather-preparedness",
+    subcategoryId: "hurricane",
+    articleId: "hurricane-preparedness",
+    title: "Hurricane Preparedness Checklist",
+    category: "Weather Preparedness",
+    subcategory: "Hurricane",
+    articleTitle: "Hurricane Preparedness",
+    articleDescription: "Steps residents can take before tropical weather arrives.",
+    message:
+      "If a hurricane may affect your area, gather supplies for several days, secure outdoor items, know your evacuation zone, and charge phones and backup batteries. Review your family plan now while conditions are calm.",
+    graphicUrl: "/images/posts/placeholder-2.jpg",
+    keywords: ["hurricane", "tropical", "preparedness", "storm"],
+    signals: ["hurricane", "tropical_weather", "emergency_preparedness"],
+    relevantMonths: [6, 7, 8, 9, 10, 11],
+    relevantSeasons: ["summer", "fall"],
+    evergreen: true,
+    priority: 92,
+    hasGraphic: true,
+    hasMessage: true,
+  },
+  {
     contentId: "demo::hot-car",
     postId: "demo-hot-car",
     categoryId: "weather-preparedness",

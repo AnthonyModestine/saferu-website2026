@@ -37,6 +37,8 @@ export type WriterBrief = {
   mustInclude?: string[]
   mustNotSay?: string[]
   categoryInstructions?: string[]
+  /** Alert or topic title for script selection */
+  title?: string
 }
 
 export type PioWriterResult = {

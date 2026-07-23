@@ -4,10 +4,7 @@
 
 import type { AiResult } from "@/lib/ai-result"
 import type { CustomizeMessageMode, RankedExternalOpportunity } from "@/lib/post-generator/types"
-import { buildWriterBriefFromOpportunity } from "@/lib/post-generator/build-writer-brief"
-import { customizePioFacebookPost } from "@/lib/post-generator/customize-pio-facebook-post"
-import { reviewPioFacebookPost } from "@/lib/post-generator/review-pio-facebook-post"
-import { writePioFacebookPost } from "@/lib/post-generator/write-pio-facebook-post"
+import { buildPostMessageInputFromOpportunity, generatePostMessage } from "@/lib/post-generator/post-message"
 import type { WriterFact } from "@/lib/post-generator/pio-writer-types"
 import {
   agencyRoleBrief,
@@ -245,8 +242,12 @@ export async function generateMessageFromOpportunity(
     state: state || "",
   }
 
-  const writerBrief = buildWriterBriefFromOpportunity(opportunity, context)
-  const draft = await writePioFacebookPost(writerBrief)
+  const input = buildPostMessageInputFromOpportunity(opportunity, context)
+  const draft = await generatePostMessage(input, {
+    city: context.city,
+    county: context.county,
+    state: context.state,
+  })
   if (!draft.ok) return draft
   if (draft.data.status !== "ready" || !draft.data.postText.trim()) {
     return {
@@ -256,18 +257,5 @@ export async function generateMessageFromOpportunity(
     }
   }
 
-  const reviewed = await reviewPioFacebookPost(writerBrief, draft.data)
-  if (!reviewed.ok) return reviewed
-  if (
-    reviewed.data.status === "needs_human_review" ||
-    !reviewed.data.finalPostText.trim()
-  ) {
-    return {
-      ok: false,
-      reason: "empty_response",
-      detail: reviewed.data.humanReviewReason || undefined,
-    }
-  }
-
-  return { ok: true, data: reviewed.data.finalPostText.trim() }
+  return { ok: true, data: draft.data.postText.trim() }
 }

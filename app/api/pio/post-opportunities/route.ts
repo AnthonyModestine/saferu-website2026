@@ -489,10 +489,13 @@ export async function POST(request: Request) {
       await runDeepSearch(candidates.map((opp) => opp.title))
     }
 
-    // Production architecture: retrieved evidence -> strategy -> writer -> quality gate.
+    // Recommendation architecture: verify evidence -> PIO editorial selection -> scored cap at four.
     // This path is intentionally fail-closed. Demo fixtures remain deterministic.
     let pipelineSummary
     let pipelineDiagnostics
+    let pipelineSelectionSummary: string | undefined
+    let pipelineNoRecommendationReason: string | null | undefined
+    let pipelineRejectedCount: number | undefined
     const typeLabel = agencyTypeLabel(agencyType, agencyTypeOther)
     const pipelineContext = {
       agencyName: agencyName || "the public safety agency",
@@ -554,6 +557,9 @@ export async function POST(request: Request) {
       ranked = pipeline.approved
       pipelineSummary = pipeline.stage1Summary
       pipelineDiagnostics = pipeline.diagnostics
+      pipelineSelectionSummary = pipeline.selectionSummary
+      pipelineNoRecommendationReason = pipeline.noRecommendationReason
+      pipelineRejectedCount = pipeline.rejectedCount
       if (pipeline.diagnostics.usedDeterministicFallback) {
         console.warn(
           "[post-opportunities] Pipeline used deterministic verified fallback:",
@@ -575,6 +581,9 @@ export async function POST(request: Request) {
           const retry = await runProductionPostPipeline(pipelineContext, ranked)
           ranked = retry.approved
           pipelineSummary = retry.stage1Summary
+          pipelineSelectionSummary = retry.selectionSummary
+          pipelineNoRecommendationReason = retry.noRecommendationReason
+          pipelineRejectedCount = retry.rejectedCount
           pipelineDiagnostics = {
             ...retry.diagnostics,
             fallbackReason:
@@ -604,73 +613,18 @@ export async function POST(request: Request) {
       recentTopicKeys,
       savedIds: Array.isArray(body.savedIds) ? body.savedIds : [],
       externalOpportunities,
-      dailyLimit: 12,
+      dailyLimit: 4,
     }
 
     const result = generatePostOpportunities(req)
-    const dailyOpportunities = flattenOpportunities(result)
-
-    // SaferU fallback content is already editorially approved. Any agency-specific
-    // rewrite must still pass the same three production stages before replacing it.
-    if (!useDemo && ranked.length === 0 && result.fromSaferU.length > 0) {
-      const curatedCandidates = result.fromSaferU.map((opp) => ({
-        id: opp.id,
-        title: opp.title,
-        summary: opp.summary,
-        category: opp.category,
-        sourceLabel: opp.sourceLabel,
-        whyItMatters: opp.whyItMatters,
-        surfacedReason: opp.surfacedReason,
-        recommendedAction: opp.recommendedAction,
-        recommendedPostTiming: opp.recommendedPostTiming,
-        priority: opp.priority,
-        signals: opp.signals ?? [],
-        sourceName: "SaferU Content Library",
-        verifiedFacts: [
-          `SaferU's approved Content Library includes a post titled "${opp.title}".`,
-          `Approved message: ${opp.curatedMessage || opp.curated?.message || opp.summary}`,
-        ],
-        publicCallToAction: ["Share the approved SaferU safety message."],
-        doNotClaim: ["Do not invent a local incident, trend, alert, or emergency."],
-        suggestedMessage: opp.curatedMessage,
-        confidenceLevel: "high" as const,
-        recommendationTier: "could_post" as const,
-        jurisdictionFit: "own" as const,
-        internalScores: {
-          agencyRelevance: 75,
-          geographicRelevance: 70,
-          residentValue: 80,
-          actionability: 75,
-          urgency: 45,
-          sourceTrust: 95,
-          seasonalRelevance: 75,
-          engagementPotential: 70,
-          freshness: 70,
-          composite: 74,
-          pioRating: 4 as const,
-          agencyFitReason: opp.whyItMatters,
-          messagingAngle: "Provide useful prevention or education without implying a local incident.",
-        },
-      }))
-      const curatedPipeline = await runProductionPostPipeline(pipelineContext, curatedCandidates)
-      const approvedById = new Map(curatedPipeline.approved.map((opp) => [opp.id, opp]))
-      for (const opportunity of result.fromSaferU) {
-        const approved = approvedById.get(opportunity.id)
-        if (!approved) continue
-        opportunity.curatedMessage = approved.suggestedMessage
-        opportunity.surfacedReason = approved.surfacedReason
-        opportunity.communicationPillar = approved.communicationPillar
-        opportunity.communicationGoal = approved.communicationGoal
-        opportunity.whyNow = approved.whyNow
-        opportunity.whyThisAgency = approved.whyThisAgency
-        opportunity.whyThisCommunity = approved.whyThisCommunity
-        opportunity.residentValue = approved.residentValue
-        opportunity.relationshipValue = approved.relationshipValue
-        opportunity.issuingAuthority = approved.issuingAuthority
-        opportunity.supportingSources = approved.supportingSources
-        opportunity.qualityGateStatus = approved.qualityGateStatus
-      }
+    if (pipelineSelectionSummary) result.selectionSummary = pipelineSelectionSummary
+    if (pipelineNoRecommendationReason !== undefined) {
+      result.noRecommendationReason = pipelineNoRecommendationReason
     }
+    if (typeof pipelineRejectedCount === "number") {
+      result.rejectedCandidateCount = pipelineRejectedCount
+    }
+    const dailyOpportunities = flattenOpportunities(result)
 
     const opportunities = dailyOpportunities.map((opp) => ({
       ...opp,
@@ -687,10 +641,13 @@ export async function POST(request: Request) {
       uncertain: result.uncertain,
       fromSaferU: result.fromSaferU,
       emptyState: result.emptyState,
+      noRecommendationReason: result.noRecommendationReason,
+      selectionSummary: result.selectionSummary,
+      rejectedCandidateCount: result.rejectedCandidateCount,
       generatedAt: result.generatedAt,
       opportunities,
       demo: useDemo,
-      pipelineVersion: "three-stage-v1",
+      pipelineVersion: "recommendation-v1",
       pipelineSummary,
       pipelineDiagnostics,
       saferuFallbackOnly:

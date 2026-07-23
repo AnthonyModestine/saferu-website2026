@@ -14,7 +14,6 @@ import { generatePostOpportunities, flattenOpportunities } from "@/lib/post-gene
 import { demoExternalOpportunities } from "@/lib/post-generator/external-scanner"
 import { rankAndGateExternalOpportunities } from "@/lib/post-generator/rank-opportunities"
 import { attachWeatherAlertGraphics } from "@/lib/pio-weather-graphic"
-import { buildOpportunityFallbackMessage } from "@/lib/post-generator/caption-voice"
 import {
   applyHolidayAiContent,
   attachHolidayGraphics,
@@ -232,21 +231,9 @@ export default function PostGeneratorPage() {
       postedFingerprints: history.postedFingerprints,
       recentTopicKeys: history.recentTopicKeys,
       externalOpportunities: rankedDemo,
-      dailyLimit: 12,
+      dailyLimit: 4,
     })
     const flat = flattenOpportunities(demo)
-    for (const opportunity of flat) {
-      if (opportunity.curatedMessage) continue
-      opportunity.curatedMessage = buildOpportunityFallbackMessage(
-        opportunity,
-        agencyName,
-        {
-          city: settings.city,
-          county: settings.county,
-          state: settings.state,
-        }
-      )
-    }
     await hydrateOpportunityGraphics(flat)
     setResult({ ...demo })
     cacheOpportunityResult(flat, demo.generatedAt)
@@ -403,6 +390,14 @@ export default function PostGeneratorPage() {
         uncertain: [],
         fromSaferU: withGraphics(data.fromSaferU as PostOpportunity[] | undefined),
         emptyState: Boolean(data.emptyState),
+        noRecommendationReason:
+          typeof data.noRecommendationReason === "string" ? data.noRecommendationReason : null,
+        selectionSummary:
+          typeof data.selectionSummary === "string" ? data.selectionSummary : undefined,
+        rejectedCandidateCount:
+          typeof data.rejectedCandidateCount === "number"
+            ? data.rejectedCandidateCount
+            : undefined,
         demo: Boolean(data.demo),
         generatedAt: String(data.generatedAt || new Date().toISOString()),
       }
@@ -625,12 +620,13 @@ export default function PostGeneratorPage() {
           <Sparkles className="mx-auto h-10 w-10 text-[#7C5CFC]" />
           <p className="mt-3 text-base font-semibold text-[#0f1c3f]">
             {locationReady
-              ? "Nothing strong enough to recommend right now"
+              ? result.noRecommendationReason ||
+                "No strong post recommendations were identified for your community right now."
               : "Finish Agency Settings"}
           </p>
           <p className="mt-1 text-sm text-[#7a8ab0]">
             {locationReady
-              ? "Try Generate again, or check Agency Settings if your service area looks incomplete."
+              ? "Try Generate again when conditions change, or check Agency Settings if your service area looks incomplete."
               : "Choose an agency type and service area, then generate."}
           </p>
         </div>

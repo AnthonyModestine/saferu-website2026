@@ -2,24 +2,24 @@
  * Post Generator engine — combines calendar context, curated content, and external signals.
  */
 
-import type {
-  CuratedContentRef,
-  ExternalOpportunityInput,
-  GeneratorRequest,
-  GeneratorResult,
-  PostOpportunity,
+import {
+  DEFAULT_DAILY_RECOMMENDATION_LIMIT,
+  type CuratedContentRef,
+  type ExternalOpportunityInput,
+  type GeneratorRequest,
+  type GeneratorResult,
+  type PostOpportunity,
 } from "./types"
+import { NO_RECOMMENDATION_MESSAGE } from "./recommendation"
 import { indexCuratedPosts, type IndexedCuratedPost } from "./content-index"
 import { buildGeneratorContext, rankCuratedPosts } from "./scoring"
-import { isNationalValueSource } from "./trusted-sources"
 
-const GENERIC_CURATED_SIGNALS = new Set([
-  "public_safety",
-  "safety",
-  "community",
-  "community_engagement",
-  "awareness",
-])
+import {
+  isOfficialAlertTemplateTopic,
+  resolveSaferuContentMatch,
+  shouldAttachSaferuLibraryGraphic,
+  shouldOfferSeparateSaferuCard,
+} from "./saferu-content-match"
 
 function toCuratedRef(post: IndexedCuratedPost, matchReason: string): CuratedContentRef {
   return {
@@ -92,48 +92,33 @@ function isPlaceholderGraphic(url?: string): boolean {
   return /placeholder-\d+\.jpg/i.test(url)
 }
 
-function isOfficialAlertTemplateTopic(input: ExternalOpportunityInput): boolean {
-  return (
-    input.sourceLabel === "Weather Alert" ||
-    input.sourceLabel === "Weather Analysis" ||
-    /road_closure|boil_water|utility|public_works/i.test(input.category || "")
+function buildSaferuCompanionOpportunity(
+  trigger: ExternalOpportunityInput,
+  match: { post: IndexedCuratedPost; score: number; matchReason: string },
+  ctx: ReturnType<typeof buildGeneratorContext>
+): PostOpportunity {
+  const whyItMatters = isOfficialAlertTemplateTopic(trigger)
+    ? `${trigger.whyItMatters} Sharing an approved preparedness message gives residents practical next steps while official conditions remain in effect.`
+    : `This approved SaferU safety message supports timely prevention related to: ${trigger.title}.`
+  const opp = buildCuratedOpportunity(
+    match,
+    ctx,
+    whyItMatters,
+    isOfficialAlertTemplateTopic(trigger)
+      ? "Post today alongside the active alert."
+      : "Post today as a prevention follow-up."
   )
-}
-
-function meaningfulSignalOverlap(
-  input: ExternalOpportunityInput,
-  match: { post: IndexedCuratedPost }
-): string[] {
-  const targets = new Set(input.signals ?? [])
-  return match.post.signals.filter(
-    (signal) => targets.has(signal) && !GENERIC_CURATED_SIGNALS.has(signal)
-  )
-}
-
-/**
- * Prefer no SaferU library graphic over a weakly matched / random one.
- * National/federal posts without local distance need a strong multi-signal match.
- */
-function shouldAttachSaferuLibraryGraphic(
-  input: ExternalOpportunityInput,
-  match: { post: IndexedCuratedPost; score: number } | undefined
-): boolean {
-  if (!match?.post.hasGraphic || isPlaceholderGraphic(match.post.graphicUrl)) return false
-  if (isOfficialAlertTemplateTopic(input)) return false
-
-  const overlap = meaningfulSignalOverlap(input, match)
-  const hasLocalDistance =
-    typeof input.distanceMiles === "number" && Number.isFinite(input.distanceMiles)
-  const nationalWithoutLocal =
-    (input.sourceLabel === "National Safety Alert" ||
-      input.sourceLabel === "Federal Advisory" ||
-      isNationalValueSource(input.sourceUrl, input.sourceName)) &&
-    !hasLocalDistance
-
-  if (nationalWithoutLocal) {
-    return match.score >= 70 && overlap.length >= 2
+  return {
+    ...opp,
+    id: makeId("saferu-companion", `${match.post.contentId}-${trigger.id}`),
+    whyToday:
+      trigger.whyNow ||
+      trigger.surfacedReason ||
+      "A separate safety message adds practical value without replacing the official alert.",
+    priority: trigger.priority === "urgent" ? "recommended_today" : trigger.priority,
+    recommendationTier: "could_post",
+    totalScore: Math.max(match.score, (trigger.internalScores?.composite ?? 70) - 8),
   }
-  return match.score >= 55 && overlap.length >= 1
 }
 
 function buildExternalFromInput(
@@ -142,12 +127,10 @@ function buildExternalFromInput(
   allowGraphic: boolean
 ): PostOpportunity {
   const now = new Date().toISOString()
-  const attachLibrary = shouldAttachSaferuLibraryGraphic(input, match)
-  const curated = attachLibrary && match ? toCuratedRef(match.post, match.matchReason) : undefined
+  const attachLibraryGraphic = shouldAttachSaferuLibraryGraphic(input, match, isPlaceholderGraphic)
+  const curated = attachLibraryGraphic && match ? toCuratedRef(match.post, match.matchReason) : undefined
 
-  // Official alerts use the premade Weather Alert / public-info canvas template
-  // (client-side). Do not invent or attach unrelated SaferU safety graphics,
-  // and do not keep external stock photos that would block the canvas template.
+  // Official alerts use the premade Weather Alert / public-info canvas template (client-side).
   const useAlertTemplate = isOfficialAlertTemplateTopic(input)
   const externalGraphic =
     allowGraphic && !useAlertTemplate ? input.graphicUrl : undefined
@@ -155,7 +138,7 @@ function buildExternalFromInput(
     allowGraphic && !useAlertTemplate ? input.graphicThumbnailUrl : undefined
   const libraryGraphic =
     !useAlertTemplate &&
-    attachLibrary &&
+    attachLibraryGraphic &&
     match?.post.graphicUrl &&
     match.post.hasGraphic &&
     !isPlaceholderGraphic(match.post.graphicUrl)
@@ -188,6 +171,7 @@ function buildExternalFromInput(
     communicationPillar: input.communicationPillar,
     communicationGoal: input.communicationGoal,
     whyNow: input.whyNow,
+    whyToday: input.whyNow || input.surfacedReason,
     whyThisAgency: input.whyThisAgency,
     whyThisCommunity: input.whyThisCommunity,
     residentValue: input.residentValue,
@@ -197,8 +181,8 @@ function buildExternalFromInput(
     qualityGateStatus: input.qualityGateStatus,
     signals: input.signals,
     curated: useAlertTemplate ? undefined : curated,
-    // External facts drive the message; a curated match supplies the optional graphic/reference.
-    curatedMessage: input.suggestedMessage,
+    curatedMessage: undefined,
+    recommendationScore: input.internalScores?.composite,
     graphicUrl: externalGraphic ?? libraryGraphic,
     graphicThumbnailUrl: externalThumbnail ?? externalGraphic ?? libraryGraphic,
     graphicSourceName: externalGraphic
@@ -219,12 +203,12 @@ function buildExternalFromInput(
       input.internalScores?.actionability ?? (input.publicCallToAction?.length ? 90 : 75),
     sourceReliabilityScore:
       input.internalScores?.sourceTrust ?? (input.sourceName ? 85 : 70),
-    curatedMatchScore: useAlertTemplate ? 0 : attachLibrary ? match?.score ?? 0 : 0,
+    curatedMatchScore: attachLibraryGraphic ? match?.score ?? 0 : 0,
     freshnessScore: input.internalScores?.freshness ?? 85,
     totalScore:
       input.internalScores?.composite ??
       ((input.priority === "urgent" ? 95 : input.priority === "recommended_today" ? 82 : 65) +
-        (!useAlertTemplate && attachLibrary && match ? 20 : 0)),
+        (attachLibraryGraphic && match ? 12 : 0)),
     confidenceLevel: input.confidenceLevel ?? "medium",
     discoveredAt: now,
     updatedAt: now,
@@ -254,30 +238,39 @@ export function generatePostOpportunities(req: GeneratorRequest): GeneratorResul
   const posted = new Set(req.postedFingerprints ?? [])
 
   const built: PostOpportunity[] = []
+  const companions: PostOpportunity[] = []
+  const usedCompanionContent = new Set<string>()
   for (const input of req.externalOpportunities ?? []) {
     if (posted.has(input.id)) continue
-    const curatedMatch = rankCuratedPosts(posts, ctx, input.signals ?? [], used, 1, true)[0]
+    const curatedMatch = resolveSaferuContentMatch(input, posts, todayIso, used, isPlaceholderGraphic)
     built.push(buildExternalFromInput(input, curatedMatch, true))
+    if (
+      curatedMatch &&
+      shouldOfferSeparateSaferuCard(input, curatedMatch, isPlaceholderGraphic) &&
+      !usedCompanionContent.has(curatedMatch.post.contentId)
+    ) {
+      usedCompanionContent.add(curatedMatch.post.contentId)
+      companions.push(buildSaferuCompanionOpportunity(input, curatedMatch, ctx))
+    }
   }
 
   const demo = posts.every((p) => p.contentId.startsWith("demo::"))
-  const cleaned = filterDismissed(dedupeByTitle(built), dismissed).sort(
+  const cleaned = filterDismissed(dedupeByTitle([...built, ...companions]), dismissed).sort(
     (a, b) => b.totalScore - a.totalScore
   )
 
-  const dailyLimit = Math.max(3, Math.min(req.dailyLimit ?? 5, 8))
+  const dailyLimit = Math.max(
+    0,
+    Math.min(req.dailyLimit ?? DEFAULT_DAILY_RECOMMENDATION_LIMIT, DEFAULT_DAILY_RECOMMENDATION_LIMIT)
+  )
 
-  // Quality over quantity: only scored 4–5 star opportunities reach this stage.
-  const topRecommended = cleaned
-    .filter((opp) => (opp.recommendationTier || "top_recommended") === "top_recommended")
-    .slice(0, dailyLimit)
-  const couldPost = cleaned
-    .filter((opp) => opp.recommendationTier === "could_post")
-    .slice(0, dailyLimit)
+  const selected = cleaned.slice(0, dailyLimit)
+  const topRecommended = selected.filter(
+    (opp) => (opp.recommendationTier || "top_recommended") === "top_recommended"
+  )
+  const couldPost = selected.filter((opp) => !topRecommended.includes(opp))
+  const dailySet = selected
   const uncertain: PostOpportunity[] = []
-
-  // Legacy priority buckets still used by older UI paths.
-  const dailySet = [...topRecommended, ...couldPost]
   const urgent = dailySet.filter((opp) => opp.priority === "urgent")
   const recommendedToday = dailySet.filter(
     (opp) => opp.priority === "recommended_today" && opp.opportunitySource !== "saferu_curated"
@@ -288,8 +281,7 @@ export function generatePostOpportunities(req: GeneratorRequest): GeneratorResul
       opp.opportunitySource !== "saferu_curated"
   )
 
-  // Curated graphics attach to scored recommendations above. When nothing local
-  // surfaced, offer SaferU library content as a clearly marked fallback only.
+  // When nothing local surfaced, offer SaferU library content as a clearly marked fallback only.
   let saferuSet: PostOpportunity[] = []
   if (dailySet.length === 0) {
     const curatedFallback = rankCuratedPosts(posts, ctx, ctx.signals, used, 3, false)
@@ -303,6 +295,8 @@ export function generatePostOpportunities(req: GeneratorRequest): GeneratorResul
     )
   }
 
+  const hasLocalRecommendations = dailySet.length > 0
+
   return {
     urgent,
     recommendedToday,
@@ -312,10 +306,9 @@ export function generatePostOpportunities(req: GeneratorRequest): GeneratorResul
     uncertain,
     fromSaferU: saferuSet,
     emptyState:
-      topRecommended.length === 0 &&
-      couldPost.length === 0 &&
-      uncertain.length === 0 &&
-      saferuSet.length === 0,
+      !hasLocalRecommendations && uncertain.length === 0 && saferuSet.length === 0,
+    noRecommendationReason:
+      !hasLocalRecommendations && saferuSet.length === 0 ? NO_RECOMMENDATION_MESSAGE : null,
     demo,
     generatedAt: new Date().toISOString(),
   }

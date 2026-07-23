@@ -6,15 +6,22 @@ import type {
   Stage2Draft,
 } from "@/lib/post-generator/pipeline-types"
 import type { RankedExternalOpportunity } from "@/lib/post-generator/types"
-import { writePioFacebookPost } from "@/lib/post-generator/write-pio-facebook-post"
+import {
+  buildPostMessageInputFromRecommendation,
+  generatePostMessage,
+} from "@/lib/post-generator/post-message"
 
 export async function runStage2Writer(
   context: PipelineAgencyContext,
   recommendation: Stage1Recommendation,
   source?: RankedExternalOpportunity
 ): Promise<AiResult<Stage2Draft>> {
-  const writerBrief = buildWriterBriefFromRecommendation(recommendation, context, source)
-  const result = await writePioFacebookPost(writerBrief)
+  const input = buildPostMessageInputFromRecommendation(recommendation, context, source)
+  const result = await generatePostMessage(input, {
+    city: context.city,
+    county: context.county,
+    state: context.state,
+  })
   if (!result.ok) return result
 
   return {
