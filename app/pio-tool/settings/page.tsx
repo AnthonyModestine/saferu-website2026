@@ -252,6 +252,21 @@ export default function AgencySettingsPage() {
               </div>
             )}
 
+            <div className="space-y-2">
+              <Label htmlFor="serviceZips">Service ZIP codes</Label>
+              <Input
+                id="serviceZips"
+                placeholder="e.g. 19446, 19454"
+                className="placeholder:text-muted-foreground/60"
+                value={settings.serviceZips}
+                onChange={(e) => updateSettings({ serviceZips: e.target.value })}
+              />
+              <p className="text-xs text-muted-foreground">
+                One or more ZIP codes in your primary service area, separated by commas. Used for
+                weather alerts and local source matching in the Post Generator.
+              </p>
+            </div>
+
           </div>
 
           <div className="space-y-2">

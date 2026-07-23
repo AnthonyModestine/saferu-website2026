@@ -1,6 +1,6 @@
 import type { ExternalOpportunityInput } from "./types"
 import { scanFederalHazards } from "./federal-scanner"
-import { scanNationalSafetyAlerts } from "./national-alerts-scanner"
+import { scanFbiIc3ScamAlerts, scanNationalSafetyAlerts } from "./national-alerts-scanner"
 import {
   resolveServiceAreaLocations,
   type ServiceAreaLocation,
@@ -383,18 +383,19 @@ export async function scanExternalOpportunities({
     state,
     serviceZips,
   })
-  const [weatherResults, federal, national] = await Promise.all([
+  const [weatherResults, federal, national, ic3] = await Promise.all([
     Promise.all(locations.map((location) => scanWeatherForLocation(location))),
     scanFederalHazards({ serviceAreaType, city, county, state, serviceZips }),
     state
       ? scanNationalSafetyAlerts({ serviceAreaType, city, county, state, serviceZips })
       : Promise.resolve([]),
+    scanFbiIc3ScamAlerts(1),
   ])
   const weather = weatherResults.flat()
   const roads = roadImpacts.map(roadImpactToOpportunity)
 
   const seen = new Set<string>()
-  return [...weather, ...federal, ...national, ...roads].filter((opp) => {
+  return [...weather, ...federal, ...national, ...ic3, ...roads].filter((opp) => {
     const key = `${opp.category}:${opp.title}`.toLowerCase()
     if (seen.has(key)) return false
     seen.add(key)

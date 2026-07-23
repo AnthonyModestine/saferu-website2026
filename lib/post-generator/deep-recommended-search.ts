@@ -147,6 +147,7 @@ Return ONLY valid JSON:
 
 Rules:
 - ${passFocus}
+- Also search for: new state/local laws or ordinances residents should know, FBI/FTC/CISA public scam or fraud advisories, and active weather or emergency alerts in the service area.
 - Prefer HIGH-CONFIDENCE recommended posts this ${opts.agencyType || "public safety"} agency would actually publish today.
 - Do NOT return evergreen tip sheets with no local trigger (e.g. generic "lock your doors") unless tied to a current local/official update.
 - Do NOT recommend community festivals/events unless this agency is clearly hosting/participating per the source.

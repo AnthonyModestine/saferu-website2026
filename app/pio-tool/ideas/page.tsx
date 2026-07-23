@@ -10,6 +10,7 @@ import { useAgency } from "@/lib/agency-context"
 import { useMemberSession } from "@/lib/use-member-session"
 import { isLocalGuestPreviewClient } from "@/lib/local-preview"
 import { pressCenterSignInUrl } from "@/lib/press-center-routes"
+import { parseServiceZips } from "@/lib/local-ideas-ai"
 import { generatePostOpportunities, flattenOpportunities } from "@/lib/post-generator/engine"
 import { demoExternalOpportunities } from "@/lib/post-generator/external-scanner"
 import { rankAndGateExternalOpportunities } from "@/lib/post-generator/rank-opportunities"
@@ -124,7 +125,6 @@ export default function PostGeneratorPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isDemo, setIsDemo] = useState(false)
-  const [saferuFallbackOnly, setSaferuFallbackOnly] = useState(false)
   const [generatingId, setGeneratingId] = useState<string | null>(null)
   const autoLoadedRef = useRef(false)
 
@@ -147,7 +147,6 @@ export default function PostGeneratorPage() {
     const opportunities = [...cached.opportunities]
     await hydrateOpportunityGraphics(opportunities)
     setResult(resultFromCached(opportunities, cached.generatedAt))
-    setSaferuFallbackOnly(false)
     setIsDemo(false)
     return true
   }
@@ -225,7 +224,7 @@ export default function PostGeneratorPage() {
       city: settings.city || "San Saba",
       county: settings.county,
       state: stateVal,
-      serviceZips: [],
+      serviceZips: parseServiceZips(settings.serviceZips),
       dismissedIds: history.dismissedIds,
       usedContentIds: history.usedContentIds,
       postedFingerprints: history.postedFingerprints,
@@ -238,7 +237,6 @@ export default function PostGeneratorPage() {
     setResult({ ...demo })
     cacheOpportunityResult(flat, demo.generatedAt)
     setIsDemo(true)
-    setSaferuFallbackOnly(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     settings.agencyName,
@@ -264,14 +262,16 @@ export default function PostGeneratorPage() {
 
     autoLoadedRef.current = true
     void (async () => {
-      if (await applyCachedBriefing()) return
-      setLoading(true)
-      const count = await prefetchPostOpportunities({ settings, isPaid: true })
-      if (count > 0 && (await applyCachedBriefing())) {
+      try {
+        if (await applyCachedBriefing()) return
+        const count = await prefetchPostOpportunities({ settings, isPaid: true })
+        if (count > 0 && (await applyCachedBriefing())) return
+        await loadOpportunities()
+      } catch (err) {
+        console.error("Auto briefing load failed:", err)
+        setError("Could not load recommendations. Try Generate again.")
         setLoading(false)
-        return
       }
-      void loadOpportunities()
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionLoading, guest, locationReady])
@@ -349,7 +349,7 @@ export default function PostGeneratorPage() {
           city: settings.city,
           county: settings.county,
           state: settings.state.trim(),
-          serviceZips: [],
+          serviceZips: parseServiceZips(settings.serviceZips),
           dismissedIds: history.dismissedIds,
           usedContentIds: history.usedContentIds,
           postedFingerprints: history.postedFingerprints,
@@ -404,7 +404,6 @@ export default function PostGeneratorPage() {
       setResult(next)
       cacheOpportunityResult(opportunities, next.generatedAt)
       setIsDemo(Boolean(data.demo))
-      setSaferuFallbackOnly(Boolean(data.saferuFallbackOnly))
       if (data.pipelineDiagnostics) {
         console.info("[AI Post Generator] pipelineDiagnostics", data.pipelineDiagnostics)
       }
@@ -508,10 +507,10 @@ export default function PostGeneratorPage() {
     ...((result.topRecommended ?? []).length === 0 && (result.couldPost ?? []).length === 0
       ? [...result.urgent, ...result.recommendedToday, ...result.planAhead]
       : []),
-    ...result.fromSaferU,
   ].filter((opp, index, all) => all.findIndex((item) => item.id === opp.id) === index)
 
   const hasAny = recommendations.length > 0
+  const hasRun = Boolean(result.generatedAt)
   const area = serviceAreaLabel(settings)
 
   return (
@@ -607,28 +606,35 @@ export default function PostGeneratorPage() {
         </p>
       )}
 
-      {saferuFallbackOnly && hasAny && !isDemo && (
-        <p className="rounded-xl border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-sm text-[#92400e]">
-          Live local recommendations could not be verified this run, so SaferU safety content is
-          shown instead. Try Generate again, or check that your service area in Agency Settings is
-          complete.
-        </p>
-      )}
-
       {!hasAny && !loading ? (
         <div className="rounded-3xl border border-dashed border-[#c7d2fe] bg-gradient-to-br from-[#EFF6FF] to-[#F5F3FF] px-6 py-12 text-center">
           <Sparkles className="mx-auto h-10 w-10 text-[#7C5CFC]" />
           <p className="mt-3 text-base font-semibold text-[#0f1c3f]">
-            {locationReady
-              ? result.noRecommendationReason ||
-                "No strong post recommendations were identified for your community right now."
-              : "Finish Agency Settings"}
+            {!locationReady
+              ? "Finish Agency Settings"
+              : !hasRun
+                ? "Ready when you are"
+                : result.noRecommendationReason ||
+                  "No strong post recommendations were identified for your community right now."}
           </p>
           <p className="mt-1 text-sm text-[#7a8ab0]">
-            {locationReady
-              ? "Try Generate again when conditions change, or check Agency Settings if your service area looks incomplete."
-              : "Choose an agency type and service area, then generate."}
+            {!locationReady
+              ? "Choose an agency type and service area, then generate."
+              : !hasRun
+                ? "Click Generate above to search weather, traffic, utility, law-enforcement, and federal sources for your area. This usually takes about a minute."
+                : "Try Generate again when conditions change, or add service ZIP codes in Agency Settings for better local matching."}
           </p>
+          {locationReady && !hasRun ? (
+            <Button
+              type="button"
+              className="mt-5 bg-[#7C5CFC] text-white hover:bg-[#6d4de8]"
+              disabled={loading}
+              onClick={() => void loadOpportunities()}
+            >
+              <Sparkles className="mr-2 h-4 w-4" />
+              Generate recommendations
+            </Button>
+          ) : null}
         </div>
       ) : hasAny ? (
         <section>

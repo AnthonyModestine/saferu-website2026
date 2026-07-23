@@ -151,7 +151,7 @@ Return ONLY valid JSON:
 Rules:
 - Topics must be active today or within the last 48 hours and still relevant for a PIO post.
 - Every topic MUST include a working sourceUrl from a credible source (.gov preferred, then utilities, schools, Citizen, verified news citing officials).
-- Prefer COMMUNITY-WIDE public safety items: weather impacts, traffic/511 closures, utility outages, boil-water advisories, air quality, health advisories, school delays, official missing-person campaigns, transit disruptions, emergency management notices.
+- Prefer COMMUNITY-WIDE public safety items: weather impacts, traffic/511 closures, utility outages, boil-water advisories, air quality, health advisories, school delays, official missing-person campaigns, transit disruptions, emergency management notices, new laws or ordinances affecting residents, and verified FBI/FTC scam or fraud warnings.
 - Do NOT recommend community events, festivals, open houses, or fairs unless the cited source clearly shows this ${opts.agencyType || "public safety"} agency is hosting or officially participating.
 - Prefer topics that are DIFFERENT from signals already detected (do not add another heat/storm post if those signals are already listed).
 - NEVER include: private crime victims, home addresses, license plates, unverified scanner gossip, or graphic incident details.

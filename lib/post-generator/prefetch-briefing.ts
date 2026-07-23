@@ -1,5 +1,6 @@
 "use client"
 
+import { parseServiceZips } from "@/lib/local-ideas-ai"
 import { isAgencyLocationReady } from "@/lib/agency-location"
 import type { DepartmentType } from "@/lib/department-types"
 import type { ServiceAreaType } from "@/lib/agency-context"
@@ -22,6 +23,7 @@ export type PrefetchSettings = {
   city: string
   county: string
   state: string
+  serviceZips?: string
 }
 
 let prefetchInFlight: Promise<number> | null = null
@@ -128,7 +130,7 @@ export async function prefetchPostOpportunities(opts: {
           city: opts.settings.city,
           county: opts.settings.county,
           state: opts.settings.state.trim(),
-          serviceZips: [],
+          serviceZips: parseServiceZips(opts.settings.serviceZips),
           dismissedIds: history.dismissedIds,
           usedContentIds: history.usedContentIds,
           postedFingerprints: history.postedFingerprints,

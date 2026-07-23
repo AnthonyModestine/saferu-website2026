@@ -25,7 +25,7 @@ interface AgencySettings {
   /** County-wide jurisdiction, especially for sheriff's offices. */
   county: string
   state: string
-  /** Comma- or space-separated ZIPs — legacy field; service area now uses city/county/state. */
+  /** Comma- or space-separated ZIPs for weather alerts and local Post Generator matching. */
   serviceZips: string
   boilerplate: string
   logoUrl: string | null
@@ -237,6 +237,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
     settings.city,
     settings.county,
     settings.state,
+    settings.serviceZips,
   ])
 
   const updateSettings = (newSettings: Partial<AgencySettings>) => {

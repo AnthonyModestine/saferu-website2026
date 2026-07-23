@@ -255,8 +255,6 @@ export async function POST(request: Request) {
         candidates = []
       }
 
-      candidates = [...candidates, ...calendarHolidayCandidates(todayIso)]
-
       const uniqueExisting = new Map(
         candidates.map((opp) => [opp.title.trim().toLowerCase(), opp])
       )
@@ -265,7 +263,7 @@ export async function POST(request: Request) {
         [...uniqueExisting.values()].map((opp) => topicKey(opp))
       )
       // Search broadly; strict scoring and final PIO validation will curate the few worth showing.
-      const discoveryTarget = 12
+      const discoveryTarget = 18
       const slotsRemaining = () => Math.max(0, discoveryTarget - usedTopicFamilies.size)
       const addCandidate = (opportunity: ExternalOpportunityInput) => {
         const family = topicKey(opportunity)
@@ -327,7 +325,7 @@ export async function POST(request: Request) {
         ]),
       ]
 
-      const expandedNeeded = Math.min(5, slotsRemaining())
+      const expandedNeeded = Math.max(6, Math.min(8, slotsRemaining()))
       if (expandedNeeded > 0) {
         const expandedTopics = await discoverExpandedPublicSafetyTopics({
           state,
@@ -352,7 +350,7 @@ export async function POST(request: Request) {
         }
       }
 
-      const needed = slotsRemaining()
+      const needed = Math.max(4, slotsRemaining())
       if (needed > 0) {
         const discovered = await discoverLocalCurrentEventsWithAI({
           state,
@@ -373,6 +371,12 @@ export async function POST(request: Request) {
             discovered.reason,
             discovered.detail || ""
           )
+        }
+      }
+      // Seasonal calendar items are lowest priority — only when live discovery is thin.
+      if (slotsRemaining() > 0 && uniqueExisting.size < 6) {
+        for (const opportunity of calendarHolidayCandidates(todayIso)) {
+          addCandidate(opportunity)
         }
       }
       candidates = [...uniqueExisting.values()]
@@ -482,9 +486,9 @@ export async function POST(request: Request) {
       return false
     }
 
-    if (!useDemo && ranked.length === 0) {
+    if (!useDemo && ranked.length < 3) {
       console.info(
-        "[post-opportunities] No ranked recommendations — starting deep search passes."
+        `[post-opportunities] Only ${ranked.length} ranked recommendation(s) — starting deep search passes.`
       )
       await runDeepSearch(candidates.map((opp) => opp.title))
     }
@@ -593,7 +597,6 @@ export async function POST(request: Request) {
       }
     }
 
-    const rankedBeforeSaferuFill = ranked.length
     const externalOpportunities: ExternalOpportunityInput[] = ranked.map(
       ({ internalScores: _scores, ...rest }) => rest
     )
@@ -650,12 +653,6 @@ export async function POST(request: Request) {
       pipelineVersion: "recommendation-v1",
       pipelineSummary,
       pipelineDiagnostics,
-      saferuFallbackOnly:
-        !useDemo &&
-        rankedBeforeSaferuFill === 0 &&
-        result.fromSaferU.length > 0 &&
-        result.topRecommended.length === 0 &&
-        result.couldPost.length === 0,
     })
   } catch (e) {
     console.error("Post opportunities error:", e)

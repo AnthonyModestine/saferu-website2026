@@ -113,7 +113,7 @@ Return ONLY valid JSON:
 
 Rules:
 - Find only real, verifiable PUBLIC SAFETY / CIVIC UPDATES relevant to residents in the configured service area — not community festivals or entertainment events.
-- Prefer: weather impacts, road/traffic disruptions, utility outages, boil-water notices, school delays/closures, air quality, wildfire/smoke, health advisories, official missing-person campaigns, emergency management notices.
+- Prefer: weather impacts, road/traffic disruptions, utility outages, boil-water notices, school delays/closures, air quality, wildfire/smoke, health advisories, official missing-person campaigns, emergency management notices, new state or local laws affecting residents, and FBI/FTC/CISA public advisories when relevant to the community.
 - Do NOT recommend community events, festivals, open houses, fairs, concerts, or "save the date" activities unless the cited source clearly shows THIS agency type (${opts.agencyType || "public safety"}) is hosting or officially participating.
 - Prefer opportunities this agency type would realistically communicate (${opts.agencyType || "public safety"}).
 - Geographic scope: ${
