@@ -12,7 +12,7 @@ import {
 } from "./types"
 import { NO_RECOMMENDATION_MESSAGE } from "./recommendation"
 import { indexCuratedPosts, type IndexedCuratedPost } from "./content-index"
-import { buildGeneratorContext } from "./scoring"
+import { buildGeneratorContext, rankCuratedPosts } from "./scoring"
 
 import {
   isOfficialAlertTemplateTopic,
@@ -38,6 +38,54 @@ function toCuratedRef(post: IndexedCuratedPost, matchReason: string): CuratedCon
 
 function makeId(prefix: string, seed: string): string {
   return `${prefix}-${seed.replace(/[^a-z0-9]+/gi, "-").slice(0, 40)}`
+}
+
+const SAFERU_LIBRARY_LIMIT = 2
+
+function buildCuratedOpportunity(
+  scored: { post: IndexedCuratedPost; score: number; matchReason: string },
+  ctx: ReturnType<typeof buildGeneratorContext>,
+  whyItMatters: string,
+  timing: string
+): PostOpportunity {
+  const curated = toCuratedRef(scored.post, scored.matchReason)
+  const now = new Date().toISOString()
+  return {
+    id: makeId("saferu", scored.post.contentId),
+    title: scored.post.title,
+    summary: scored.post.articleDescription || scored.post.message.slice(0, 120),
+    category: scored.post.signals[0]?.replace(/_/g, " ") || "safety",
+    sourceLabel: "SaferU Curated Content",
+    whyItMatters,
+    recommendedAction: `Share the existing SaferU post: "${scored.post.title}".`,
+    recommendedPostTiming: timing,
+    opportunitySource: "saferu_curated",
+    priority: "optional",
+    recommendationTier: "could_post",
+    surfacedReason: whyItMatters,
+    status: "new",
+    curated,
+    curatedMessage: scored.post.message,
+    graphicUrl:
+      scored.post.hasGraphic && !isPlaceholderGraphic(scored.post.graphicUrl)
+        ? scored.post.graphicUrl
+        : undefined,
+    graphicThumbnailUrl:
+      scored.post.hasGraphic && !isPlaceholderGraphic(scored.post.graphicUrl)
+        ? scored.post.graphicUrl
+        : undefined,
+    signals: scored.post.signals,
+    timelinessScore: scored.post.relevantMonths.includes(ctx.month) ? 85 : 60,
+    safetyValueScore: 80,
+    actionabilityScore: 75,
+    sourceReliabilityScore: 95,
+    curatedMatchScore: scored.score,
+    freshnessScore: 70,
+    totalScore: scored.score,
+    confidenceLevel: "high",
+    discoveredAt: now,
+    updatedAt: now,
+  }
 }
 
 function isPlaceholderGraphic(url?: string): boolean {
@@ -195,8 +243,29 @@ export function generatePostOpportunities(req: GeneratorRequest): GeneratorResul
       opp.opportunitySource !== "saferu_curated"
   )
 
-  // SaferU library posts are not mixed into live briefings. Use empty state when discovery finds nothing.
-  const saferuSet: PostOpportunity[] = []
+  // SaferU library is always shown separately from live community recommendations.
+  const liveSignals = [
+    ...new Set(cleaned.flatMap((opp) => opp.signals ?? []).filter(Boolean)),
+  ]
+  const saferuScored = rankCuratedPosts(
+    posts,
+    ctx,
+    liveSignals.length ? liveSignals : ctx.signals,
+    used,
+    SAFERU_LIBRARY_LIMIT,
+    false
+  )
+  const saferuSet = filterDismissed(
+    saferuScored.map((scored) =>
+      buildCuratedOpportunity(
+        scored,
+        ctx,
+        scored.matchReason,
+        "Ready-made safety content from the SaferU library — use anytime alongside live updates."
+      )
+    ),
+    dismissed
+  )
 
   const hasLocalRecommendations = dailySet.length > 0
 
@@ -208,10 +277,8 @@ export function generatePostOpportunities(req: GeneratorRequest): GeneratorResul
     couldPost,
     uncertain,
     fromSaferU: saferuSet,
-    emptyState:
-      !hasLocalRecommendations && uncertain.length === 0 && saferuSet.length === 0,
-    noRecommendationReason:
-      !hasLocalRecommendations && saferuSet.length === 0 ? NO_RECOMMENDATION_MESSAGE : null,
+    emptyState: !hasLocalRecommendations && uncertain.length === 0,
+    noRecommendationReason: !hasLocalRecommendations ? NO_RECOMMENDATION_MESSAGE : null,
     demo,
     generatedAt: new Date().toISOString(),
   }

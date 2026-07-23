@@ -62,6 +62,14 @@ export function isKeepableWithoutPerfectEvidence(
     return true
   }
 
+  if (
+    opportunity.sourceLabel === "Current Local Opportunity" &&
+    /\.gov(\/|$)/i.test(url) &&
+    (opportunity.verifiedFacts?.length ?? 0) > 0
+  ) {
+    return true
+  }
+
   if (opportunity.confidenceLevel === "high") return true
 
   const trust = opportunity.internalScores?.sourceTrust ?? 0
@@ -94,6 +102,8 @@ export function provisionalEvidenceFromOpportunity(
     (opportunity.sourceLabel === "National Safety Alert" &&
       opportunity.priority !== "optional" &&
       opportunity.priority !== "plan_ahead") ||
+    (opportunity.sourceLabel === "Current Local Opportunity" &&
+      /\.gov(\/|$)/i.test(sourceUrl)) ||
     (opportunity.confidenceLevel === "high" && !isNakedNationalFiller(opportunity))
 
   return [

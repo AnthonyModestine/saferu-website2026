@@ -28,6 +28,7 @@ import {
   topicKey,
 } from "@/lib/post-generator/rank-opportunities"
 import { discoverStrongRecommendedTopics } from "@/lib/post-generator/deep-recommended-search"
+import { rescueOfficialRankedCandidates } from "@/lib/post-generator/official-rescue"
 import { discoverCreatedContentFollowups } from "@/lib/post-generator/content-followup-ai"
 import { runProductionPostPipeline } from "@/lib/post-generator/production-pipeline"
 import { prepareWeatherOpportunityForPipeline } from "@/lib/post-generator/weather-message-ai"
@@ -493,7 +494,28 @@ export async function POST(request: Request) {
       await runDeepSearch(candidates.map((opp) => opp.title))
     }
 
-    // Recommendation architecture: verify evidence -> PIO editorial selection -> scored cap at four.
+    if (!useDemo && ranked.length === 0 && candidates.length > 0) {
+      const relaxed = rankAndGateExternalOpportunities(candidates, {
+        agencyType,
+        agencyName,
+        city,
+        county,
+        todayIso,
+        postedFingerprints,
+        recentTopicKeys,
+        requireTrustedSource: true,
+        minPioRating: 3,
+        ...rankPrefs,
+      })
+      if (relaxed.length > 0) {
+        console.info(
+          `[post-opportunities] Relaxed rank accepted ${relaxed.length} candidate(s) after strict gate returned zero.`
+        )
+        ranked = relaxed
+      }
+    }
+
+    const candidatesFound = candidates.length
     // This path is intentionally fail-closed. Demo fixtures remain deterministic.
     let pipelineSummary
     let pipelineDiagnostics
@@ -555,6 +577,7 @@ export async function POST(request: Request) {
       ],
     }
     const rankedBeforePipeline = ranked.length
+    const rankedForRescue = [...ranked]
     ranked = ranked.map((opp) => prepareWeatherOpportunityForPipeline(opp, pipelineContext))
     if (!useDemo && ranked.length > 0) {
       const pipeline = await runProductionPostPipeline(pipelineContext, ranked)
@@ -593,6 +616,33 @@ export async function POST(request: Request) {
             fallbackReason:
               `${pipeline.diagnostics.fallbackReason || "pipeline_empty"};recovery_attempt`,
           }
+        }
+      }
+    }
+
+    if (!useDemo && ranked.length === 0 && rankedForRescue.length > 0) {
+      const rescued = rescueOfficialRankedCandidates(rankedForRescue)
+      if (rescued.length > 0) {
+        console.warn(
+          `[post-opportunities] Official rescue kept ${rescued.length} verified item(s) after pipeline returned zero.`
+        )
+        ranked = rescued
+        pipelineNoRecommendationReason = null
+        pipelineSelectionSummary =
+          "Surfaced verified official sources for your area after additional review could not confirm other items."
+        pipelineDiagnostics = {
+          ...(pipelineDiagnostics ?? {
+            rankedIn: rankedForRescue.length,
+            verifiedEvidence: 0,
+            droppedAtEvidence: [],
+            approvedCount: rescued.length,
+            usedDeterministicFallback: true,
+          }),
+          approvedCount: rescued.length,
+          usedDeterministicFallback: true,
+          fallbackReason: `${
+            pipelineDiagnostics?.fallbackReason || "pipeline_empty"
+          };official_rescue`,
         }
       }
     }
@@ -653,6 +703,11 @@ export async function POST(request: Request) {
       pipelineVersion: "recommendation-v1",
       pipelineSummary,
       pipelineDiagnostics,
+      discoveryStats: {
+        candidatesFound,
+        rankedAfterGate: rankedForRescue.length,
+        approvedAfterPipeline: ranked.length,
+      },
     })
   } catch (e) {
     console.error("Post opportunities error:", e)

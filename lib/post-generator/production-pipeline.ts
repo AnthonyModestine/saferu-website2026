@@ -1,5 +1,5 @@
 import { runStage1Discovery } from "@/lib/post-generator/stage-1-discovery"
-import { verifyRankedEvidence } from "@/lib/post-generator/evidence"
+import { verifyOpportunityEvidence } from "@/lib/post-generator/evidence"
 import {
   isKeepableWithoutPerfectEvidence,
   provisionalEvidenceFromOpportunity,
@@ -158,7 +158,20 @@ export async function runProductionPostPipeline(
     }
   }
 
-  const candidates = await verifyRankedEvidence(ranked)
+  const candidates = await Promise.all(
+    ranked.slice(0, 8).map(async (opportunity) => {
+      if (isKeepableWithoutPerfectEvidence(opportunity)) {
+        const provisional = provisionalEvidenceFromOpportunity(opportunity)
+        if (provisional.length) {
+          return { opportunity, evidence: provisional }
+        }
+      }
+      return {
+        opportunity,
+        evidence: await verifyOpportunityEvidence(opportunity),
+      }
+    })
+  )
   const enriched = candidates.map((candidate) => {
     if (hasVerifiedEvidence(candidate.evidence)) return candidate
     if (!isKeepableWithoutPerfectEvidence(candidate.opportunity)) return candidate

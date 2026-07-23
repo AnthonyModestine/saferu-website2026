@@ -48,6 +48,8 @@ export type RankContext = {
   declinedTopicKeys?: string[]
   /** Topics recently published — soft-dedupe. */
   publishedTopicKeys?: string[]
+  /** Minimum PIO star rating (1–5). Default 4. */
+  minPioRating?: number
 }
 
 const WEIGHTS = {
@@ -623,9 +625,10 @@ export function scoreExternalOpportunity(
 
   composite = clamp(composite)
   const pioRating = compositeToStars(composite)
-  // Quality gate: 1–3 stars never reach the user.
+  const minPioRating = ctx.minPioRating ?? 4
+  // Quality gate: below minPioRating never reach the user.
   // Declined topic families can still surface when newly urgent (4–5★ after penalties).
-  if (pioRating < 4) return null
+  if (pioRating < minPioRating) return null
 
   let messagingAngle = messagingAngleForOpportunity(
     input.signals ?? [],

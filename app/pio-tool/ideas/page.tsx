@@ -125,6 +125,11 @@ export default function PostGeneratorPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isDemo, setIsDemo] = useState(false)
+  const [discoveryStats, setDiscoveryStats] = useState<{
+    candidatesFound?: number
+    rankedAfterGate?: number
+    approvedAfterPipeline?: number
+  } | null>(null)
   const [generatingId, setGeneratingId] = useState<string | null>(null)
   const autoLoadedRef = useRef(false)
 
@@ -404,6 +409,15 @@ export default function PostGeneratorPage() {
       setResult(next)
       cacheOpportunityResult(opportunities, next.generatedAt)
       setIsDemo(Boolean(data.demo))
+      setDiscoveryStats(
+        data.discoveryStats && typeof data.discoveryStats === "object"
+          ? (data.discoveryStats as {
+              candidatesFound?: number
+              rankedAfterGate?: number
+              approvedAfterPipeline?: number
+            })
+          : null
+      )
       if (data.pipelineDiagnostics) {
         console.info("[AI Post Generator] pipelineDiagnostics", data.pipelineDiagnostics)
       }
@@ -501,7 +515,7 @@ export default function PostGeneratorPage() {
     }).catch(() => {})
   }
 
-  const recommendations = [
+  const liveRecommendations = [
     ...(result.topRecommended ?? []),
     ...(result.couldPost ?? []),
     ...((result.topRecommended ?? []).length === 0 && (result.couldPost ?? []).length === 0
@@ -509,7 +523,12 @@ export default function PostGeneratorPage() {
       : []),
   ].filter((opp, index, all) => all.findIndex((item) => item.id === opp.id) === index)
 
-  const hasAny = recommendations.length > 0
+  const saferuLibrary = (result.fromSaferU ?? []).filter(
+    (opp, index, all) => all.findIndex((item) => item.id === opp.id) === index
+  )
+
+  const hasLive = liveRecommendations.length > 0
+  const hasSaferu = saferuLibrary.length > 0
   const hasRun = Boolean(result.generatedAt)
   const area = serviceAreaLabel(settings)
 
@@ -532,7 +551,8 @@ export default function PostGeneratorPage() {
               </h1>
             </div>
             <p className="mt-1.5 max-w-xl text-sm text-[#7a8ab0]">
-              What to share with your community today
+              Live community updates (weather, traffic, laws, scams) plus ready-made SaferU safety
+              posts — shown separately.
               {locationReady ? (
                 <>
                   {" "}
@@ -600,71 +620,111 @@ export default function PostGeneratorPage() {
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 
-      {isDemo && hasAny && (
+      {isDemo && hasLive && (
         <p className="text-xs font-medium text-[#7a8ab0]">
           Sample briefing — sign in for live analysis tied to your area.
         </p>
       )}
 
-      {!hasAny && !loading ? (
-        <div className="rounded-3xl border border-dashed border-[#c7d2fe] bg-gradient-to-br from-[#EFF6FF] to-[#F5F3FF] px-6 py-12 text-center">
-          <Sparkles className="mx-auto h-10 w-10 text-[#7C5CFC]" />
-          <p className="mt-3 text-base font-semibold text-[#0f1c3f]">
-            {!locationReady
-              ? "Finish Agency Settings"
-              : !hasRun
-                ? "Ready when you are"
-                : result.noRecommendationReason ||
-                  "No strong post recommendations were identified for your community right now."}
-          </p>
-          <p className="mt-1 text-sm text-[#7a8ab0]">
-            {!locationReady
-              ? "Choose an agency type and service area, then generate."
-              : !hasRun
-                ? "Click Generate above to search weather, traffic, utility, law-enforcement, and federal sources for your area. This usually takes about a minute."
-                : "Try Generate again when conditions change, or add service ZIP codes in Agency Settings for better local matching."}
-          </p>
-          {locationReady && !hasRun ? (
-            <Button
-              type="button"
-              className="mt-5 bg-[#7C5CFC] text-white hover:bg-[#6d4de8]"
-              disabled={loading}
-              onClick={() => void loadOpportunities()}
-            >
-              <Sparkles className="mr-2 h-4 w-4" />
-              Generate recommendations
-            </Button>
-          ) : null}
-        </div>
-      ) : hasAny ? (
-        <section>
-          <ul className="grid gap-4 md:grid-cols-2">
-            {recommendations.map((opp) => (
-              <li key={opp.id}>
-                <OpportunityCard
-                  opportunity={opp}
-                  onUse={handleUse}
-                  onGenerate={generatingId === opp.id ? undefined : (o) => void handleGenerate(o)}
-                  onSave={handleSave}
-                  onDismiss={handleDismiss}
-                />
-                {generatingId === opp.id && (
-                  <p className="mt-1 flex items-center gap-1 text-xs text-[#7a8ab0]">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    Generating message…
-                  </p>
-                )}
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : loading ? (
+      {loading ? (
         <div className="rounded-3xl border border-dashed border-[#c7d2fe] bg-gradient-to-br from-[#EFF6FF] to-[#F5F3FF] px-6 py-12 text-center">
           <Loader2 className="mx-auto h-10 w-10 animate-spin text-[#7C5CFC]" />
           <p className="mt-3 text-base font-semibold text-[#0f1c3f]">Finding something useful…</p>
           <p className="mt-1 text-sm text-[#7a8ab0]">This can take about a minute.</p>
         </div>
-      ) : null}
+      ) : (
+        <>
+          <section className="space-y-4">
+            <div>
+              <h2 className="text-lg font-semibold text-[#0f1c3f]">Community updates</h2>
+              <p className="text-sm text-[#7a8ab0]">
+                Weather, road closures, new laws, FBI scam alerts, and other timely items for your
+                area — sourced from official and verified channels.
+              </p>
+            </div>
+
+            {hasLive ? (
+              <ul className="grid gap-4 md:grid-cols-2">
+                {liveRecommendations.map((opp) => (
+                  <li key={opp.id}>
+                    <OpportunityCard
+                      opportunity={opp}
+                      onUse={handleUse}
+                      onGenerate={
+                        generatingId === opp.id ? undefined : (o) => void handleGenerate(o)
+                      }
+                      onSave={handleSave}
+                      onDismiss={handleDismiss}
+                    />
+                    {generatingId === opp.id && (
+                      <p className="mt-1 flex items-center gap-1 text-xs text-[#7a8ab0]">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Generating message…
+                      </p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="rounded-3xl border border-dashed border-[#c7d2fe] bg-gradient-to-br from-[#EFF6FF] to-[#F5F3FF] px-6 py-10 text-center">
+                <Sparkles className="mx-auto h-9 w-9 text-[#7C5CFC]" />
+                <p className="mt-3 text-base font-semibold text-[#0f1c3f]">
+                  {!locationReady
+                    ? "Finish Agency Settings"
+                    : !hasRun
+                      ? "Ready when you are"
+                      : result.noRecommendationReason ||
+                        "No strong community updates were identified for your area right now."}
+                </p>
+                <p className="mt-1 text-sm text-[#7a8ab0]">
+                  {!locationReady
+                    ? "Choose an agency type and service area, then generate."
+                    : !hasRun
+                      ? "Click Generate to search weather, traffic, utility, law-enforcement, and federal sources."
+                      : discoveryStats && (discoveryStats.candidatesFound ?? 0) > 0
+                        ? `SaferU found ${discoveryStats.candidatesFound} possible topic(s), but none met our quality bar for a PIO post today. Try again later or add service ZIP codes in Agency Settings.`
+                        : "Try Generate again when conditions change, or add service ZIP codes in Agency Settings."}
+                </p>
+                {locationReady && !hasRun ? (
+                  <Button
+                    type="button"
+                    className="mt-5 bg-[#7C5CFC] text-white hover:bg-[#6d4de8]"
+                    disabled={loading}
+                    onClick={() => void loadOpportunities()}
+                  >
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Generate recommendations
+                  </Button>
+                ) : null}
+              </div>
+            )}
+          </section>
+
+          {hasSaferu ? (
+            <section className="space-y-4 border-t border-[#e2e8f5] pt-8">
+              <div>
+                <h2 className="text-lg font-semibold text-[#0f1c3f]">SaferU library</h2>
+                <p className="text-sm text-[#7a8ab0]">
+                  Ready-made safety posts with graphics from the SaferU content library. These are
+                  separate from today&apos;s live search — use them anytime on your calendar.
+                </p>
+              </div>
+              <ul className="grid gap-4 md:grid-cols-2">
+                {saferuLibrary.map((opp) => (
+                  <li key={opp.id}>
+                    <OpportunityCard
+                      opportunity={opp}
+                      onUse={handleUse}
+                      onSave={handleSave}
+                      onDismiss={handleDismiss}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+        </>
+      )}
     </div>
   )
 }

@@ -138,6 +138,12 @@ export function scorePioCandidate(
   } else if (!whyToday) {
     eligible = false
     rejectReason = "no_why_today"
+  } else if (
+    opportunity.sourceLabel === "Weather Alert" ||
+    opportunity.sourceLabel === "Federal Advisory"
+  ) {
+    eligible = score >= 50
+    if (!eligible) rejectReason = "below_score_threshold"
   } else if (score < MIN_RECOMMENDATION_SCORE) {
     eligible = false
     rejectReason = "below_score_threshold"
