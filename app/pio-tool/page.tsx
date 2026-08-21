@@ -16,6 +16,7 @@ import {
   Send,
   ChevronRight,
   Sparkles,
+  ImageIcon,
 } from "lucide-react"
 import { useSubscription } from "@/lib/use-subscription"
 import { useMemberSession } from "@/lib/use-member-session"
@@ -28,6 +29,10 @@ import {
 } from "@/lib/post-generator/prefetch-briefing"
 import { startHostedCheckoutSession } from "@/app/actions/stripe"
 import { pressCenterSignInUrl, pressCenterSignUpUrl } from "@/lib/press-center-routes"
+import {
+  GRAPHIC_STUDIO_PATH,
+  PRESS_CENTER_FEATURES,
+} from "@/lib/press-center-features"
 import {
   daysUntil,
   formatEventDateShort,
@@ -296,6 +301,7 @@ export default function PIODashboardPage() {
   }, [])
 
   useEffect(() => {
+    if (!PRESS_CENTER_FEATURES.postGeneratorVisible) return
     if (!member || !isSubscribed || !locationReady) return
     void prefetchPostOpportunities({ settings, isPaid: true }).then((count) => {
       if (count > 0) setBriefingCount(count)
@@ -314,6 +320,7 @@ export default function PIODashboardPage() {
   ])
 
   const ideaPreview = useMemo(() => {
+    if (!PRESS_CENTER_FEATURES.postGeneratorVisible) return []
     if (!member) return [...DEMO_AREA_IDEAS]
     if (!locationReady) return []
     const cached = loadCachedBriefingPreview(5)
@@ -329,7 +336,7 @@ export default function PIODashboardPage() {
       return {
         postsToday: DEMO_POSTS.length,
         eventsSoon: 2,
-        ideas: DEMO_AREA_IDEAS.length,
+        ideas: PRESS_CENTER_FEATURES.postGeneratorVisible ? DEMO_AREA_IDEAS.length : 0,
       }
     }
     const postsToday = hasMounted
@@ -341,7 +348,7 @@ export default function PIODashboardPage() {
 
   const briefingSummary = useMemo(() => {
     if (!member) {
-      return "A sample agency day — recommendations, events, and posts that stay in sync."
+      return "A sample agency day — events and posts that stay in sync."
     }
     const parts: string[] = []
     if (briefingStats.postsToday > 0)
@@ -352,7 +359,7 @@ export default function PIODashboardPage() {
       parts.push(
         `${briefingStats.eventsSoon} ${briefingStats.eventsSoon === 1 ? "event" : "events"} coming up`
       )
-    if (briefingStats.ideas > 0)
+    if (PRESS_CENTER_FEATURES.postGeneratorVisible && briefingStats.ideas > 0)
       parts.push(
         `${briefingStats.ideas} ${briefingStats.ideas === 1 ? "recommendation" : "recommendations"} for your area`
       )
@@ -454,7 +461,7 @@ export default function PIODashboardPage() {
           </div>
 
           {/* Briefing stats */}
-          <div className="mt-4 grid gap-2.5 sm:grid-cols-3">
+          <div className="mt-4 grid gap-2.5 sm:grid-cols-2">
             <a href="#posts-to-share" className="group flex items-baseline gap-2.5 rounded-xl border border-white/10 bg-white/[0.07] px-4 py-3 transition-colors hover:bg-white/[0.12]">
               <span className="text-2xl font-bold">{briefingStats.postsToday}</span>
               <span className="text-sm font-semibold text-[#BFDBFE]">
@@ -467,36 +474,60 @@ export default function PIODashboardPage() {
                 {briefingStats.eventsSoon === 1 ? "event in the next 2 weeks" : "events in the next 2 weeks"}
               </span>
             </a>
-            <div className="flex items-baseline gap-2.5 rounded-xl border border-[#F2B233]/40 bg-[#F2B233]/10 px-4 py-3">
-              <span className="text-2xl font-bold text-[#F2B233]">{briefingStats.ideas}</span>
-              <span className="text-sm font-semibold text-[#ffe3a8]">
-                {briefingStats.ideas === 1 ? "AI recommendation for your area" : "AI recommendations for your area"}
-              </span>
-            </div>
+            {PRESS_CENTER_FEATURES.postGeneratorVisible && (
+              <div className="flex items-baseline gap-2.5 rounded-xl border border-[#F2B233]/40 bg-[#F2B233]/10 px-4 py-3 sm:col-span-2">
+                <span className="text-2xl font-bold text-[#F2B233]">{briefingStats.ideas}</span>
+                <span className="text-sm font-semibold text-[#ffe3a8]">
+                  {briefingStats.ideas === 1 ? "AI recommendation for your area" : "AI recommendations for your area"}
+                </span>
+              </div>
+            )}
           </div>
 
-          {/* Today's recommendations inside the briefing */}
+          {/* Graphic Studio / optional recommendations CTA */}
           <div className="mt-4 border-t border-white/10 pt-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-2">
-                <Sparkles className="h-4 w-4 shrink-0 text-[#F2B233]" />
-                <p className="text-sm font-bold uppercase tracking-[0.14em] text-[#93C5FD]">
-                  Today for your area
-                </p>
-                {ideasLocationLabel ? (
-                  <span className="truncate text-sm text-[#8fa5c7]">· {ideasLocationLabel}</span>
+                {PRESS_CENTER_FEATURES.postGeneratorVisible ? (
+                  <>
+                    <Sparkles className="h-4 w-4 shrink-0 text-[#F2B233]" />
+                    <p className="text-sm font-bold uppercase tracking-[0.14em] text-[#93C5FD]">
+                      Today for your area
+                    </p>
+                    {ideasLocationLabel ? (
+                      <span className="truncate text-sm text-[#8fa5c7]">· {ideasLocationLabel}</span>
+                    ) : (
+                      <span className="truncate text-sm text-[#8fa5c7]">
+                        · Set your service area in Settings
+                      </span>
+                    )}
+                  </>
                 ) : (
-                  <span className="truncate text-sm text-[#8fa5c7]">
-                    · Set your service area in Settings
-                  </span>
+                  <>
+                    <ImageIcon className="h-4 w-4 shrink-0 text-[#F2B233]" />
+                    <p className="text-sm font-bold uppercase tracking-[0.14em] text-[#93C5FD]">
+                      Graphic Studio
+                    </p>
+                    <span className="truncate text-sm text-[#8fa5c7]">
+                      · Safety tips and event flyers
+                    </span>
+                  </>
                 )}
               </div>
               {member ? (
                 <Button asChild size="sm" className="bg-white text-[#0f1c3f] hover:bg-[#E0E7FF]">
-                  <Link href={createHref("/pio-tool/ideas")}>
-                    {briefingStats.ideas > 0
-                      ? `See ${briefingStats.ideas} ${briefingStats.ideas === 1 ? "recommendation" : "recommendations"}`
-                      : "Open generator"}
+                  <Link
+                    href={createHref(
+                      PRESS_CENTER_FEATURES.postGeneratorVisible
+                        ? "/pio-tool/ideas"
+                        : GRAPHIC_STUDIO_PATH
+                    )}
+                  >
+                    {PRESS_CENTER_FEATURES.postGeneratorVisible
+                      ? briefingStats.ideas > 0
+                        ? `See ${briefingStats.ideas} ${briefingStats.ideas === 1 ? "recommendation" : "recommendations"}`
+                        : "Open generator"
+                      : "Create a graphic"}
                     <ChevronRight className="ml-1 h-4 w-4" />
                   </Link>
                 </Button>
@@ -552,12 +583,22 @@ export default function PIODashboardPage() {
             icon={CalendarDays}
             iconBg="bg-[#10B981]"
           />
-          <QuickCreateTile
-            href={createHref("/pio-tool/ideas")}
-            title="AI Post Generator"
-            icon={Sparkles}
-            iconBg="bg-[#F59E0B]"
-          />
+          {PRESS_CENTER_FEATURES.graphicStudioVisible && (
+            <QuickCreateTile
+              href={createHref(GRAPHIC_STUDIO_PATH)}
+              title="Graphic Studio"
+              icon={ImageIcon}
+              iconBg="bg-[#F59E0B]"
+            />
+          )}
+          {PRESS_CENTER_FEATURES.postGeneratorVisible && (
+            <QuickCreateTile
+              href={createHref("/pio-tool/ideas")}
+              title="AI Post Generator"
+              icon={Sparkles}
+              iconBg="bg-[#F59E0B]"
+            />
+          )}
         </div>
       </section>}
 

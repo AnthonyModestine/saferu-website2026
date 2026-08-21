@@ -20,11 +20,12 @@ import {
 import { useAgency } from "@/lib/agency-context"
 import { useMemberSession } from "@/lib/use-member-session"
 import { pressCenterSignInUrl, pressCenterSignUpUrl } from "@/lib/press-center-routes"
-
-/**
- * AI Post Generator (in Create nav): analyzes conditions + SaferU Content Library
- * to recommend timely posts with curated messages and graphics when available.
- */
+import {
+  GRAPHIC_STUDIO_PATH,
+  PRESS_CENTER_FEATURES,
+  POST_GENERATOR_PATH,
+} from "@/lib/press-center-features"
+import { ImageIcon } from "lucide-react"
 
 const createItems = [
   {
@@ -49,13 +50,28 @@ const createItems = [
     accent: "text-[#10B981]",
     match: "/pio-tool/events",
   },
-  {
-    title: "AI Post Generator",
-    description: "What to post today — with SaferU graphics",
-    href: "/pio-tool/ideas",
-    icon: Sparkles,
-    accent: "text-[#F59E0B]",
-  },
+  ...(PRESS_CENTER_FEATURES.graphicStudioVisible
+    ? [
+        {
+          title: "Graphic Studio",
+          description: "Safety tips and event flyers with logos locked in",
+          href: GRAPHIC_STUDIO_PATH,
+          icon: ImageIcon,
+          accent: "text-[#F59E0B]",
+        },
+      ]
+    : []),
+  ...(PRESS_CENTER_FEATURES.postGeneratorVisible
+    ? [
+        {
+          title: "AI Post Generator",
+          description: "What to post today — with SaferU graphics",
+          href: POST_GENERATOR_PATH,
+          icon: Sparkles,
+          accent: "text-[#F59E0B]",
+        },
+      ]
+    : []),
 ]
 
 const assistantItems = [

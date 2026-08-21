@@ -112,7 +112,7 @@ export function Hero() {
                       { label: "Press Release", icon: FileText, accent: "text-[#3B82F6]" },
                       { label: "Video Request", icon: Video, accent: "text-[#7C5CFC]" },
                       { label: "Community Events", icon: CalendarDays, accent: "text-[#10B981]" },
-                      { label: "AI Post Generator", icon: Sparkles, accent: "text-[#F59E0B]" },
+                      { label: "Graphic Studio", icon: Sparkles, accent: "text-[#F59E0B]" },
                     ].map((item) => (
                       <span
                         key={item.label}
@@ -220,7 +220,7 @@ export function Hero() {
                         { label: "Press Release", icon: FileText, tone: "bg-[#3B82F6]" },
                         { label: "Video Request", icon: Video, tone: "bg-[#7C5CFC]" },
                         { label: "Community Event", icon: CalendarDays, tone: "bg-[#10B981]" },
-                        { label: "AI Post Generator", icon: Sparkles, tone: "bg-[#F59E0B]" },
+                        { label: "Graphic Studio", icon: Sparkles, tone: "bg-[#F59E0B]" },
                       ].map((item) => (
                         <div
                           key={item.label}

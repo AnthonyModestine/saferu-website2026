@@ -150,8 +150,8 @@ const PRESS_CENTER_TOOLS = [
     tone: "bg-[#4A9D6B]",
   },
   {
-    label: "AI Post Generator",
-    detail: "Get sourced, locally relevant post recommendations for your service area.",
+    label: "Graphic Studio",
+    detail: "Create safety-tip and event graphics with logos locked in place.",
     icon: Sparkles,
     tone: "bg-[#7C5CFC]",
   },
@@ -418,78 +418,71 @@ const BRIEFING_CARDS = [
   },
 ]
 
-/** Section 6 — AI Post Generator (dark color block). */
-export function AiPostGeneratorSection() {
+/** Section 6 — Graphic Studio (dark color block). */
+export function GraphicStudioSection() {
   return (
     <section className="relative overflow-hidden bg-[#0F1C3F] py-20 sm:py-28">
       <div className="pointer-events-none absolute inset-0" aria-hidden="true">
-        <div className="absolute -top-40 left-1/2 h-[420px] w-[720px] -translate-x-1/2 rounded-full bg-[#7C5CFC]/20 blur-[140px]" />
+        <div className="absolute -top-40 left-1/2 h-[420px] w-[720px] -translate-x-1/2 rounded-full bg-[#F2B233]/15 blur-[140px]" />
         <div className="absolute -left-32 bottom-0 h-[320px] w-[320px] rounded-full bg-[#2563EB]/15 blur-[120px]" />
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff05_1px,transparent_1px),linear-gradient(to_bottom,#ffffff05_1px,transparent_1px)] bg-[size:3.5rem_3.5rem]" />
       </div>
 
       <div className="relative mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-3xl text-center">
-          <p className="inline-flex items-center gap-2 rounded-full bg-[#7C5CFC] px-4 py-1.5 text-sm font-bold text-white shadow-[0_6px_20px_rgba(124,92,252,0.35)]">
+          <p className="inline-flex items-center gap-2 rounded-full bg-[#F2B233] px-4 py-1.5 text-sm font-bold text-[#0F1C3F] shadow-[0_6px_20px_rgba(242,178,51,0.35)]">
             <Sparkles className="h-4 w-4" />
-            AI Post Generator
+            Graphic Studio
           </p>
           <h2 className="mt-5 text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">
-            Know What&rsquo;s Worth Sharing
+            Make It Look Official
           </h2>
           <p className="mt-6 text-lg leading-relaxed text-[#b8c7e0] sm:text-xl">
-            SaferU reviews relevant public information and turns the strongest opportunities into
-            clear recommendations for your agency.
+            Build safety-tip graphics and community event flyers with your department logo locked
+            in place — so every post looks ready to share.
           </p>
         </div>
 
-        <div className="mt-14 grid gap-6 md:grid-cols-3">
-          {BRIEFING_CARDS.map((card) => (
-            <div
-              key={card.state}
-              className="flex flex-col rounded-2xl bg-white p-6 shadow-xl transition-transform duration-300 hover:-translate-y-1.5"
-            >
-              <span
-                className={`inline-flex w-fit items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${card.stateChip}`}
-              >
-                <card.stateIcon className="h-3.5 w-3.5" />
-                {card.state}
-              </span>
-              <p
-                className={`mt-4 text-[11px] font-bold uppercase tracking-widest ${card.eyebrowTone}`}
-              >
-                {card.eyebrow}
-              </p>
-              <h3 className="mt-1.5 text-lg font-bold leading-snug text-[#0F1C3F]">
-                {card.headline}
-              </h3>
-              <p className="mt-2 flex items-center gap-1.5 text-sm font-semibold text-[#2563EB]">
-                <CalendarClock className="h-4 w-4 shrink-0" />
-                {card.timing}
-              </p>
-              <p className="mt-2 flex-1 text-sm leading-relaxed text-[#5c6b85]">{card.why}</p>
-              <p className="mt-3 text-xs font-medium text-[#5c6b85]">{card.source}</p>
-              <div className="mt-4 flex items-center border-t border-[#E2E8F5] pt-4">
-                <span className="rounded-lg bg-[#7C5CFC] px-3.5 py-1.5 text-xs font-bold text-white">
-                  Use This Post
-                </span>
-              </div>
-            </div>
-          ))}
+        <div className="mt-14 grid gap-6 md:grid-cols-2">
+          <div className="rounded-2xl bg-white p-6 shadow-xl">
+            <p className="text-[11px] font-bold uppercase tracking-widest text-[#B45309]">
+              Safety Tip
+            </p>
+            <h3 className="mt-2 text-xl font-bold text-[#0F1C3F]">Prevention reminders</h3>
+            <p className="mt-2 text-sm leading-relaxed text-[#5c6b85]">
+              SaferU logo bottom-left. Your agency logo bottom-right. Short tip copy that residents
+              can understand in seconds.
+            </p>
+          </div>
+          <div className="rounded-2xl bg-white p-6 shadow-xl">
+            <p className="text-[11px] font-bold uppercase tracking-widest text-[#047857]">
+              Community Event
+            </p>
+            <h3 className="mt-2 text-xl font-bold text-[#0F1C3F]">Flyers without the design stress</h3>
+            <p className="mt-2 text-sm leading-relaxed text-[#5c6b85]">
+              Add the event name, time, and place. Optional background photo. Your logo only —
+              no SaferU branding on event graphics.
+            </p>
+          </div>
         </div>
 
         <div className="mt-14 text-center">
           <Button
             asChild
             size="lg"
-            className="rounded-xl bg-[#7C5CFC] px-9 py-7 text-lg font-bold text-white shadow-[0_8px_30px_rgba(124,92,252,0.35)] transition-transform hover:-translate-y-0.5 hover:bg-[#8d70ff]"
+            className="rounded-xl bg-[#F2B233] px-9 py-7 text-lg font-bold text-[#0F1C3F] shadow-[0_8px_30px_rgba(242,178,51,0.35)] transition-transform hover:-translate-y-0.5 hover:bg-[#ffc44d]"
           >
-            <Link href="/pio-tool/ideas">See Today&rsquo;s Recommendations</Link>
+            <Link href="/pio-tool/graphics">Open Graphic Studio</Link>
           </Button>
         </div>
       </div>
     </section>
   )
+}
+
+/** @deprecated Prefer GraphicStudioSection — Post Generator is hidden from customers. */
+export function AiPostGeneratorSection() {
+  return <GraphicStudioSection />
 }
 
 /** Section 7 — Free curated library and weekly member content. */

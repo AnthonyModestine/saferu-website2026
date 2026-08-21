@@ -36,8 +36,8 @@ const PRESS_CENTER_FEATURES: { label: string; ai?: boolean }[] = [
   { label: "Social media versions included with each press release" },
   { label: "Video Request Generator", ai: true },
   { label: "Community Event Campaigns" },
-  { label: "AI Post Generator", ai: true },
-  { label: "Sourced communication recommendations for your service area", ai: true },
+  { label: "Graphic Studio", ai: true },
+  { label: "Safety tip and event graphics with department logos", ai: true },
   { label: "Agency profile and branding" },
   { label: "Saved drafts and communication history" },
   { label: "Ready-to-share captions" },
@@ -82,8 +82,8 @@ const FAQ_ITEMS = [
     a: "The number varies based on the length and complexity of each communication. A full press release package uses more tokens than a short community post. Your monthly allowance is designed to support regular agency communication across SaferU's creation tools.",
   },
   {
-    q: "Does viewing AI Post Generator recommendations use tokens?",
-    a: "No. Viewing recommendations and their sources does not use the agency's monthly AI allowance. Tokens are used when the agency asks SaferU to generate a message from the recommendation.",
+    q: "Does Graphic Studio use AI tokens?",
+    a: "Creating and downloading graphics from locked templates does not use your monthly AI allowance. If SaferU later adds AI drafting helpers inside Graphic Studio, those optional AI actions may use tokens and will be labeled clearly.",
   },
   {
     q: "Does editing or copying a message use tokens?",

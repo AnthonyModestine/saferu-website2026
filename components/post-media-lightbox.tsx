@@ -67,7 +67,12 @@ export function PostMediaLightbox({ src, alt, open, onClose }: PostMediaLightbox
               width={1920}
               height={1080}
               className="mx-auto max-h-[90vh] w-auto h-auto rounded-lg object-contain"
-              unoptimized={src.startsWith("/images/") || src.startsWith("http")}
+              unoptimized={
+                src.startsWith("/images/") ||
+                src.startsWith("http") ||
+                src.startsWith("data:") ||
+                src.startsWith("blob:")
+              }
             />
           </div>
         )}
