@@ -32,3 +32,27 @@ export function aiErrorPayload(reason: AiFailureReason, detail?: string) {
     ...(process.env.NODE_ENV === "development" && detail ? { detail } : {}),
   }
 }
+
+export function graphicStudioErrorMessage(reason: AiFailureReason): string {
+  if (reason === "missing_api_key") {
+    return "Graphic Studio is not configured on the server. Add OPENAI_API_KEY in Vercel and redeploy."
+  }
+  if (reason === "openai_error") {
+    return "OpenAI returned an error. Please try again in a minute."
+  }
+  if (reason === "empty_input") {
+    return "Tell us what residents should know."
+  }
+  if (reason === "invalid_json" || reason === "empty_response") {
+    return "We could not finish this graphic brief. Please try again."
+  }
+  return "Graphic Studio is temporarily unavailable. Please try again in a few minutes."
+}
+
+export function graphicStudioErrorPayload(reason: AiFailureReason, detail?: string) {
+  return {
+    error: graphicStudioErrorMessage(reason),
+    code: reason,
+    ...(process.env.NODE_ENV === "development" && detail ? { detail } : {}),
+  }
+}

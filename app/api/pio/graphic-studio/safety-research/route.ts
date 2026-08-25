@@ -4,7 +4,7 @@ import { getIsPaidByEmail } from "@/lib/member-access"
 import { isOnActiveTrial } from "@/lib/pio-trial"
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
 import { isLocalPreviewServer } from "@/lib/local-preview-server"
-import { aiErrorPayload } from "@/lib/ai-result"
+import { graphicStudioErrorPayload } from "@/lib/ai-result"
 import { formatDepartmentLabel } from "@/lib/department-types"
 import { draftSafetyTipGraphicCopy } from "@/lib/pio-graphic-studio-ai"
 import {
@@ -84,7 +84,7 @@ export async function POST(request: Request) {
     })
 
     if (!result.ok) {
-      return NextResponse.json(aiErrorPayload(result.reason, result.detail), { status: 503 })
+      return NextResponse.json(graphicStudioErrorPayload(result.reason, result.detail), { status: 503 })
     }
 
     return NextResponse.json(result.data)

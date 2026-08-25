@@ -4,9 +4,9 @@ import { getIsPaidByEmail } from "@/lib/member-access"
 import { isOnActiveTrial } from "@/lib/pio-trial"
 import { checkRateLimit } from "@/lib/rate-limit"
 import { isLocalPreviewServer } from "@/lib/local-preview-server"
-import { aiErrorPayload } from "@/lib/ai-result"
+import { graphicStudioErrorPayload } from "@/lib/ai-result"
 import { generateSafetyTipGraphicImage } from "@/lib/pio-graphic-studio-ai"
-import { getGraphicStudioRecord, saveGraphicStudioRecord } from "@/lib/graphic-studio-store"
+import { getGraphicStudioRecord, saveGraphicStudioRecord, resolveMemberAgencyLogo } from "@/lib/graphic-studio-store"
 
 export const maxDuration = 120
 
@@ -46,11 +46,10 @@ export async function POST(request: Request) {
       )
     }
 
-    const agencyLogoUrl =
-      typeof body.agencyLogoUrl === "string" &&
-      (body.agencyLogoUrl.startsWith("data:") || body.agencyLogoUrl.startsWith("/"))
-        ? body.agencyLogoUrl
-        : null
+    const agencyLogoUrl = await resolveMemberAgencyLogo(
+      session.memberId,
+      typeof body.agencyLogoUrl === "string" ? body.agencyLogoUrl : null
+    )
 
     const result = await generateSafetyTipGraphicImage({
       category: String(body.category || "Other / Custom"),
@@ -67,7 +66,7 @@ export async function POST(request: Request) {
     })
 
     if (!result.ok) {
-      return NextResponse.json(aiErrorPayload(result.reason, result.detail), { status: 503 })
+      return NextResponse.json(graphicStudioErrorPayload(result.reason, result.detail), { status: 503 })
     }
 
     const graphicId = String(body.graphicId || "")

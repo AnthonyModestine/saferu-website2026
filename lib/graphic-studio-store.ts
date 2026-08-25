@@ -2,6 +2,7 @@ import "server-only"
 
 import { mkdir, readFile, writeFile } from "fs/promises"
 import path from "path"
+import { getStoredAgencySettings } from "@/lib/agency-settings-store"
 import type { GraphicStudioSource } from "@/lib/pio-graphic-studio-types"
 
 const DATA_DIR = path.join(process.cwd(), "data")
@@ -64,4 +65,17 @@ export async function getGraphicStudioRecord(
 ): Promise<GraphicStudioRecord | null> {
   const store = await readStore()
   return store.records.find((item) => item.graphic_id === graphicId) ?? null
+}
+
+export async function resolveMemberAgencyLogo(
+  memberId: string,
+  fallback?: string | null
+): Promise<string | null> {
+  const stored = await getStoredAgencySettings(memberId)
+  if (stored?.logoUrl) return stored.logoUrl
+  if (typeof fallback === "string" && fallback.startsWith("/")) return fallback.slice(0, 300)
+  if (typeof fallback === "string" && fallback.startsWith("data:") && fallback.length < 400_000) {
+    return fallback
+  }
+  return null
 }

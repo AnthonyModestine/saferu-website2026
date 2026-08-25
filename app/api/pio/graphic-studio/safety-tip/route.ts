@@ -4,9 +4,9 @@ import { getIsPaidByEmail } from "@/lib/member-access"
 import { isOnActiveTrial } from "@/lib/pio-trial"
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
 import { isLocalPreviewServer } from "@/lib/local-preview-server"
-import { aiErrorPayload } from "@/lib/ai-result"
+import { graphicStudioErrorPayload } from "@/lib/ai-result"
 import { generateSafetyTipGraphicImage } from "@/lib/pio-graphic-studio-ai"
-import { saveGraphicStudioRecord } from "@/lib/graphic-studio-store"
+import { saveGraphicStudioRecord, resolveMemberAgencyLogo } from "@/lib/graphic-studio-store"
 import {
   isSafetyAudience,
   isSafetyGraphicStyle,
@@ -55,12 +55,10 @@ export async function POST(request: Request) {
     const emergencyMessage = String(body.emergencyMessage || "").trim()
     const visualDirection = String(body.visualDirection || body.visualConcept || "").trim()
     const verifiedTopic = String(body.verifiedTopic || category).trim()
-    const agencyLogoUrl =
-      typeof body.agencyLogoUrl === "string" && body.agencyLogoUrl.startsWith("data:")
-        ? body.agencyLogoUrl.slice(0, 900_000)
-        : typeof body.agencyLogoUrl === "string" && body.agencyLogoUrl.startsWith("/")
-          ? body.agencyLogoUrl.slice(0, 300)
-          : null
+    const agencyLogoUrl = await resolveMemberAgencyLogo(
+      session.memberId,
+      typeof body.agencyLogoUrl === "string" ? body.agencyLogoUrl : null
+    )
 
     if (!isSafetyTipCategory(category)) {
       return NextResponse.json({ error: "Choose a safety graphic category." }, { status: 400 })
@@ -99,7 +97,7 @@ export async function POST(request: Request) {
     })
 
     if (!result.ok) {
-      return NextResponse.json(aiErrorPayload(result.reason, result.detail), { status: 503 })
+      return NextResponse.json(graphicStudioErrorPayload(result.reason, result.detail), { status: 503 })
     }
 
     const graphicId = crypto.randomUUID()

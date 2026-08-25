@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { PostMediaLightbox } from "@/components/post-media-lightbox"
 import { useAgency } from "@/lib/agency-context"
 import { compositeAgencyLogo, createSafetyTipGraphic } from "@/lib/pio-graphic-studio"
+import { GraphicStudioSelect } from "@/components/pio/graphic-studio-select"
 import {
   SAFETY_AUDIENCES,
   SAFETY_GRAPHIC_STYLES,
@@ -20,30 +21,6 @@ import {
   type SafetyResearchBrief,
   type SafetyTipCategory,
 } from "@/lib/pio-graphic-studio-types"
-
-function Chip({
-  label,
-  active,
-  onClick,
-}: {
-  label: string
-  active: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={
-        active
-          ? "rounded-full bg-[#0f1c3f] px-3 py-1.5 text-xs font-semibold text-white"
-          : "rounded-full border border-[#e2e8f5] px-3 py-1.5 text-xs font-semibold text-[#334155] hover:border-[#F2B233] hover:bg-[#FFFBEB]"
-      }
-    >
-      {label}
-    </button>
-  )
-}
 
 export default function SafetyTipGraphicPage() {
   const { settings } = useAgency()
@@ -76,7 +53,6 @@ export default function SafetyTipGraphicPage() {
     agencyTypeOther: settings.agencyTypeOther,
     city: settings.city,
     state: settings.state,
-    agencyLogoUrl: settings.logoUrl,
   }
 
   const stampLogo = async (imageDataUrl: string) => {
@@ -208,7 +184,7 @@ export default function SafetyTipGraphicPage() {
           style,
           category,
           visualDirection: research?.visual_concept || "",
-          agencyLogoUrl: settings.logoUrl,
+          agencyLogoUrl: settings.logoUrl?.startsWith("/") ? settings.logoUrl : null,
         }),
       })
       const data = await res.json()
@@ -272,19 +248,13 @@ export default function SafetyTipGraphicPage() {
 
       <div className="grid gap-6 lg:grid-cols-[1fr_1.15fr]">
         <section className="space-y-5 rounded-2xl border border-[#e2e8f5] bg-white p-5 shadow-sm">
-          <div className="space-y-2">
-            <Label>What type of safety content are you creating?</Label>
-            <div className="flex flex-wrap gap-2">
-              {SAFETY_TIP_CATEGORIES.map((item) => (
-                <Chip
-                  key={item}
-                  label={item}
-                  active={item === category}
-                  onClick={() => setCategory(item)}
-                />
-              ))}
-            </div>
-          </div>
+          <GraphicStudioSelect
+            id="safety-category"
+            label="What type of safety content are you creating?"
+            value={category}
+            options={SAFETY_TIP_CATEGORIES}
+            onChange={(value) => setCategory(value as SafetyTipCategory)}
+          />
 
           <div className="space-y-2">
             <Label htmlFor="residentNeed">What do you want residents to know?</Label>
@@ -302,33 +272,21 @@ export default function SafetyTipGraphicPage() {
             </p>
           </div>
 
-          <div className="space-y-2">
-            <Label>Who is this message for?</Label>
-            <div className="flex flex-wrap gap-2">
-              {SAFETY_AUDIENCES.map((item) => (
-                <Chip
-                  key={item}
-                  label={item}
-                  active={item === audience}
-                  onClick={() => setAudience(item)}
-                />
-              ))}
-            </div>
-          </div>
+          <GraphicStudioSelect
+            id="safety-audience"
+            label="Who is this message for?"
+            value={audience}
+            options={SAFETY_AUDIENCES}
+            onChange={(value) => setAudience(value as SafetyAudience)}
+          />
 
-          <div className="space-y-2">
-            <Label>What style would you like?</Label>
-            <div className="flex flex-wrap gap-2">
-              {SAFETY_GRAPHIC_STYLES.map((item) => (
-                <Chip
-                  key={item}
-                  label={item}
-                  active={item === style}
-                  onClick={() => setStyle(item)}
-                />
-              ))}
-            </div>
-          </div>
+          <GraphicStudioSelect
+            id="safety-style"
+            label="What style would you like?"
+            value={style}
+            options={SAFETY_GRAPHIC_STYLES}
+            onChange={(value) => setStyle(value as SafetyGraphicStyle)}
+          />
 
           <div className="space-y-2">
             <Label htmlFor="visualRequest">Anything you want shown in the graphic? (optional)</Label>

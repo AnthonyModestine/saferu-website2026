@@ -143,8 +143,15 @@ function asStringArray(value: unknown): string[] {
 }
 
 function parseResearch(parsed: Record<string, unknown>): SafetyResearchBrief | null {
-  const recommended_headline = asString(parsed.recommended_headline)
-  const resident_message = asString(parsed.resident_message)
+  const recommended_headline =
+    asString(parsed.recommended_headline) ||
+    asString(parsed.headline) ||
+    asString(parsed.recommendedHeadline)
+  const resident_message =
+    asString(parsed.resident_message) ||
+    asString(parsed.body) ||
+    asString(parsed.residentMessage) ||
+    asString(parsed.main_message)
   if (!recommended_headline || !resident_message) return null
 
   const sourcesRaw = Array.isArray(parsed.sources) ? parsed.sources : []
@@ -167,7 +174,8 @@ function parseResearch(parsed: Record<string, unknown>): SafetyResearchBrief | n
     primary_takeaway: asString(parsed.primary_takeaway).slice(0, 220),
     headline_options: asStringArray(parsed.headline_options).slice(0, 6),
     recommended_headline: recommended_headline.slice(0, 80),
-    supporting_line: asString(parsed.supporting_line).slice(0, 160),
+    supporting_line:
+      (asString(parsed.supporting_line) || asString(parsed.supportingLine) || asString(parsed.supporting)).slice(0, 160),
     resident_message: resident_message.slice(0, 320),
     emergency_message: asString(parsed.emergency_message).slice(0, 160),
     visual_concept: asString(parsed.visual_concept).slice(0, 400),
@@ -326,9 +334,27 @@ export async function draftSafetyTipGraphicCopy(opts: {
   try {
     const { default: OpenAI } = await import("openai")
     const openai = new OpenAI({ apiKey })
-    let raw = ""
 
+    const runJsonBrief = async () => {
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        temperature: 0.3,
+        response_format: { type: "json_object" },
+        max_tokens: 1800,
+        messages: [
+          { role: "system", content: RESEARCH_SYSTEM },
+          { role: "user", content: `${userMessage}\n\nReturn the required JSON object only.` },
+        ],
+      })
+      return completion.choices?.[0]?.message?.content?.trim() || ""
+    }
+
+    let raw = ""
     try {
+      raw = await runJsonBrief()
+    } catch (jsonErr) {
+      const detail = jsonErr instanceof Error ? jsonErr.message : String(jsonErr)
+      console.warn("[graphic-studio-ai] JSON brief failed, trying search model:", detail)
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini-search-preview",
         web_search_options: {
@@ -343,30 +369,21 @@ export async function draftSafetyTipGraphicCopy(opts: {
           },
         },
         messages: [
-          { role: "system", content: RESEARCH_SYSTEM },
-          { role: "user", content: userMessage },
-        ],
-      })
-      raw = completion.choices?.[0]?.message?.content?.trim() || ""
-    } catch {
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        temperature: 0.3,
-        response_format: { type: "json_object" },
-        max_tokens: 1400,
-        messages: [
-          { role: "system", content: RESEARCH_SYSTEM },
-          { role: "user", content: userMessage },
+          {
+            role: "user",
+            content: `${RESEARCH_SYSTEM}\n\n${userMessage}\n\nReturn the required JSON object only. No markdown.`,
+          },
         ],
       })
       raw = completion.choices?.[0]?.message?.content?.trim() || ""
     }
 
+    const parsed = raw ? parseJsonObject(raw) : null
+    const research = parsed ? parseResearch(parsed) : null
+
     if (!raw) return { ok: false, reason: "empty_response" }
-    const parsed = parseJsonObject(raw)
     if (!parsed) return { ok: false, reason: "invalid_json", detail: raw.slice(0, 400) }
-    const research = parseResearch(parsed)
-    if (!research) return { ok: false, reason: "empty_response" }
+    if (!research) return { ok: false, reason: "empty_response", detail: raw.slice(0, 400) }
 
     return {
       ok: true,

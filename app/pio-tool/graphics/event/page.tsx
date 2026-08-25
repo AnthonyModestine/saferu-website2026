@@ -10,36 +10,13 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { useAgency } from "@/lib/agency-context"
 import { compositeAgencyLogo, createEventGraphic } from "@/lib/pio-graphic-studio"
+import { GraphicStudioSelect } from "@/components/pio/graphic-studio-select"
 import {
   EVENT_GRAPHIC_STYLES,
   EVENT_GRAPHIC_TYPES,
   type EventGraphicStyle,
   type EventGraphicType,
 } from "@/lib/pio-graphic-studio-types"
-
-function Chip({
-  label,
-  active,
-  onClick,
-}: {
-  label: string
-  active: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={
-        active
-          ? "rounded-full bg-[#0f1c3f] px-3 py-1.5 text-xs font-semibold text-white"
-          : "rounded-full border border-[#e2e8f5] px-3 py-1.5 text-xs font-semibold text-[#334155] hover:border-[#10B981] hover:bg-[#ECFDF5]"
-      }
-    >
-      {label}
-    </button>
-  )
-}
 
 export default function EventGraphicPage() {
   const { settings } = useAgency()
@@ -117,7 +94,6 @@ export default function EventGraphicPage() {
           contact,
           style,
           agencyName: settings.agencyName,
-          agencyLogoUrl: settings.logoUrl,
         }),
       })
       const data = await res.json()
@@ -176,19 +152,13 @@ export default function EventGraphicPage() {
 
       <div className="grid gap-6 lg:grid-cols-[1fr_1.15fr]">
         <section className="space-y-4 rounded-2xl border border-[#e2e8f5] bg-white p-5 shadow-sm">
-          <div className="space-y-2">
-            <Label>What type of event are you promoting?</Label>
-            <div className="flex flex-wrap gap-2">
-              {EVENT_GRAPHIC_TYPES.map((item) => (
-                <Chip
-                  key={item}
-                  label={item}
-                  active={item === eventType}
-                  onClick={() => setEventType(item)}
-                />
-              ))}
-            </div>
-          </div>
+          <GraphicStudioSelect
+            id="event-type"
+            label="What type of event are you promoting?"
+            value={eventType}
+            options={EVENT_GRAPHIC_TYPES}
+            onChange={(value) => setEventType(value as EventGraphicType)}
+          />
           <div className="space-y-2">
             <Label htmlFor="eventName">Event name</Label>
             <Input
@@ -239,19 +209,13 @@ export default function EventGraphicPage() {
               maxLength={80}
             />
           </div>
-          <div className="space-y-2">
-            <Label>Style</Label>
-            <div className="flex flex-wrap gap-2">
-              {EVENT_GRAPHIC_STYLES.map((item) => (
-                <Chip
-                  key={item}
-                  label={item}
-                  active={item === style}
-                  onClick={() => setStyle(item)}
-                />
-              ))}
-            </div>
-          </div>
+          <GraphicStudioSelect
+            id="event-style"
+            label="Style"
+            value={style}
+            options={EVENT_GRAPHIC_STYLES}
+            onChange={(value) => setStyle(value as EventGraphicStyle)}
+          />
           <div className="space-y-2">
             <Label htmlFor="background">Event photo (optional)</Label>
             <div className="flex items-center gap-2">
