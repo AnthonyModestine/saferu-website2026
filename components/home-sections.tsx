@@ -446,12 +446,12 @@ export function GraphicStudioSection() {
         <div className="mt-14 grid gap-6 md:grid-cols-2">
           <div className="rounded-2xl bg-white p-6 shadow-xl">
             <p className="text-[11px] font-bold uppercase tracking-widest text-[#B45309]">
-              Safety Tip
+              Safety Graphic
             </p>
             <h3 className="mt-2 text-xl font-bold text-[#0F1C3F]">Prevention reminders</h3>
             <p className="mt-2 text-sm leading-relaxed text-[#5c6b85]">
-              SaferU logo bottom-left. Your agency logo bottom-right. Short tip copy that residents
-              can understand in seconds.
+              One clear safety takeaway, researched before design. Your agency logo bottom-right —
+              no SaferU mark on the public graphic.
             </p>
           </div>
           <div className="rounded-2xl bg-white p-6 shadow-xl">

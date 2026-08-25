@@ -1,6 +1,6 @@
 /**
  * Client-side canvas helpers for Press Center Graphic Studio.
- * Safety tips include SaferU branding; event graphics do not.
+ * Customer graphics belong to the agency — never stamp a SaferU logo.
  */
 
 export type GraphicAspect = "landscape" | "square"
@@ -11,7 +11,6 @@ export type SafetyTipGraphicInput = {
   body: string
   agencyName?: string
   agencyLogoUrl?: string | null
-  saferuLogoUrl?: string | null
   accent?: string
   aspect?: GraphicAspect
 }
@@ -110,19 +109,6 @@ async function drawLogo(
   return true
 }
 
-function drawSaferuWordmark(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  box: number
-) {
-  ctx.fillStyle = "rgba(255,255,255,0.92)"
-  ctx.font = `700 ${Math.round(box * 0.28)}px Inter, Arial, sans-serif`
-  ctx.textAlign = "left"
-  ctx.textBaseline = "middle"
-  ctx.fillText("SaferU", x + 8, y + box / 2)
-}
-
 /** Fallback template when AI image generation is unavailable. */
 export async function createSafetyTipGraphic(
   input: SafetyTipGraphicInput
@@ -176,20 +162,18 @@ export async function createSafetyTipGraphic(
     y += Math.round(height * 0.055)
   }
 
-  return compositeSafetyTipLogos({
+  return compositeAgencyLogo({
     imageDataUrl: canvas.toDataURL("image/png"),
     agencyLogoUrl: input.agencyLogoUrl,
     agencyName: input.agencyName,
-    saferuLogoUrl: input.saferuLogoUrl || "/images/saferu-logo.png",
   })
 }
 
-/** Stamp exact SaferU + agency logos onto an AI-generated safety graphic. */
-export async function compositeSafetyTipLogos(opts: {
+/** Stamp the exact agency logo bottom-right. Never add SaferU branding. */
+export async function compositeAgencyLogo(opts: {
   imageDataUrl: string
   agencyLogoUrl?: string | null
   agencyName?: string
-  saferuLogoUrl?: string | null
 }): Promise<string | null> {
   if (typeof document === "undefined") return null
 
@@ -209,40 +193,14 @@ export async function compositeSafetyTipLogos(opts: {
   const drawH = background.height * scale
   ctx.drawImage(background, (width - drawW) / 2, (height - drawH) / 2, drawW, drawH)
 
-  // Soft brand bar so logos remain readable on any generated scene.
-  const barH = Math.round(height * 0.22)
-  const barY = height - barH
-  const barGrad = ctx.createLinearGradient(0, barY, 0, height)
-  barGrad.addColorStop(0, "rgba(11,27,58,0)")
-  barGrad.addColorStop(0.35, "rgba(11,27,58,0.55)")
-  barGrad.addColorStop(1, "rgba(11,27,58,0.88)")
-  ctx.fillStyle = barGrad
-  ctx.fillRect(0, barY, width, barH)
+  if (!opts.agencyLogoUrl) return canvas.toDataURL("image/png")
 
   const pad = Math.round(width * 0.035)
-  const logoBox = Math.round(height * 0.155)
+  const logoBox = Math.round(width * 0.11)
   const logoY = height - pad - logoBox
-
-  // SaferU — bottom left (exact supplied logo; never redrawn by the image model).
-  const saferuDrawn = await drawLogo(
-    ctx,
-    opts.saferuLogoUrl || "/images/saferu-logo.png",
-    pad,
-    logoY,
-    logoBox
-  )
-  if (!saferuDrawn) drawSaferuWordmark(ctx, pad, logoY, logoBox)
-
-  // Agency — bottom right.
   const rightX = width - pad - logoBox
-  const agencyDrawn = await drawLogo(ctx, opts.agencyLogoUrl, rightX, logoY, logoBox)
-  if (!agencyDrawn && opts.agencyName) {
-    ctx.fillStyle = "rgba(255,255,255,0.92)"
-    ctx.font = `600 ${Math.round(logoBox * 0.2)}px Inter, Arial, sans-serif`
-    ctx.textAlign = "right"
-    ctx.textBaseline = "middle"
-    ctx.fillText(opts.agencyName.slice(0, 36), width - pad, logoY + logoBox / 2)
-  }
+
+  await drawLogo(ctx, opts.agencyLogoUrl, rightX, logoY, logoBox)
 
   return canvas.toDataURL("image/png")
 }
@@ -337,19 +295,11 @@ export async function createEventGraphic(input: EventGraphicInput): Promise<stri
     ctx.textAlign = "left"
   }
 
-  const footerY = height - Math.round(height * 0.16)
-  const logoBox = Math.round(height * 0.11)
-  const rightX = width - pad - logoBox
-  ctx.fillStyle = "rgba(255,255,255,0.1)"
-  drawRoundedRect(ctx, rightX - 8, footerY - 8, logoBox + 16, logoBox + 16, 16)
-  ctx.fill()
-  const agencyDrawn = await drawLogo(ctx, input.agencyLogoUrl, rightX, footerY, logoBox)
-  if (!agencyDrawn && input.agencyName) {
-    ctx.fillStyle = "rgba(255,255,255,0.9)"
-    ctx.font = `600 ${Math.round(logoBox * 0.18)}px Inter, Arial, sans-serif`
-    ctx.textAlign = "center"
-    ctx.textBaseline = "middle"
-    ctx.fillText(input.agencyName.slice(0, 28), rightX + logoBox / 2, footerY + logoBox / 2)
+  if (input.agencyLogoUrl) {
+    const footerY = height - Math.round(height * 0.16)
+    const logoBox = Math.round(width * 0.11)
+    const rightX = width - pad - logoBox
+    await drawLogo(ctx, input.agencyLogoUrl, rightX, footerY, logoBox)
   }
 
   return canvas.toDataURL("image/png")

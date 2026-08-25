@@ -16,8 +16,8 @@ export default function GraphicStudioPage() {
         </Button>
         <h1 className="text-3xl font-bold text-[#0f1c3f]">Graphic Studio</h1>
         <p className="mt-2 max-w-2xl text-[#64748B]">
-          Create share-ready graphics for safety tips and community events. Logos are placed
-          automatically so every post looks official.
+          Create professional 16:9 social graphics for your agency. The finished image belongs to
+          your department — SaferU is the creation platform, not a logo on the graphic.
         </p>
       </div>
 
@@ -30,13 +30,13 @@ export default function GraphicStudioPage() {
             <Shield className="h-6 w-6" />
           </div>
           <h2 className="text-xl font-bold text-[#0f1c3f] group-hover:text-[#92400E]">
-            Safety Tip
+            Safety Graphic
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-[#64748B]">
-            Prevention and safety reminders. SaferU logo stays in the bottom-left corner; your
-            department logo goes in the bottom-right.
+            Educational graphics that help residents prevent crime, fire, injuries, scams, cyber
+            incidents, emergencies, and other safety risks.
           </p>
-          <p className="mt-4 text-sm font-semibold text-[#2563EB]">Create safety tip →</p>
+          <p className="mt-4 text-sm font-semibold text-[#2563EB]">Create safety graphic →</p>
         </Link>
 
         <Link
@@ -47,11 +47,11 @@ export default function GraphicStudioPage() {
             <CalendarDays className="h-6 w-6" />
           </div>
           <h2 className="text-xl font-bold text-[#0f1c3f] group-hover:text-[#047857]">
-            Community Event
+            Event Graphic
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-[#64748B]">
-            Flyers for Coffee with a Cop, National Night Out, open houses, and more. Your logo
-            only — no SaferU branding on event graphics.
+            Promotional graphics for agency events, meetings, programs, outreach, recruitment, and
+            community activities.
           </p>
           <p className="mt-4 text-sm font-semibold text-[#2563EB]">Create event graphic →</p>
         </Link>
@@ -61,13 +61,14 @@ export default function GraphicStudioPage() {
         <div className="flex items-start gap-3">
           <ImageIcon className="mt-0.5 h-5 w-5 shrink-0 text-[#64748B]" />
           <div>
-            <p className="text-sm font-semibold text-[#0f1c3f]">Logo tip</p>
+            <p className="text-sm font-semibold text-[#0f1c3f]">Agency logo</p>
             <p className="mt-1 text-sm text-[#64748B]">
-              Upload your department logo in{" "}
+              Upload your official logo in{" "}
               <Link href="/pio-tool/settings" className="font-semibold text-[#2563EB] hover:underline">
                 Agency Settings
-              </Link>{" "}
-              so it appears automatically on every graphic.
+              </Link>
+              . It is placed bottom-right and designed into the composition. If you have not
+              uploaded a logo, we leave branding off — we will not invent a badge or use SaferU.
             </p>
           </div>
         </div>

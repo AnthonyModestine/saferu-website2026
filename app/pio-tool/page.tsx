@@ -509,7 +509,7 @@ export default function PIODashboardPage() {
                       Graphic Studio
                     </p>
                     <span className="truncate text-sm text-[#8fa5c7]">
-                      · Safety tips and event flyers
+                      · Safety graphics and event flyers
                     </span>
                   </>
                 )}

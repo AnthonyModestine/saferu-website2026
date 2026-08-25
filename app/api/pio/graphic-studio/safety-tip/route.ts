@@ -5,13 +5,16 @@ import { isOnActiveTrial } from "@/lib/pio-trial"
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
 import { isLocalPreviewServer } from "@/lib/local-preview-server"
 import { aiErrorPayload } from "@/lib/ai-result"
-import { formatDepartmentLabel } from "@/lib/department-types"
+import { generateSafetyTipGraphicImage } from "@/lib/pio-graphic-studio-ai"
+import { saveGraphicStudioRecord } from "@/lib/graphic-studio-store"
 import {
-  createSafetyTipGraphicPackage,
-  SAFETY_TIP_CATEGORIES,
-} from "@/lib/pio-graphic-studio-ai"
+  isSafetyAudience,
+  isSafetyGraphicStyle,
+  isSafetyTipCategory,
+  type GraphicStudioSource,
+} from "@/lib/pio-graphic-studio-types"
 
-export const maxDuration = 90
+export const maxDuration = 120
 
 export async function POST(request: Request) {
   const session = await getMemberSession()
@@ -44,38 +47,98 @@ export async function POST(request: Request) {
     const body = await request.json()
     const category = String(body.category || "").trim()
     const residentNeed = String(body.residentNeed || body.prompt || "").trim()
+    const audience = String(body.audience || "General Community").trim()
+    const style = String(body.style || "Let SaferU Decide").trim()
+    const headline = String(body.headline || "").trim()
+    const supportingLine = String(body.supportingLine || "").trim()
+    const copyBody = String(body.body || "").trim()
+    const emergencyMessage = String(body.emergencyMessage || "").trim()
+    const visualDirection = String(body.visualDirection || body.visualConcept || "").trim()
+    const verifiedTopic = String(body.verifiedTopic || category).trim()
+    const agencyLogoUrl =
+      typeof body.agencyLogoUrl === "string" && body.agencyLogoUrl.startsWith("data:")
+        ? body.agencyLogoUrl.slice(0, 900_000)
+        : typeof body.agencyLogoUrl === "string" && body.agencyLogoUrl.startsWith("/")
+          ? body.agencyLogoUrl.slice(0, 300)
+          : null
 
-    if (!SAFETY_TIP_CATEGORIES.includes(category as (typeof SAFETY_TIP_CATEGORIES)[number])) {
-      return NextResponse.json({ error: "Choose a safety tip category." }, { status: 400 })
+    if (!isSafetyTipCategory(category)) {
+      return NextResponse.json({ error: "Choose a safety graphic category." }, { status: 400 })
     }
-    if (residentNeed.length < 8) {
+    if (!isSafetyAudience(audience) || !isSafetyGraphicStyle(style)) {
+      return NextResponse.json({ error: "Choose audience and style." }, { status: 400 })
+    }
+    if (!headline || !copyBody) {
       return NextResponse.json(
-        { error: "Tell us what residents should know (at least a short sentence)." },
+        { error: "Approve a headline and safety message before generating." },
         { status: 400 }
       )
     }
 
-    const agencyType = formatDepartmentLabel(
-      String(body.agencyType || body.departmentType || ""),
-      String(body.agencyTypeOther || body.departmentOther || "")
-    )
+    const mustShow = Array.isArray(body.mustShow)
+      ? body.mustShow.map((item: unknown) => String(item || "").trim()).filter(Boolean)
+      : []
+    const mustAvoid = Array.isArray(body.mustAvoid)
+      ? body.mustAvoid.map((item: unknown) => String(item || "").trim()).filter(Boolean)
+      : []
 
-    const result = await createSafetyTipGraphicPackage({
+    const result = await generateSafetyTipGraphicImage({
       category,
+      headline,
+      supportingLine,
+      body: copyBody,
+      emergencyMessage,
+      audience,
+      visualDirection,
+      style,
+      mustShow,
+      mustAvoid,
+      verifiedTopic,
       residentNeed,
-      agencyName: String(body.agencyName || ""),
-      agencyType,
-      city: String(body.city || ""),
-      state: String(body.state || ""),
+      agencyLogoUrl,
     })
 
     if (!result.ok) {
       return NextResponse.json(aiErrorPayload(result.reason, result.detail), { status: 503 })
     }
 
-    return NextResponse.json(result.data)
+    const graphicId = crypto.randomUUID()
+    const sources = (Array.isArray(body.sources) ? body.sources : []) as GraphicStudioSource[]
+    await saveGraphicStudioRecord({
+      graphic_id: graphicId,
+      agency_id: String(body.agencyName || session.email),
+      user_id: session.email,
+      graphic_type: "safety",
+      category,
+      audience,
+      original_user_request: residentNeed,
+      approved_headline: headline,
+      approved_supporting_line: supportingLine,
+      approved_body_copy: copyBody,
+      approved_emergency_message: emergencyMessage,
+      visual_style: style,
+      research_json: body.research ?? null,
+      source_records: sources,
+      image_prompt: verifiedTopic,
+      agency_logo_used: Boolean(agencyLogoUrl),
+      generation_model: result.data.model,
+      generated_at: new Date().toISOString(),
+      revision_count: 0,
+      status: "generated",
+    })
+
+    return NextResponse.json({
+      imageDataUrl: result.data.dataUrl,
+      generationModel: result.data.model,
+      graphicId,
+      headline,
+      supportingLine,
+      body: copyBody,
+      emergencyMessage,
+      caption: String(body.caption || copyBody),
+    })
   } catch (err) {
     console.error("[api/pio/graphic-studio/safety-tip]", err)
-    return NextResponse.json({ error: "Failed to create safety tip graphic." }, { status: 500 })
+    return NextResponse.json({ error: "Failed to create safety graphic." }, { status: 500 })
   }
 }
