@@ -1,4 +1,4 @@
-import type { SafetyTipCategory } from "@/lib/pio-graphic-studio-types"
+import { graphicOnImageCopy } from "@/lib/graphic-studio-display-copy"
 
 /** Category-specific research guidance from the Graphic Studio product spec. */
 const CATEGORY_SOURCE_GUIDANCE: Partial<Record<SafetyTipCategory, string>> = {
@@ -36,7 +36,7 @@ Your job is to research a requested public-safety topic, verify the safety infor
 
 The user's category is a broad bucket only. The verified topic MUST match what the user asked for — not a random popular topic from that category.
 
-Example: Category "Scams & Fraud" + user asks about Bitcoin impersonation → verified_topic must be about that scam, NOT grease fires, kitchen safety, or unrelated fire content.
+Example: Category "Scams & Fraud" + user asks about Bitcoin impersonation → verified_topic must be about that scam, not an unrelated topic from a different category.
 
 RESEARCH REQUIREMENTS
 
@@ -108,8 +108,16 @@ export function buildSafetyImagePrompt(opts: {
   style: string
   mustShow: string[]
   mustAvoid: string[]
-  agencyLogoPresent: boolean
+  /** Leave bottom-right empty — agency logo is stamped client-side after generation. */
+  reserveLogoCorner: boolean
 }): string {
+  const display = graphicOnImageCopy({
+    headline: opts.headline,
+    supportingLine: opts.supportingLine,
+    body: opts.residentMessage,
+    emergencyMessage: opts.emergencyMessage,
+  })
+
   const mustShow = opts.mustShow.length
     ? opts.mustShow.map((item) => `- ${item}`).join("\n")
     : "- the primary safety situation from the verified topic"
@@ -119,39 +127,30 @@ export function buildSafetyImagePrompt(opts: {
 
   const paletteHint = paletteForCategory(opts.category)
 
-  const logoBlock = opts.agencyLogoPresent
-    ? `An official agency logo is provided as an image input.
+  const logoBlock = opts.reserveLogoCorner
+    ? `Do NOT render any agency logo, badge, seal, sheriff star, fire patch, or department emblem anywhere in this image.
 
-You MUST incorporate the exact supplied agency logo into the finished composition.
+A real agency logo will be added AFTER generation in the bottom-right corner.
 
-Place the logo in the BOTTOM-RIGHT corner.
+Leave the bottom-right corner completely empty:
+- no fake badges or seals
+- no placeholder logo boxes
+- no text or icons in the bottom-right 14% of canvas width and bottom 16% of canvas height
 
-Design the graphic around the logo from the beginning.
-
-Reserve a clean bottom-right branding area BEFORE arranging text or important imagery.
-
-Target visual size: approximately 10–12% of canvas width with proportional height.
-
-Maintain approximately 3–4% padding from the right and bottom edges.
-
-Nothing important should appear underneath or behind the logo.
-
-DO NOT invent a new logo, badge, sheriff star, municipal seal, or recreate the supplied logo from memory.
-DO NOT stretch, distort, crop, or recolor the supplied logo.`
+Design the layout knowing that corner is reserved for post-production branding.`
     : `No agency logo is provided.
 
 Do not create a logo.
 Do not create a placeholder.
 Do not insert SaferU branding.
-Do not invent a badge, patch, seal, or department name.
-Use the bottom-right area naturally as part of the composition.`
+Do not invent a badge, patch, seal, or department name.`
 
-  const supportingBlock = opts.supportingLine.trim()
-    ? `Supporting line (render exactly): "${opts.supportingLine.trim()}"`
+  const supportingBlock = display.supportingLine
+    ? `Supporting line (one line only): "${display.supportingLine}"`
     : "Supporting line: (none — do not invent one)"
 
-  const emergencyBlock = opts.emergencyMessage.trim()
-    ? `Emergency message (render exactly): "${opts.emergencyMessage.trim()}"`
+  const emergencyBlock = display.emergencyMessage
+    ? `Emergency callout (small, optional): "${display.emergencyMessage}"`
     : "Emergency message: (none — do not invent one)"
 
   return `Create a professional 16:9 public-safety social media graphic.
@@ -169,15 +168,18 @@ Verified topic (the ONLY subject of this graphic): ${opts.verifiedTopic}
 Original agency request: ${opts.originalRequest}
 
 You MUST design a graphic about the verified topic above.
-DO NOT substitute a different safety subject.
-DO NOT show grease fires, stove safety, kitchen fires, or cooking content unless the verified topic is explicitly about that.
-DO NOT show unrelated stock safety imagery that contradicts the verified topic.
+DO NOT substitute an unrelated safety subject from a different category.
 
-Render these EXACT on-screen text strings (spell exactly, do not paraphrase):
-Headline: "${opts.headline.trim()}"
+ON-GRAPHIC TEXT (strict — these are the ONLY words to render on the image):
+Headline: "${display.headline}"
 ${supportingBlock}
-Main safety message: "${opts.residentMessage.trim()}"
+Main message (1–2 short lines max, left side only): "${display.mainMessage}"
 ${emergencyBlock}
+
+Do not render a full-width footer bar, bottom paragraph strip, or edge-to-edge text block.
+Do not cram the entire approved copy onto the graphic — keep total on-image text under 45 words.
+Keep at least 8% margin on the left, top, and right edges.
+Keep the bottom 18% of the canvas free of text (logo safe zone).
 
 Do not invent additional tips, statistics, laws, warnings, or different headline/body wording.
 
@@ -218,7 +220,9 @@ LAYOUT
 
 Use one dominant visual, one large headline, one concise safety message, strong visual hierarchy, generous whitespace, large mobile-readable typography, clean margins, intentional composition.
 
-Avoid tiny text, long paragraphs, excessive cards, excessive icons, clutter, unnecessary decoration, information overload, text touching the canvas edge.
+Place all text in the upper-left or left third of the canvas — never in a full-width band across the bottom.
+
+Avoid tiny text, long paragraphs, full-width footer text bars, excessive cards, excessive icons, clutter, unnecessary decoration, information overload, text touching the canvas edge.
 
 ==================================================
 VISUAL STYLE
@@ -269,8 +273,6 @@ OFFICIAL AGENCY LOGO
 
 ${logoBlock}
 
-If the attached image is a logo, it is ONLY the official agency logo — not the background of the graphic. Create a full 16:9 original composition and place that exact logo bottom-right.
-
 ==================================================
 FINAL QUALITY TARGET
 ==================================================
@@ -290,7 +292,7 @@ function paletteForCategory(category: string): string {
     return "Topic palette: orange, red, white, charcoal, warm neutrals."
   }
   if (key.includes("scam") || key.includes("fraud") || key.includes("crime")) {
-    return "Topic palette: navy, blue, red, warning colors — NOT kitchen/fire orange unless the topic is fire."
+    return "Topic palette: navy, blue, red, warning colors."
   }
   if (key.includes("cyber")) {
     return "Topic palette: blue, cyan, purple, clean technology colors."

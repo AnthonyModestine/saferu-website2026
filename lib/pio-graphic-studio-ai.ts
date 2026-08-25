@@ -4,16 +4,17 @@ import { readFile } from "fs/promises"
 import path from "path"
 import { toFile } from "openai"
 import {
-  buildSafetyImagePrompt,
-  researchSourceGuidance,
-  SAFETY_RESEARCH_SYSTEM,
-} from "@/lib/graphic-studio-prompts"
-import {
   buildFallbackSafetyResearchBrief,
   normalizeSafetyResearchBrief,
   SAFETY_RESEARCH_RESPONSE_FORMAT,
   safetyResearchBriefSchema,
 } from "@/lib/graphic-studio-schemas"
+import { graphicOnImageCopy } from "@/lib/graphic-studio-display-copy"
+import {
+  buildSafetyImagePrompt,
+  researchSourceGuidance,
+  SAFETY_RESEARCH_SYSTEM,
+} from "@/lib/graphic-studio-prompts"
 import { runPioStructuredCall } from "@/lib/pio-structured-call"
 import type { AiResult } from "@/lib/ai-result"
 import {
@@ -324,11 +325,18 @@ export async function validateGeneratedGraphic(opts: {
   supportingLine: string
   body: string
   emergencyMessage: string
-  agencyLogoExpected: boolean
+  reserveLogoCorner: boolean
 }): Promise<{ status: "PASS" | "REGENERATE"; problems: string[]; revision_instructions: string[] }> {
   const apiKey = process.env.OPENAI_API_KEY?.trim()
   const fallback = { status: "PASS" as const, problems: [] as string[], revision_instructions: [] as string[] }
   if (!apiKey) return fallback
+
+  const onImage = graphicOnImageCopy({
+    headline: opts.headline,
+    supportingLine: opts.supportingLine,
+    body: opts.body,
+    emergencyMessage: opts.emergencyMessage,
+  })
 
   try {
     const { default: OpenAI } = await import("openai")
@@ -345,18 +353,21 @@ export async function validateGeneratedGraphic(opts: {
 
 Compare it against the approved content and visual requirements.
 
-Look carefully for spelling errors, factual contradictions, malformed objects, extra text, missing text, logo distortion, fake agency branding, logo overlap, clutter, tiny unreadable copy, text touching the edges, and visual safety mistakes.
+Look carefully for spelling errors, factual contradictions, malformed objects, extra text, missing text, fake agency branding, clutter, tiny unreadable copy, text touching the edges, full-width bottom text bars, and visual safety mistakes.
 
 Approved category: ${opts.category}
 Approved verified topic: ${opts.verifiedTopic}
-Approved headline (must appear on graphic): ${opts.headline}
-Supporting line: ${opts.supportingLine || "(none)"}
-Body: ${opts.body}
-Emergency: ${opts.emergencyMessage || "(none)"}
-Agency logo expected: ${opts.agencyLogoExpected ? "yes, bottom-right" : "no — fail if a fake badge/seal/logo was invented"}
+Expected on-image headline: ${onImage.headline}
+Expected on-image supporting line: ${onImage.supportingLine || "(none)"}
+Expected on-image main message (short): ${onImage.mainMessage}
+Expected on-image emergency: ${onImage.emergencyMessage || "(none)"}
+Agency logo in this image: ${opts.reserveLogoCorner ? "NO — logo is added after generation. FAIL if any badge, seal, patch, or logo appears anywhere." : "not expected — fail if a fake badge/seal/logo was invented"}
 
-REGENERATE if the graphic shows a different safety topic than the verified topic (example: grease/kitchen fire content when the topic is a scam).
-REGENERATE if the headline text is missing, paraphrased, or replaced with unrelated safety messaging.
+REGENERATE if the graphic shows a different safety topic than the verified topic.
+REGENERATE if the headline is missing or replaced with unrelated messaging.
+REGENERATE if text runs edge-to-edge or fills a full-width footer bar across the bottom.
+REGENERATE if there is too much text to read quickly (wall of text).
+REGENERATE if any agency badge, seal, or logo appears when logo should be added post-production.
 
 Return JSON:
 {"status":"PASS"|"REGENERATE","problems":[],"revision_instructions":[]}
@@ -406,6 +417,7 @@ export async function generateSafetyTipGraphicImage(opts: {
   revisionRequest?: string
 }): Promise<AiResult<GeneratedImage>> {
   const verifiedTopic = opts.verifiedTopic?.trim() || opts.category
+  const stampLogoClientSide = Boolean(opts.agencyLogoUrl)
   const basePrompt = buildSafetyImagePrompt({
     category: opts.category,
     verifiedTopic,
@@ -419,7 +431,7 @@ export async function generateSafetyTipGraphicImage(opts: {
     style: opts.style || "Let SaferU Decide",
     mustShow: opts.mustShow || [],
     mustAvoid: opts.mustAvoid || [],
-    agencyLogoPresent: Boolean(opts.agencyLogoUrl),
+    reserveLogoCorner: stampLogoClientSide,
   })
   const prompt = opts.revisionRequest
     ? `Edit the supplied existing graphic. This is a PRECISION REVISION.
@@ -435,7 +447,7 @@ ${basePrompt}`
 
   let image = await generateImageFromPrompt({
     prompt,
-    logoUrl: opts.agencyLogoUrl,
+    logoUrl: null,
     sourceImageDataUrl: opts.sourceImageDataUrl,
   })
   if (!image.ok) return image
@@ -448,7 +460,7 @@ ${basePrompt}`
     supportingLine: opts.supportingLine || "",
     body: opts.body,
     emergencyMessage: opts.emergencyMessage || "",
-    agencyLogoExpected: Boolean(opts.agencyLogoUrl),
+    reserveLogoCorner: stampLogoClientSide,
   })
 
   if (review.status === "REGENERATE" && review.revision_instructions.length) {
@@ -459,7 +471,7 @@ ${review.revision_instructions.map((item) => `- ${item}`).join("\n")}
 `
     const retry = await generateImageFromPrompt({
       prompt: retryPrompt,
-      logoUrl: opts.agencyLogoUrl,
+      logoUrl: null,
       sourceImageDataUrl: image.data.dataUrl,
     })
     if (retry.ok) image = retry
@@ -534,10 +546,13 @@ export function buildEventImagePrompt(opts: {
   contact: string
   style: string
   agencyLogoPresent: boolean
+  reserveLogoCorner: boolean
 }): string {
-  const logo = opts.agencyLogoPresent
-    ? `An official agency logo is supplied as an image input. Place the exact supplied logo in the BOTTOM-RIGHT corner. Design around the logo. Keep important content away from the logo area. Do not recreate, alter, crop, recolor, distort, or replace it.`
-    : `No logo is supplied. Do not generate one. Do not invent a badge, seal, or SaferU mark.`
+  const logo = opts.reserveLogoCorner
+    ? `Do NOT render any agency logo, badge, or seal. Leave the bottom-right corner empty — a real logo is added after generation.`
+    : opts.agencyLogoPresent
+      ? `An official agency logo is supplied as an image input. Place the exact supplied logo in the BOTTOM-RIGHT corner. Design around the logo. Keep important content away from the logo area. Do not recreate, alter, crop, recolor, distort, or replace it.`
+      : `No logo is supplied. Do not generate one. Do not invent a badge, seal, or SaferU mark.`
 
   return `Create a professional 16:9 public-agency event graphic.
 
@@ -557,7 +572,7 @@ Style: ${opts.style}
 DESIGN PRIORITY
 The resident should immediately understand WHAT, WHEN, WHERE.
 Event name should be dominant. Date/time highly visible. Location easy to find.
-Avoid long paragraphs.
+Avoid long paragraphs and full-width bottom text bars.
 Use professional imagery appropriate to the event.
 Do not fabricate uniforms, badges, seals, or agency branding.
 Do not use SaferU branding.
@@ -578,6 +593,7 @@ export async function generateEventGraphicImage(opts: {
   style?: string
   agencyLogoUrl?: string | null
 }): Promise<AiResult<GeneratedImage>> {
+  const stampLogoClientSide = Boolean(opts.agencyLogoUrl)
   const prompt = buildEventImagePrompt({
     eventType: opts.eventType,
     eventName: opts.eventName,
@@ -588,7 +604,8 @@ export async function generateEventGraphicImage(opts: {
     cta: opts.cta || "",
     contact: opts.contact || "",
     style: opts.style || "Let SaferU Decide",
-    agencyLogoPresent: Boolean(opts.agencyLogoUrl),
+    agencyLogoPresent: false,
+    reserveLogoCorner: stampLogoClientSide,
   })
-  return generateImageFromPrompt({ prompt, logoUrl: opts.agencyLogoUrl })
+  return generateImageFromPrompt({ prompt, logoUrl: null })
 }
