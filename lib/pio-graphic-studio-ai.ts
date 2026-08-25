@@ -11,6 +11,7 @@ import {
 } from "@/lib/graphic-studio-schemas"
 import { graphicOnImageCopy } from "@/lib/graphic-studio-display-copy"
 import {
+  buildAgencyLogoPromptBlock,
   buildSafetyImagePrompt,
   GRAPHIC_MARGIN_RULES,
   researchSourceGuidance,
@@ -208,9 +209,9 @@ async function resolveLogoFile(logoUrl?: string | null) {
   return null
 }
 
-function truncateImagePrompt(prompt: string, max = 3900): string {
+function truncateForDallE(prompt: string, max = 3950): string {
   if (prompt.length <= max) return prompt
-  return `${prompt.slice(0, max - 24).trimEnd()}\n\n[Prompt truncated]`
+  return `${prompt.slice(0, max - 40).trimEnd()}\n\n[Prompt shortened for DALL-E]`
 }
 
 async function fetchImageAsDataUrl(url: string): Promise<string | null> {
@@ -235,7 +236,7 @@ async function generateImageFromPrompt(opts: {
   const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) return { ok: false, reason: "missing_api_key" }
 
-  const prompt = truncateImagePrompt(opts.prompt)
+  const fullPrompt = opts.prompt
   const sourceFile = opts.sourceImageDataUrl
     ? await resolveLogoFile(opts.sourceImageDataUrl)
     : null
@@ -249,7 +250,7 @@ async function generateImageFromPrompt(opts: {
         const response = await openai.images.edit({
           model: "gpt-image-1",
           image: sourceFile,
-          prompt,
+          prompt: fullPrompt,
           n: 1,
           size: "1536x1024",
         })
@@ -267,7 +268,7 @@ async function generateImageFromPrompt(opts: {
         const response = await openai.images.edit({
           model: "gpt-image-1",
           image: logoFile,
-          prompt,
+          prompt: fullPrompt,
           n: 1,
           size: "1536x1024",
         })
@@ -282,7 +283,7 @@ async function generateImageFromPrompt(opts: {
     try {
       const response = await openai.images.generate({
         model: "gpt-image-1",
-        prompt,
+        prompt: fullPrompt,
         n: 1,
         size: "1536x1024",
         quality: "medium",
@@ -294,9 +295,10 @@ async function generateImageFromPrompt(opts: {
       console.warn("[graphic-studio-ai] gpt-image-1 failed, trying dall-e-3:", detail)
     }
 
+    const dallePrompt = truncateForDallE(fullPrompt)
     const response = await openai.images.generate({
       model: "dall-e-3",
-      prompt,
+      prompt: dallePrompt,
       n: 1,
       size: "1792x1024",
       quality: "standard",
@@ -354,7 +356,7 @@ export async function validateGeneratedGraphic(opts: {
 
 Compare it against the approved content and visual requirements.
 
-Look carefully for spelling errors, factual contradictions, malformed objects, extra text, missing text, fake agency branding, clutter, tiny unreadable copy, text touching the edges, full-width bottom text bars, and visual safety mistakes.
+Look carefully for spelling errors, factual contradictions, malformed objects, extra text, missing text, fake agency branding, clutter, tiny unreadable copy, text cropped or cut off by the canvas edge, text hugging the border, imagery or text behind or under the agency logo, and visual safety mistakes.
 
 Approved category: ${opts.category}
 Approved verified topic: ${opts.verifiedTopic}
@@ -362,14 +364,15 @@ Expected on-image headline: ${onImage.headline}
 Expected on-image supporting line: ${onImage.supportingLine || "(none)"}
 Expected on-image main message (short): ${onImage.mainMessage}
 Expected on-image emergency: ${onImage.emergencyMessage || "(none)"}
-Agency logo expected: ${opts.agencyLogoExpected ? "yes — exact supplied logo once, bottom-right. FAIL if duplicated, missing, distorted, or if a fake second badge was invented." : "no — fail if a fake badge/seal/logo was invented"}
+Agency logo expected: ${opts.agencyLogoExpected ? "yes — exact supplied logo once, bottom-right on a CLEAN unobstructed background. FAIL if busy imagery, text, or graphics appear behind/under/overlapping the logo. FAIL if duplicated or distorted." : "no — fail if a fake badge/seal/logo was invented"}
 
 REGENERATE if the graphic shows a different safety topic than the verified topic.
 REGENERATE if the headline is missing or replaced with unrelated messaging.
+REGENERATE if any text is cropped, clipped, or cut off by the canvas edge.
 REGENERATE if text runs edge-to-edge or fills a full-width footer bar across the bottom.
-REGENERATE if any text, logo, icon, or important visual sits too close to the canvas edge (less than roughly 8–10% inset from top, left, right, or bottom).
+REGENERATE if any text or important visual sits too close to the canvas edge (less than roughly 12–14% inset).
 REGENERATE if there is too much text to read quickly (wall of text).
-REGENERATE if the agency logo appears more than once or is stacked/overlapping.
+REGENERATE if the agency logo appears more than once, or if anything is drawn behind/under the logo.
 
 Return JSON:
 {"status":"PASS"|"REGENERATE","problems":[],"revision_instructions":[]}
@@ -549,13 +552,13 @@ export function buildEventImagePrompt(opts: {
   style: string
   agencyLogoPresent: boolean
 }): string {
-  const logo = opts.agencyLogoPresent
-    ? `An official agency logo is supplied as an image input. Place the exact supplied logo once in the BOTTOM-RIGHT corner. Design around the logo. Keep important content away from the logo area. Do not duplicate it. Do not recreate, alter, crop, recolor, distort, or replace it.`
-    : `No logo is supplied. Do not generate one. Do not invent a badge, seal, or SaferU mark.`
-
   return `Create a professional 16:9 public-agency event graphic.
 
 This graphic will be posted by an official police, fire, EMS, emergency management, municipal, or other public agency.
+
+${buildAgencyLogoPromptBlock(opts.agencyLogoPresent)}
+
+${GRAPHIC_MARGIN_RULES}
 
 EVENT
 Event Type: ${opts.eventType}
@@ -576,10 +579,8 @@ Use professional imagery appropriate to the event.
 Do not fabricate uniforms, badges, seals, or agency branding.
 Do not use SaferU branding.
 
-${GRAPHIC_MARGIN_RULES}
-
 AGENCY LOGO
-${logo}`
+(See OFFICIAL AGENCY LOGO section above.)`
 }
 
 export async function generateEventGraphicImage(opts: {

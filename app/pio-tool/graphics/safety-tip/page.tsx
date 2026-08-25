@@ -10,7 +10,6 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { PostMediaLightbox } from "@/components/post-media-lightbox"
 import { useAgency } from "@/lib/agency-context"
-import { createSafetyTipGraphic } from "@/lib/pio-graphic-studio"
 import { GraphicStudioSelect } from "@/components/pio/graphic-studio-select"
 import {
   SAFETY_AUDIENCES,
@@ -137,15 +136,7 @@ export default function SafetyTipGraphicPage() {
         setPreview(aiImage)
         return
       }
-      const fallback = await createSafetyTipGraphic({
-        categoryLabel: category,
-        headline,
-        body,
-        agencyName: settings.agencyName,
-        agencyLogoUrl: settings.logoUrl,
-        aspect: "landscape",
-      })
-      setPreview(fallback)
+      setError("Could not generate graphic. Please try again.")
     } catch {
       setError("Something went wrong generating the graphic. Please try again.")
     } finally {

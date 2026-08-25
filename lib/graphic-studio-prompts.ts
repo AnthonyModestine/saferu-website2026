@@ -1,4 +1,5 @@
 import { graphicOnImageCopy } from "@/lib/graphic-studio-display-copy"
+import type { SafetyTipCategory } from "@/lib/pio-graphic-studio-types"
 
 /** Category-specific research guidance from the Graphic Studio product spec. */
 const CATEGORY_SOURCE_GUIDANCE: Partial<Record<SafetyTipCategory, string>> = {
@@ -36,94 +37,92 @@ Your job is to research a requested public-safety topic, verify the safety infor
 
 The user's category is a broad bucket only. The verified topic MUST match what the user asked for — not a random popular topic from that category.
 
-Example: Category "Scams & Fraud" + user asks about Bitcoin impersonation → verified_topic must be about that scam, not an unrelated topic from a different category.
-
 RESEARCH REQUIREMENTS
 
 Research the topic using CURRENT authoritative sources.
 
-Prioritize:
-
-- official government sources
-- nationally recognized safety organizations
-- recognized standards organizations
-- official manufacturer instructions when product-specific
-
-Do not use random blogs, SEO articles, social media posts, or news stories as the primary authority when an authoritative source exists.
+Prioritize official government sources, nationally recognized safety organizations, recognized standards organizations, and official manufacturer instructions when product-specific.
 
 Cross-check consequential safety advice whenever practical.
 
-DETERMINE
-
-1. Primary hazard
-2. Recommended resident action
-3. What residents should avoid
-4. Why the recommendation matters
-5. Emergency action if relevant
-6. Whether the user's request contains inaccurate or misleading assumptions
-
-CORRECT INACCURATE REQUESTS
-
-If the user's requested advice conflicts with authoritative safety guidance, do not preserve the inaccurate claim.
-
-Replace it with accurate safety advice.
-
-COPY RULES
-
-Do not copy source language unnecessarily.
-
-Do not include source organizations in resident-facing copy.
-
-Create original public-safety language.
-
-The finished graphic should communicate ONE strong takeaway.
+COPY RULES — Do not copy source language unnecessarily. Do not include source organizations in resident-facing copy. ONE strong takeaway.
 
 HEADLINE — Prefer 3–8 words.
 SUPPORTING LINE — Prefer 15 words or fewer.
 MAIN RESIDENT MESSAGE — Prefer approximately 10–35 words.
 EMERGENCY MESSAGE — Only if genuinely useful. Keep very short.
 
-VISUAL CONCEPT
-
-Develop a visual that actually demonstrates the safety issue from the user's request.
-
-For scams: show the fake call, text, payment demand, gift card request, Bitcoin demand, QR code, etc.
-For fire: show the correct response visually.
-The visual should help residents understand the recommendation before they read all the text.
+VISUAL CONCEPT — Develop a visual that demonstrates the safety issue from the user's request.
 
 Also include "caption": a Facebook caption in agency voice (we/you), 1-3 short sentences. Do not cite source organizations in the caption.
 
 OUTPUT STRICT JSON only. No markdown.`
 
-/** Shared margin / safe-zone rules for all Graphic Studio image prompts. */
-export const GRAPHIC_MARGIN_RULES = `==================================================
-MARGINS AND SAFE ZONES (mandatory)
-==================================================
+export function buildAgencyLogoPromptBlock(agencyLogoPresent: boolean): string {
+  if (!agencyLogoPresent) {
+    return `OFFICIAL AGENCY LOGO
 
-Treat the canvas like a professional print layout with generous breathing room.
+No agency logo is provided.
 
-MINIMUM INSET FROM EVERY EDGE:
-- At least 10% padding from the top edge before any text or icon begins.
-- At least 10% padding from the left edge before any text begins.
-- At least 8% padding from the right edge before any text ends (more if the logo is bottom-right).
-- At least 12% padding from the bottom edge before any text — the logo sits below text, not under it.
+Do not create a logo, placeholder, badge, patch, seal, or department name.
+Do not insert SaferU branding.`
+  }
 
-TEXT BLOCK:
-- Keep all headline and body copy inside a left content column that starts no closer than 10% from the left.
-- Limit the text column to roughly 50–55% of canvas width so copy never hugs the right side.
-- Stack headline, supporting line, and main message with clear vertical spacing between lines.
-- Never place text in the outer 10% border band on any side.
+  return `OFFICIAL AGENCY LOGO
+
+An official agency logo is provided as an image input.
+
+The attached image is ONLY the agency logo — not the background of the graphic.
+
+You MUST incorporate the exact supplied agency logo into the finished composition exactly ONCE.
+
+Place the logo in the BOTTOM-RIGHT corner. Do not move it elsewhere.
+
+Target visual size: approximately 10–12% of canvas width with proportional height.
+
+Maintain approximately 3–4% padding from the right and bottom edges.
+
+DO NOT duplicate the logo.
+DO NOT invent a second badge, seal, or department emblem.
+DO NOT recreate, stretch, distort, crop, or recolor the supplied logo.
+
+AGENCY LOGO SAFE AREA (critical)
+
+Reserve a clean bottom-right branding area BEFORE arranging the rest of the design.
+
+The bottom-right zone (roughly the right 20% and bottom 18% of the canvas) must stay visually CLEAR for the logo:
+
+- Use a solid color, soft gradient, or simple unobstructed background behind the logo — NOT busy photography, NOT diagrams, NOT text, NOT icons, NOT faces, NOT equipment drawn underneath the logo.
+- Nothing may appear underneath, behind, overlapping, or immediately adjacent to the agency logo.
+- Do not place headline, safety instructions, emergency instructions, faces, important objects, diagrams, arrows, warning symbols, or safety zones inside the logo area.
+- The logo must sit on clean open space so it is fully readable and nothing is blocked by it.`
+}
+
+export const GRAPHIC_MARGIN_RULES = `MARGINS AND SAFE ZONES (mandatory — failure to follow means the graphic is unusable)
+
+The entire composition must fit comfortably INSIDE the canvas with NO text cropped or cut off by the edges.
+
+MINIMUM INSET — no exceptions:
+- Top: at least 14% empty padding before the first line of text or top of any foreground object.
+- Left: at least 14% empty padding before any text begins.
+- Right: at least 14% empty padding before any text ends (more clearance when the logo is bottom-right).
+- Bottom: at least 16% empty padding before any text (the logo occupies the bottom-right corner below text).
+
+TEXT RULES:
+- Place ALL text in the upper-left or left third only — never across the full width, never in a bottom footer strip.
+- Text column starts at 14% from the left and must not extend past 52% of canvas width.
+- Every letter of every word must be fully visible — nothing clipped, truncated, or touching the canvas border.
+- Use large mobile-readable type with generous line spacing.
+- Total on-image words: under 40.
 
 MAIN VISUAL:
-- Important objects, faces, icons, and diagrams should stay inside the center 80% of the canvas.
-- Backgrounds may extend full bleed, but foreground subjects and labels must respect the inset margins.
+- Foreground subjects, icons, and labels stay inside the center 72% of the canvas.
+- Backgrounds may extend edge-to-edge, but no text or critical visuals in the outer 14% border on any side.`
 
-LOGO AREA:
-- Reserve the bottom-right corner for the agency logo with 3–4% padding from the right and bottom edges.
-- No text, arrows, or important imagery in the bottom-right 18% width × 16% height zone.
-
-FAIL if any text, logo, or important graphic element touches or nearly touches the canvas border.`
-
+/**
+ * Safety graphic image prompt — matches the Graphic Studio product spec (IMAGE PROMPT).
+ * OpenAI is the sole renderer; the website does not modify the returned image.
+ */
 export function buildSafetyImagePrompt(opts: {
   category: string
   verifiedTopic: string
@@ -153,44 +152,12 @@ export function buildSafetyImagePrompt(opts: {
     ? opts.mustAvoid.map((item) => `- ${item}`).join("\n")
     : "- stereotypes, gore, fake badges, unrelated safety topics"
 
-  const paletteHint = paletteForCategory(opts.category)
-
-  const logoBlock = opts.agencyLogoPresent
-    ? `An official agency logo is provided as an image input.
-
-The attached image is ONLY the agency logo — not the background of the graphic.
-
-You MUST incorporate the exact supplied agency logo into the finished composition exactly ONCE.
-
-Place the logo in the BOTTOM-RIGHT corner.
-
-Design the full 16:9 graphic around the logo from the beginning.
-
-Reserve a clean bottom-right branding area BEFORE arranging text or important imagery.
-
-Target visual size: approximately 10–12% of canvas width with proportional height.
-
-Maintain approximately 3–4% padding from the right and bottom edges.
-
-Nothing important should appear underneath or behind the logo.
-
-DO NOT duplicate the logo.
-DO NOT invent a second badge, seal, or department emblem.
-DO NOT invent a new logo, recreate the supplied logo from memory, stretch, distort, crop, or recolor it.`
-    : `No agency logo is provided.
-
-Do not create a logo.
-Do not create a placeholder.
-Do not insert SaferU branding.
-Do not invent a badge, patch, seal, or department name.`
-
   const supportingBlock = display.supportingLine
-    ? `Supporting line (one line only): "${display.supportingLine}"`
-    : "Supporting line: (none — do not invent one)"
-
+    ? `Supporting line: "${display.supportingLine}"`
+    : "Supporting line: (none)"
   const emergencyBlock = display.emergencyMessage
-    ? `Emergency callout (small, optional): "${display.emergencyMessage}"`
-    : "Emergency message: (none — do not invent one)"
+    ? `Emergency callout: "${display.emergencyMessage}"`
+    : "Emergency message: (none)"
 
   return `Create a professional 16:9 public-safety social media graphic.
 
@@ -198,27 +165,7 @@ This graphic will be published by an official police department, sheriff's offic
 
 It must look credible, polished, modern, and appropriate for an official agency social media account.
 
-==================================================
-CRITICAL — TOPIC AND COPY LOCK
-==================================================
-
-Safety category: ${opts.category}
-Verified topic (the ONLY subject of this graphic): ${opts.verifiedTopic}
-Original agency request: ${opts.originalRequest}
-
-You MUST design a graphic about the verified topic above.
-DO NOT substitute an unrelated safety subject from a different category.
-
-ON-GRAPHIC TEXT (strict — these are the ONLY words to render on the image):
-Headline: "${display.headline}"
-${supportingBlock}
-Main message (1–2 short lines max, left side only): "${display.mainMessage}"
-${emergencyBlock}
-
-Do not render a full-width footer bar, bottom paragraph strip, or edge-to-edge text block.
-Do not cram the entire approved copy onto the graphic — keep total on-image text under 45 words.
-
-Do not invent additional tips, statistics, laws, warnings, or different headline/body wording.
+${buildAgencyLogoPromptBlock(opts.agencyLogoPresent)}
 
 ${GRAPHIC_MARGIN_RULES}
 
@@ -227,7 +174,15 @@ VERIFIED CONTENT
 ==================================================
 
 Topic: ${opts.verifiedTopic}
+Category: ${opts.category}
 Target Audience: ${opts.audience}
+Original request: ${opts.originalRequest}
+
+Headline: ${display.headline}
+${supportingBlock}
+Primary resident safety message: ${display.mainMessage}
+${emergencyBlock}
+
 Visual Concept: ${opts.visualConcept}
 Preferred Style: ${opts.style}
 
@@ -242,7 +197,9 @@ PRIMARY DESIGN OBJECTIVE
 ==================================================
 
 A resident scrolling social media should understand the primary safety lesson within approximately 2–3 seconds.
+
 Teach ONE safety idea extremely well.
+
 Use the visual itself to communicate as much of the safety lesson as possible.
 
 This is NOT an article, brochure, presentation slide, dense checklist, or wall of text.
@@ -259,71 +216,56 @@ LAYOUT
 
 Use one dominant visual, one large headline, one concise safety message, strong visual hierarchy, generous whitespace, large mobile-readable typography, clean margins, intentional composition.
 
-Place all text in the upper-left or left third of the canvas — never in a full-width band across the bottom.
-All text must sit comfortably inside the margin rules above — never hugging the border.
-
-Avoid tiny text, long paragraphs, full-width footer text bars, excessive cards, excessive icons, clutter, unnecessary decoration, information overload, text touching or nearly touching the canvas edge.
+Avoid tiny text, long paragraphs, full-width footer text bars, excessive cards, excessive icons, clutter, unnecessary decoration, information overload, and any text touching or near the canvas edge.
 
 ==================================================
 VISUAL STYLE
 ==================================================
 
-Do not use the same layout for every graphic. Allow the subject matter to influence the design.
-Depending on the topic, use realistic scenes, polished illustration, clean diagrams, modern infographic elements, strong public-safety poster design, family-friendly illustration, or technology-oriented design as appropriate.
+Allow the subject matter to influence the design. Use realistic scenes, polished illustration, clean diagrams, or modern infographic elements as appropriate — not the same template every time.
 
 ==================================================
 COLOR
 ==================================================
 
-Do NOT force SaferU colors. Choose a palette that supports this specific topic.
-${paletteHint}
+Do NOT force SaferU colors. Choose a palette that supports this topic.
+${paletteForCategory(opts.category)}
 
 ==================================================
 VISUAL ACCURACY
 ==================================================
 
 Physical relationships must be logical. The visual must accurately support the verified safety information.
-Unsafe behavior should only be shown when unmistakably identified as unsafe.
 
 ==================================================
 PEOPLE
 ==================================================
 
 Do not associate crime, scams, unsafe behavior, or danger with protected characteristics. Avoid stereotypes.
-When humans are unnecessary, prefer objects, phones, vehicles, roads, homes, equipment, packages, diagrams, computers, and environmental scenes.
 
 ==================================================
 PUBLIC-SAFETY TONE
 ==================================================
 
-Professional. Clear. Educational. Confident. Not sensational.
-No gore, graphic injuries, clickbait, exaggerated destruction, or marketing copy.
+Professional. Clear. Educational. Confident. Not sensational. No gore, clickbait, or marketing copy.
 
 ==================================================
 TEXT
 ==================================================
 
-Use ONLY the approved factual messaging supplied in this prompt.
-Do not add "Source: NFPA", "According to FEMA", or similar attribution.
-All displayed text must be correctly spelled, crisp, legible, mobile readable, and professionally aligned.
+Use ONLY the approved factual messaging supplied above.
 
-==================================================
-OFFICIAL AGENCY LOGO
-==================================================
+Do not invent additional tips, statistics, laws, warnings, or source attributions.
 
-${logoBlock}
+All displayed text must be correctly spelled, crisp, legible, and fully visible within the safe margins.
 
 ==================================================
 FINAL QUALITY TARGET
 ==================================================
 
-Prioritize in this order:
-1. Safety accuracy
-2. Immediate comprehension
-3. Visual accuracy
-4. Readability
-5. Professional design
-6. Agency branding`
+The final graphic should look like something a professional PIO would publish on an official agency account.
+
+Prioritize: 1) Safety accuracy 2) Immediate comprehension 3) Visual accuracy 4) Readability 5) Professional design 6) Agency branding`
 }
 
 function paletteForCategory(category: string): string {

@@ -15,9 +15,9 @@ export function graphicOnImageCopy(opts: {
 
   const bodyWords = opts.body.trim().split(/\s+/).filter(Boolean)
   const mainMessage =
-    bodyWords.length <= 32
+    bodyWords.length <= 22
       ? bodyWords.join(" ")
-      : `${bodyWords.slice(0, 32).join(" ").replace(/[,.;:!?]+$/, "")}…`
+      : `${bodyWords.slice(0, 22).join(" ").replace(/[,.;:!?]+$/, "")}…`
 
   const emergencyRaw = opts.emergencyMessage.trim()
   const emergencyWords = emergencyRaw.split(/\s+/).filter(Boolean)
