@@ -154,8 +154,8 @@ export function buildFallbackSafetyResearchBrief(opts: {
     `A clear ${opts.category.toLowerCase()} public-safety graphic that shows the hazard and the correct resident action.`
 
   return normalizeSafetyResearchBrief({
-    verified_topic: opts.category,
-    primary_hazard: `Residents may face a ${opts.category.toLowerCase()} risk.`,
+    verified_topic: need.slice(0, 160) || opts.category,
+    primary_hazard: `Residents may face a ${opts.category.toLowerCase()} risk related to: ${need.slice(0, 120)}`,
     primary_takeaway: residentMessage,
     headline_options: [headline],
     recommended_headline: headline,

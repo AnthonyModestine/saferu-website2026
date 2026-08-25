@@ -24,7 +24,7 @@ import {
 
 export default function SafetyTipGraphicPage() {
   const { settings } = useAgency()
-  const [category, setCategory] = useState<SafetyTipCategory>("Fire & Cooking Safety")
+  const [category, setCategory] = useState<SafetyTipCategory>("Other / Custom")
   const [residentNeed, setResidentNeed] = useState("")
   const [audience, setAudience] = useState<SafetyAudience>("General Community")
   const [style, setStyle] = useState<SafetyGraphicStyle>("Let SaferU Decide")

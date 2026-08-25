@@ -4,6 +4,11 @@ import { readFile } from "fs/promises"
 import path from "path"
 import { toFile } from "openai"
 import {
+  buildSafetyImagePrompt,
+  researchSourceGuidance,
+  SAFETY_RESEARCH_SYSTEM,
+} from "@/lib/graphic-studio-prompts"
+import {
   buildFallbackSafetyResearchBrief,
   normalizeSafetyResearchBrief,
   SAFETY_RESEARCH_RESPONSE_FORMAT,
@@ -48,79 +53,7 @@ export type SafetyTipGraphicPackage = SafetyTipGraphicCopy & {
   graphicId: string
 }
 
-const RESEARCH_SYSTEM = `You are the factual research and public-safety content engine for SaferU Graphic Studio.
-
-Your job is NOT to generate an image.
-
-Your job is to research a requested public-safety topic, verify the safety information, determine the most useful resident-facing takeaway, and produce a concise creative brief for another AI system that will create the graphic.
-
-RESEARCH REQUIREMENTS
-
-Research the topic using CURRENT authoritative sources.
-
-Prioritize:
-
-- official government sources
-- nationally recognized safety organizations
-- recognized standards organizations
-- official manufacturer instructions when product-specific
-
-Do not use random blogs, SEO articles, social media posts, or news stories as the primary authority when an authoritative source exists.
-
-Cross-check consequential safety advice whenever practical.
-
-DETERMINE
-
-1. Primary hazard
-2. Recommended resident action
-3. What residents should avoid
-4. Why the recommendation matters
-5. Emergency action if relevant
-6. Whether the user's request contains inaccurate or misleading assumptions
-
-CORRECT INACCURATE REQUESTS
-
-If the user's requested advice conflicts with authoritative safety guidance, do not preserve the inaccurate claim.
-
-Replace it with accurate safety advice.
-
-COPY RULES
-
-Do not copy source language unnecessarily.
-
-Do not include source organizations in resident-facing copy.
-
-Create original public-safety language.
-
-The finished graphic should communicate ONE strong takeaway.
-
-HEADLINE
-
-Prefer 3–8 words.
-
-SUPPORTING LINE
-
-Prefer 15 words or fewer.
-
-MAIN RESIDENT MESSAGE
-
-Prefer approximately 10–35 words.
-
-EMERGENCY MESSAGE
-
-Only include if genuinely useful.
-
-Keep it very short.
-
-VISUAL CONCEPT
-
-Develop a visual that actually demonstrates the safety issue.
-
-The visual should help residents understand the recommendation even before they read all the text.
-
-Also include "caption": a Facebook caption in agency voice (we/you), 1-3 short sentences. Do not cite source organizations in the caption.
-
-OUTPUT STRICT JSON only. No markdown.`
+export { buildSafetyImagePrompt } from "@/lib/graphic-studio-prompts"
 
 function parseJsonObject(raw: string): Record<string, unknown> | null {
   const trimmed = raw.trim()
@@ -149,113 +82,6 @@ function asStringArray(value: unknown): string[] {
   return value.map((item) => String(item || "").trim()).filter(Boolean)
 }
 
-export function buildSafetyImagePrompt(opts: {
-  verifiedTopic: string
-  audience: string
-  headline: string
-  supportingLine: string
-  residentMessage: string
-  emergencyMessage: string
-  visualConcept: string
-  style: string
-  mustShow: string[]
-  mustAvoid: string[]
-  agencyLogoPresent: boolean
-}): string {
-  const mustShow = opts.mustShow.length ? opts.mustShow.map((item) => `- ${item}`).join("\n") : "- the primary safety situation"
-  const mustAvoid = opts.mustAvoid.length ? opts.mustAvoid.map((item) => `- ${item}`).join("\n") : "- stereotypes, gore, fake badges"
-  const logoBlock = opts.agencyLogoPresent
-    ? `An official agency logo is provided as an image input.
-
-You MUST incorporate the exact supplied agency logo into the finished composition.
-
-Place the logo in the BOTTOM-RIGHT corner.
-
-Design the graphic around the logo from the beginning.
-
-Reserve a clean bottom-right branding area BEFORE arranging text or important imagery.
-
-Target visual size: approximately 10–12% of canvas width with proportional height.
-
-Maintain approximately 3–4% padding from the right and bottom edges.
-
-Nothing important should appear underneath or behind the logo.
-
-DO NOT invent a new logo, badge, sheriff star, municipal seal, or recreate the supplied logo from memory.
-DO NOT stretch, distort, crop, or recolor the supplied logo.`
-    : `No agency logo is provided.
-
-Do not create a logo.
-Do not create a placeholder.
-Do not insert SaferU branding.
-Do not invent a badge, patch, seal, or department name.
-Use the bottom-right area naturally as part of the composition.`
-
-  return `Create a professional 16:9 public-safety social media graphic.
-
-This graphic will be published by an official police department, sheriff's office, fire department, EMS agency, emergency management agency, municipality, or other public agency.
-
-It must look credible, polished, modern, and appropriate for an official agency social media account.
-
-VERIFIED CONTENT
-
-Topic: ${opts.verifiedTopic}
-Target Audience: ${opts.audience}
-Headline: ${opts.headline}
-Supporting Line: ${opts.supportingLine || "(none)"}
-Primary Resident Safety Message: ${opts.residentMessage}
-Emergency Message: ${opts.emergencyMessage || "(none)"}
-Visual Concept: ${opts.visualConcept}
-Preferred Style: ${opts.style}
-
-The visual MUST show:
-${mustShow}
-
-The visual MUST NOT show:
-${mustAvoid}
-
-PRIMARY DESIGN OBJECTIVE
-A resident scrolling social media should understand the primary safety lesson within approximately 2–3 seconds.
-Teach ONE safety idea extremely well.
-This is NOT an article, brochure, presentation slide, dense checklist, or wall of text.
-
-FORMAT
-16:9 landscape. High resolution. Professional social-media graphic.
-
-LAYOUT
-Use one dominant visual, one large headline, one concise safety message, strong visual hierarchy, generous whitespace, large mobile-readable typography, clean margins.
-Avoid tiny text, long paragraphs, excessive cards, excessive icons, clutter, unnecessary decoration, text touching the canvas edge.
-
-COLOR
-Do NOT force SaferU colors. Choose a palette that supports the topic.
-Red = danger/stop/emergency. Orange = caution/fire/road work. Yellow = warning. Green = safe/correct action. Blue = trust/informational.
-
-VISUAL ACCURACY
-Physical relationships must be logical. Vehicles, roads, distances, and equipment must look normal and support the verified advice.
-Unsafe behavior should only be shown when it is unmistakably identified as unsafe.
-
-PEOPLE
-Do not associate crime, scams, unsafe behavior, or danger with protected characteristics. Avoid stereotypes. When humans are unnecessary, prefer objects and environments.
-
-PUBLIC-SAFETY TONE
-Professional. Clear. Educational. Confident. Not sensational.
-No gore, graphic injuries, clickbait, or marketing copy.
-
-TEXT
-Use ONLY the approved factual messaging supplied above.
-Do not invent extra tips, statistics, laws, distances, procedures, citations, or source organizations.
-Do not add "Source: NFPA" or similar attribution.
-All displayed text must be correctly spelled, crisp, and mobile readable.
-
-OFFICIAL AGENCY LOGO
-${logoBlock}
-
-If the attached image is a logo, it is ONLY the official agency logo — not the background of the graphic. Create a full 16:9 original composition and place that exact logo bottom-right.
-
-FINAL QUALITY TARGET
-Prioritize: 1) Safety accuracy 2) Immediate comprehension 3) Visual accuracy 4) Readability 5) Professional design 6) Agency branding`
-}
-
 export async function draftSafetyTipGraphicCopy(opts: {
   category: string
   residentNeed: string
@@ -279,6 +105,7 @@ export async function draftSafetyTipGraphicCopy(opts: {
 
   const payload = {
     category,
+    category_source_guidance: researchSourceGuidance(category),
     audience,
     resident_need: residentNeed,
     visual_request: opts.visualRequest?.trim() || "",
@@ -287,6 +114,8 @@ export async function draftSafetyTipGraphicCopy(opts: {
     agency_type: opts.agencyType?.trim() || "",
     city: opts.city?.trim() || "",
     state: opts.state?.trim() || "",
+    instruction:
+      "Research the user's requested topic exactly. Do not substitute a different popular safety topic from the category.",
   }
 
   const buildCopy = (research: SafetyResearchBrief): SafetyTipGraphicCopy => ({
@@ -318,7 +147,7 @@ export async function draftSafetyTipGraphicCopy(opts: {
 
     const result = await runPioStructuredCall(
       openai,
-      RESEARCH_SYSTEM,
+      SAFETY_RESEARCH_SYSTEM,
       payload,
       SAFETY_RESEARCH_RESPONSE_FORMAT,
       safetyResearchBriefSchema,
@@ -489,6 +318,8 @@ async function generateImageFromPrompt(opts: {
 
 export async function validateGeneratedGraphic(opts: {
   imageDataUrl: string
+  category: string
+  verifiedTopic: string
   headline: string
   supportingLine: string
   body: string
@@ -516,11 +347,16 @@ Compare it against the approved content and visual requirements.
 
 Look carefully for spelling errors, factual contradictions, malformed objects, extra text, missing text, logo distortion, fake agency branding, logo overlap, clutter, tiny unreadable copy, text touching the edges, and visual safety mistakes.
 
-Approved headline: ${opts.headline}
+Approved category: ${opts.category}
+Approved verified topic: ${opts.verifiedTopic}
+Approved headline (must appear on graphic): ${opts.headline}
 Supporting line: ${opts.supportingLine || "(none)"}
 Body: ${opts.body}
 Emergency: ${opts.emergencyMessage || "(none)"}
 Agency logo expected: ${opts.agencyLogoExpected ? "yes, bottom-right" : "no — fail if a fake badge/seal/logo was invented"}
+
+REGENERATE if the graphic shows a different safety topic than the verified topic (example: grease/kitchen fire content when the topic is a scam).
+REGENERATE if the headline text is missing, paraphrased, or replaced with unrelated safety messaging.
 
 Return JSON:
 {"status":"PASS"|"REGENERATE","problems":[],"revision_instructions":[]}
@@ -569,8 +405,11 @@ export async function generateSafetyTipGraphicImage(opts: {
   sourceImageDataUrl?: string | null
   revisionRequest?: string
 }): Promise<AiResult<GeneratedImage>> {
+  const verifiedTopic = opts.verifiedTopic?.trim() || opts.category
   const basePrompt = buildSafetyImagePrompt({
-    verifiedTopic: opts.verifiedTopic || opts.category,
+    category: opts.category,
+    verifiedTopic,
+    originalRequest: opts.residentNeed?.trim() || verifiedTopic,
     audience: opts.audience,
     headline: opts.headline,
     supportingLine: opts.supportingLine || "",
@@ -603,6 +442,8 @@ ${basePrompt}`
 
   const review = await validateGeneratedGraphic({
     imageDataUrl: image.data.dataUrl,
+    category: opts.category,
+    verifiedTopic,
     headline: opts.headline,
     supportingLine: opts.supportingLine || "",
     body: opts.body,
