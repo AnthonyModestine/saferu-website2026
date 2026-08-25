@@ -95,6 +95,35 @@ Also include "caption": a Facebook caption in agency voice (we/you), 1-3 short s
 
 OUTPUT STRICT JSON only. No markdown.`
 
+/** Shared margin / safe-zone rules for all Graphic Studio image prompts. */
+export const GRAPHIC_MARGIN_RULES = `==================================================
+MARGINS AND SAFE ZONES (mandatory)
+==================================================
+
+Treat the canvas like a professional print layout with generous breathing room.
+
+MINIMUM INSET FROM EVERY EDGE:
+- At least 10% padding from the top edge before any text or icon begins.
+- At least 10% padding from the left edge before any text begins.
+- At least 8% padding from the right edge before any text ends (more if the logo is bottom-right).
+- At least 12% padding from the bottom edge before any text — the logo sits below text, not under it.
+
+TEXT BLOCK:
+- Keep all headline and body copy inside a left content column that starts no closer than 10% from the left.
+- Limit the text column to roughly 50–55% of canvas width so copy never hugs the right side.
+- Stack headline, supporting line, and main message with clear vertical spacing between lines.
+- Never place text in the outer 10% border band on any side.
+
+MAIN VISUAL:
+- Important objects, faces, icons, and diagrams should stay inside the center 80% of the canvas.
+- Backgrounds may extend full bleed, but foreground subjects and labels must respect the inset margins.
+
+LOGO AREA:
+- Reserve the bottom-right corner for the agency logo with 3–4% padding from the right and bottom edges.
+- No text, arrows, or important imagery in the bottom-right 18% width × 16% height zone.
+
+FAIL if any text, logo, or important graphic element touches or nearly touches the canvas border.`
+
 export function buildSafetyImagePrompt(opts: {
   category: string
   verifiedTopic: string
@@ -188,10 +217,10 @@ ${emergencyBlock}
 
 Do not render a full-width footer bar, bottom paragraph strip, or edge-to-edge text block.
 Do not cram the entire approved copy onto the graphic — keep total on-image text under 45 words.
-Keep at least 8% margin on the left, top, and right edges.
-Keep the bottom 18% of the canvas free of text (logo safe zone).
 
 Do not invent additional tips, statistics, laws, warnings, or different headline/body wording.
+
+${GRAPHIC_MARGIN_RULES}
 
 ==================================================
 VERIFIED CONTENT
@@ -231,8 +260,9 @@ LAYOUT
 Use one dominant visual, one large headline, one concise safety message, strong visual hierarchy, generous whitespace, large mobile-readable typography, clean margins, intentional composition.
 
 Place all text in the upper-left or left third of the canvas — never in a full-width band across the bottom.
+All text must sit comfortably inside the margin rules above — never hugging the border.
 
-Avoid tiny text, long paragraphs, full-width footer text bars, excessive cards, excessive icons, clutter, unnecessary decoration, information overload, text touching the canvas edge.
+Avoid tiny text, long paragraphs, full-width footer text bars, excessive cards, excessive icons, clutter, unnecessary decoration, information overload, text touching or nearly touching the canvas edge.
 
 ==================================================
 VISUAL STYLE

@@ -12,6 +12,7 @@ import {
 import { graphicOnImageCopy } from "@/lib/graphic-studio-display-copy"
 import {
   buildSafetyImagePrompt,
+  GRAPHIC_MARGIN_RULES,
   researchSourceGuidance,
   SAFETY_RESEARCH_SYSTEM,
 } from "@/lib/graphic-studio-prompts"
@@ -366,6 +367,7 @@ Agency logo expected: ${opts.agencyLogoExpected ? "yes — exact supplied logo o
 REGENERATE if the graphic shows a different safety topic than the verified topic.
 REGENERATE if the headline is missing or replaced with unrelated messaging.
 REGENERATE if text runs edge-to-edge or fills a full-width footer bar across the bottom.
+REGENERATE if any text, logo, icon, or important visual sits too close to the canvas edge (less than roughly 8–10% inset from top, left, right, or bottom).
 REGENERATE if there is too much text to read quickly (wall of text).
 REGENERATE if the agency logo appears more than once or is stacked/overlapping.
 
@@ -573,6 +575,8 @@ Avoid long paragraphs and full-width bottom text bars.
 Use professional imagery appropriate to the event.
 Do not fabricate uniforms, badges, seals, or agency branding.
 Do not use SaferU branding.
+
+${GRAPHIC_MARGIN_RULES}
 
 AGENCY LOGO
 ${logo}`
