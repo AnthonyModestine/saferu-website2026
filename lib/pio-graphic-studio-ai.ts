@@ -3,6 +3,13 @@ import "server-only"
 import { readFile } from "fs/promises"
 import path from "path"
 import { toFile } from "openai"
+import {
+  buildFallbackSafetyResearchBrief,
+  normalizeSafetyResearchBrief,
+  SAFETY_RESEARCH_RESPONSE_FORMAT,
+  safetyResearchBriefSchema,
+} from "@/lib/graphic-studio-schemas"
+import { runPioStructuredCall } from "@/lib/pio-structured-call"
 import type { AiResult } from "@/lib/ai-result"
 import {
   isSafetyAudience,
@@ -142,54 +149,6 @@ function asStringArray(value: unknown): string[] {
   return value.map((item) => String(item || "").trim()).filter(Boolean)
 }
 
-function parseResearch(parsed: Record<string, unknown>): SafetyResearchBrief | null {
-  const recommended_headline =
-    asString(parsed.recommended_headline) ||
-    asString(parsed.headline) ||
-    asString(parsed.recommendedHeadline)
-  const resident_message =
-    asString(parsed.resident_message) ||
-    asString(parsed.body) ||
-    asString(parsed.residentMessage) ||
-    asString(parsed.main_message)
-  if (!recommended_headline || !resident_message) return null
-
-  const sourcesRaw = Array.isArray(parsed.sources) ? parsed.sources : []
-  const sources = sourcesRaw
-    .map((row) => {
-      if (!row || typeof row !== "object") return null
-      const item = row as Record<string, unknown>
-      return {
-        organization: asString(item.organization).slice(0, 120),
-        title: asString(item.title).slice(0, 200),
-        url: asString(item.url).slice(0, 400),
-        claim_supported: asString(item.claim_supported).slice(0, 300),
-      }
-    })
-    .filter((row): row is NonNullable<typeof row> => Boolean(row?.organization || row?.url))
-
-  return {
-    verified_topic: asString(parsed.verified_topic).slice(0, 160),
-    primary_hazard: asString(parsed.primary_hazard).slice(0, 220),
-    primary_takeaway: asString(parsed.primary_takeaway).slice(0, 220),
-    headline_options: asStringArray(parsed.headline_options).slice(0, 6),
-    recommended_headline: recommended_headline.slice(0, 80),
-    supporting_line:
-      (asString(parsed.supporting_line) || asString(parsed.supportingLine) || asString(parsed.supporting)).slice(0, 160),
-    resident_message: resident_message.slice(0, 320),
-    emergency_message: asString(parsed.emergency_message).slice(0, 160),
-    visual_concept: asString(parsed.visual_concept).slice(0, 400),
-    visual_style_recommendation: asString(parsed.visual_style_recommendation).slice(0, 80),
-    visual_must_show: asStringArray(parsed.visual_must_show).slice(0, 8),
-    visual_must_avoid: asStringArray(parsed.visual_must_avoid).slice(0, 8),
-    accuracy_notes: asStringArray(parsed.accuracy_notes).slice(0, 8),
-    user_request_corrected: Boolean(parsed.user_request_corrected),
-    correction_explanation: asString(parsed.correction_explanation).slice(0, 400),
-    sources,
-    caption: asString(parsed.caption).slice(0, 500) || resident_message.slice(0, 400),
-  }
-}
-
 export function buildSafetyImagePrompt(opts: {
   verifiedTopic: string
   audience: string
@@ -318,93 +277,69 @@ export async function draftSafetyTipGraphicCopy(opts: {
   if (!residentNeed) return { ok: false, reason: "empty_input" }
   if (!isSafetyTipCategory(category)) return { ok: false, reason: "empty_input" }
 
-  const userMessage = [
-    `Category: ${category}`,
-    `Audience: ${audience}`,
-    `User's requested topic: ${residentNeed}`,
-    `Optional visual request: ${opts.visualRequest?.trim() || "(none)"}`,
-    `Preferred style: ${style}`,
-    opts.agencyName ? `Agency: ${opts.agencyName}` : null,
-    opts.agencyType ? `Agency type: ${opts.agencyType}` : null,
-    opts.city || opts.state ? `Community: ${[opts.city, opts.state].filter(Boolean).join(", ")}` : null,
-  ]
-    .filter(Boolean)
-    .join("\n")
+  const payload = {
+    category,
+    audience,
+    resident_need: residentNeed,
+    visual_request: opts.visualRequest?.trim() || "",
+    style,
+    agency_name: opts.agencyName?.trim() || "",
+    agency_type: opts.agencyType?.trim() || "",
+    city: opts.city?.trim() || "",
+    state: opts.state?.trim() || "",
+  }
+
+  const buildCopy = (research: SafetyResearchBrief): SafetyTipGraphicCopy => ({
+    category: category as SafetyTipCategory,
+    audience: audience as SafetyAudience,
+    style: style as SafetyGraphicStyle,
+    categoryLabel: category.toUpperCase(),
+    headline: research.recommended_headline,
+    supportingLine: research.supporting_line,
+    body: research.resident_message,
+    emergencyMessage: research.emergency_message,
+    caption: research.caption,
+    visualDirection: research.visual_concept,
+    research,
+  })
+
+  const fallbackBrief = () =>
+    buildFallbackSafetyResearchBrief({
+      category,
+      residentNeed,
+      audience,
+      style,
+      visualRequest: opts.visualRequest,
+    })
 
   try {
     const { default: OpenAI } = await import("openai")
     const openai = new OpenAI({ apiKey })
 
-    const runJsonBrief = async () => {
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        temperature: 0.3,
-        response_format: { type: "json_object" },
-        max_tokens: 1800,
-        messages: [
-          { role: "system", content: RESEARCH_SYSTEM },
-          { role: "user", content: `${userMessage}\n\nReturn the required JSON object only.` },
-        ],
-      })
-      return completion.choices?.[0]?.message?.content?.trim() || ""
+    const result = await runPioStructuredCall(
+      openai,
+      RESEARCH_SYSTEM,
+      payload,
+      SAFETY_RESEARCH_RESPONSE_FORMAT,
+      safetyResearchBriefSchema,
+      2200,
+      0.3
+    )
+
+    if (result.ok) {
+      return { ok: true, data: buildCopy(normalizeSafetyResearchBrief(result.data)) }
     }
 
-    let raw = ""
-    try {
-      raw = await runJsonBrief()
-    } catch (jsonErr) {
-      const detail = jsonErr instanceof Error ? jsonErr.message : String(jsonErr)
-      console.warn("[graphic-studio-ai] JSON brief failed, trying search model:", detail)
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini-search-preview",
-        web_search_options: {
-          search_context_size: "medium",
-          user_location: {
-            type: "approximate",
-            approximate: {
-              country: "US",
-              ...(opts.state ? { region: opts.state } : {}),
-              ...(opts.city ? { city: opts.city } : {}),
-            },
-          },
-        },
-        messages: [
-          {
-            role: "user",
-            content: `${RESEARCH_SYSTEM}\n\n${userMessage}\n\nReturn the required JSON object only. No markdown.`,
-          },
-        ],
-      })
-      raw = completion.choices?.[0]?.message?.content?.trim() || ""
-    }
-
-    const parsed = raw ? parseJsonObject(raw) : null
-    const research = parsed ? parseResearch(parsed) : null
-
-    if (!raw) return { ok: false, reason: "empty_response" }
-    if (!parsed) return { ok: false, reason: "invalid_json", detail: raw.slice(0, 400) }
-    if (!research) return { ok: false, reason: "empty_response", detail: raw.slice(0, 400) }
-
-    return {
-      ok: true,
-      data: {
-        category,
-        audience,
-        style,
-        categoryLabel: category.toUpperCase(),
-        headline: research.recommended_headline,
-        supportingLine: research.supporting_line,
-        body: research.resident_message,
-        emergencyMessage: research.emergency_message,
-        caption: research.caption,
-        visualDirection: research.visual_concept,
-        research,
-      },
-    }
+    console.warn(
+      "[graphic-studio-ai] structured brief failed, using fallback:",
+      result.reason,
+      result.detail
+    )
+    return { ok: true, data: buildCopy(fallbackBrief()) }
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err)
     console.error("[graphic-studio-ai] safety research error:", detail)
-    return { ok: false, reason: "openai_error", detail }
+    return { ok: true, data: buildCopy(fallbackBrief()) }
   }
 }
 
