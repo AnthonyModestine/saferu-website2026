@@ -108,8 +108,7 @@ export function buildSafetyImagePrompt(opts: {
   style: string
   mustShow: string[]
   mustAvoid: string[]
-  /** Leave bottom-right empty — agency logo is stamped client-side after generation. */
-  reserveLogoCorner: boolean
+  agencyLogoPresent: boolean
 }): string {
   const display = graphicOnImageCopy({
     headline: opts.headline,
@@ -127,17 +126,28 @@ export function buildSafetyImagePrompt(opts: {
 
   const paletteHint = paletteForCategory(opts.category)
 
-  const logoBlock = opts.reserveLogoCorner
-    ? `Do NOT render any agency logo, badge, seal, sheriff star, fire patch, or department emblem anywhere in this image.
+  const logoBlock = opts.agencyLogoPresent
+    ? `An official agency logo is provided as an image input.
 
-A real agency logo will be added AFTER generation in the bottom-right corner.
+The attached image is ONLY the agency logo — not the background of the graphic.
 
-Leave the bottom-right corner completely empty:
-- no fake badges or seals
-- no placeholder logo boxes
-- no text or icons in the bottom-right 14% of canvas width and bottom 16% of canvas height
+You MUST incorporate the exact supplied agency logo into the finished composition exactly ONCE.
 
-Design the layout knowing that corner is reserved for post-production branding.`
+Place the logo in the BOTTOM-RIGHT corner.
+
+Design the full 16:9 graphic around the logo from the beginning.
+
+Reserve a clean bottom-right branding area BEFORE arranging text or important imagery.
+
+Target visual size: approximately 10–12% of canvas width with proportional height.
+
+Maintain approximately 3–4% padding from the right and bottom edges.
+
+Nothing important should appear underneath or behind the logo.
+
+DO NOT duplicate the logo.
+DO NOT invent a second badge, seal, or department emblem.
+DO NOT invent a new logo, recreate the supplied logo from memory, stretch, distort, crop, or recolor it.`
     : `No agency logo is provided.
 
 Do not create a logo.

@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { useAgency } from "@/lib/agency-context"
-import { compositeAgencyLogo, createEventGraphic } from "@/lib/pio-graphic-studio"
+import { createEventGraphic } from "@/lib/pio-graphic-studio"
 import { GraphicStudioSelect } from "@/components/pio/graphic-studio-select"
 import {
   EVENT_GRAPHIC_STYLES,
@@ -39,17 +39,6 @@ export default function EventGraphicPage() {
 
   const timeLabel = [startTime, endTime].filter(Boolean).join(" – ")
   const dateTime = [date, timeLabel].filter(Boolean).join(" · ")
-
-  const stampLogo = async (imageDataUrl: string) => {
-    if (!settings.logoUrl) return imageDataUrl
-    return (
-      (await compositeAgencyLogo({
-        imageDataUrl,
-        agencyLogoUrl: settings.logoUrl,
-        agencyName: settings.agencyName,
-      })) || imageDataUrl
-    )
-  }
 
   const generateLocal = async () => {
     setGenerating(true)
@@ -103,7 +92,7 @@ export default function EventGraphicPage() {
       }
       const aiImage = typeof data.imageDataUrl === "string" ? data.imageDataUrl : ""
       if (aiImage) {
-        setPreview(await stampLogo(aiImage))
+        setPreview(aiImage)
         return
       }
       setError("AI did not return an image. Try the simple template.")

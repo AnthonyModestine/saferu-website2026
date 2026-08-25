@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { PostMediaLightbox } from "@/components/post-media-lightbox"
 import { useAgency } from "@/lib/agency-context"
-import { compositeAgencyLogo, createSafetyTipGraphic } from "@/lib/pio-graphic-studio"
+import { createSafetyTipGraphic } from "@/lib/pio-graphic-studio"
 import { GraphicStudioSelect } from "@/components/pio/graphic-studio-select"
 import {
   SAFETY_AUDIENCES,
@@ -53,16 +53,6 @@ export default function SafetyTipGraphicPage() {
     agencyTypeOther: settings.agencyTypeOther,
     city: settings.city,
     state: settings.state,
-  }
-
-  const stampLogo = async (imageDataUrl: string) => {
-    if (!settings.logoUrl) return imageDataUrl
-    const stamped = await compositeAgencyLogo({
-      imageDataUrl,
-      agencyLogoUrl: settings.logoUrl,
-      agencyName: settings.agencyName,
-    })
-    return stamped || imageDataUrl
   }
 
   const prepareMessage = async () => {
@@ -143,9 +133,8 @@ export default function SafetyTipGraphicPage() {
       setGraphicId(typeof data.graphicId === "string" ? data.graphicId : null)
       const aiImage = typeof data.imageDataUrl === "string" ? data.imageDataUrl : ""
       if (aiImage) {
-        const stamped = await stampLogo(aiImage)
         setHistory((prev) => (preview ? [...prev, preview] : prev))
-        setPreview(stamped)
+        setPreview(aiImage)
         return
       }
       const fallback = await createSafetyTipGraphic({
@@ -192,7 +181,7 @@ export default function SafetyTipGraphicPage() {
         setError(String(data.error || "Could not revise graphic."))
         return
       }
-      const next = typeof data.imageDataUrl === "string" ? await stampLogo(data.imageDataUrl) : null
+      const next = typeof data.imageDataUrl === "string" ? data.imageDataUrl : null
       if (next) {
         setHistory((prev) => [...prev, preview])
         setPreview(next)
