@@ -80,7 +80,7 @@ export async function POST(request: Request) {
     }
 
     const graphicId = crypto.randomUUID()
-    await saveGraphicStudioRecord({
+    const saved = await saveGraphicStudioRecord({
       graphic_id: graphicId,
       agency_id: String(body.agencyName || session.email),
       user_id: session.email,
@@ -102,6 +102,9 @@ export async function POST(request: Request) {
       revision_count: 0,
       status: "generated",
     })
+    if (!saved) {
+      console.warn("[api/pio/graphic-studio/event] generation record not persisted")
+    }
 
     return NextResponse.json({
       imageDataUrl: result.data.dataUrl,

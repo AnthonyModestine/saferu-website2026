@@ -354,6 +354,18 @@ async function resolveLogoFile(logoUrl?: string | null) {
       const ext = type.includes("jpeg") || type.includes("jpg") ? "jpg" : type.includes("webp") ? "webp" : "png"
       return toFile(buf, `agency-logo.${ext}`, { type })
     }
+    if (logoUrl.startsWith("http://") || logoUrl.startsWith("https://")) {
+      const res = await fetch(logoUrl)
+      if (!res.ok) return null
+      const buf = Buffer.from(await res.arrayBuffer())
+      const contentType = res.headers.get("content-type") || "image/png"
+      const ext = contentType.includes("jpeg") || contentType.includes("jpg")
+        ? "jpg"
+        : contentType.includes("webp")
+          ? "webp"
+          : "png"
+      return toFile(buf, `agency-logo.${ext}`, { type: contentType })
+    }
     if (logoUrl.startsWith("/")) {
       const filePath = path.join(process.cwd(), "public", logoUrl.replace(/^\//, ""))
       const buf = await readFile(filePath)
@@ -363,6 +375,11 @@ async function resolveLogoFile(logoUrl?: string | null) {
     return null
   }
   return null
+}
+
+function truncateImagePrompt(prompt: string, max = 3900): string {
+  if (prompt.length <= max) return prompt
+  return `${prompt.slice(0, max - 24).trimEnd()}\n\n[Prompt truncated]`
 }
 
 async function fetchImageAsDataUrl(url: string): Promise<string | null> {
@@ -387,21 +404,21 @@ async function generateImageFromPrompt(opts: {
   const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) return { ok: false, reason: "missing_api_key" }
 
+  const prompt = truncateImagePrompt(opts.prompt)
+  const sourceFile = opts.sourceImageDataUrl
+    ? await resolveLogoFile(opts.sourceImageDataUrl)
+    : null
+
   try {
     const { default: OpenAI } = await import("openai")
     const openai = new OpenAI({ apiKey })
-    const logoFile = await resolveLogoFile(opts.logoUrl)
-    const sourceFile = opts.sourceImageDataUrl
-      ? await resolveLogoFile(opts.sourceImageDataUrl)
-      : null
 
-    const editImage = sourceFile || logoFile
-    if (editImage) {
+    if (sourceFile) {
       try {
         const response = await openai.images.edit({
           model: "gpt-image-1",
-          image: editImage,
-          prompt: opts.prompt,
+          image: sourceFile,
+          prompt,
           n: 1,
           size: "1536x1024",
         })
@@ -413,10 +430,28 @@ async function generateImageFromPrompt(opts: {
       }
     }
 
+    const logoFile = sourceFile ? null : await resolveLogoFile(opts.logoUrl)
+    if (logoFile) {
+      try {
+        const response = await openai.images.edit({
+          model: "gpt-image-1",
+          image: logoFile,
+          prompt,
+          n: 1,
+          size: "1536x1024",
+        })
+        const b64 = response.data?.[0]?.b64_json
+        if (b64) return { ok: true, data: { dataUrl: `data:image/png;base64,${b64}`, model: "gpt-image-1" } }
+      } catch (editErr) {
+        const detail = editErr instanceof Error ? editErr.message : String(editErr)
+        console.warn("[graphic-studio-ai] logo edit failed, trying generate:", detail)
+      }
+    }
+
     try {
       const response = await openai.images.generate({
         model: "gpt-image-1",
-        prompt: opts.prompt,
+        prompt,
         n: 1,
         size: "1536x1024",
         quality: "medium",
@@ -430,10 +465,11 @@ async function generateImageFromPrompt(opts: {
 
     const response = await openai.images.generate({
       model: "dall-e-3",
-      prompt: opts.prompt,
+      prompt,
       n: 1,
       size: "1792x1024",
       quality: "standard",
+      response_format: "b64_json",
     })
     const item = response.data?.[0]
     if (item?.b64_json) {

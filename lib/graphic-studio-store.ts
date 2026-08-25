@@ -44,20 +44,33 @@ async function readStore(): Promise<FileStore> {
   }
 }
 
-async function writeStore(store: FileStore): Promise<void> {
-  await mkdir(DATA_DIR, { recursive: true })
-  const records = store.records.slice(-MAX_RECORDS)
-  await writeFile(STORE_PATH, JSON.stringify({ records }, null, 2), "utf-8")
+async function writeStore(store: FileStore): Promise<boolean> {
+  try {
+    await mkdir(DATA_DIR, { recursive: true })
+    const records = store.records.slice(-MAX_RECORDS)
+    await writeFile(STORE_PATH, JSON.stringify({ records }, null, 2), "utf-8")
+    return true
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err)
+    console.warn("[graphic-studio-store] Could not persist generation record:", detail)
+    return false
+  }
 }
 
 export async function saveGraphicStudioRecord(
   record: GraphicStudioRecord
-): Promise<void> {
-  const store = await readStore()
-  const idx = store.records.findIndex((item) => item.graphic_id === record.graphic_id)
-  if (idx >= 0) store.records[idx] = record
-  else store.records.push(record)
-  await writeStore(store)
+): Promise<boolean> {
+  try {
+    const store = await readStore()
+    const idx = store.records.findIndex((item) => item.graphic_id === record.graphic_id)
+    if (idx >= 0) store.records[idx] = record
+    else store.records.push(record)
+    return await writeStore(store)
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err)
+    console.warn("[graphic-studio-store] save failed:", detail)
+    return false
+  }
 }
 
 export async function getGraphicStudioRecord(
@@ -74,6 +87,12 @@ export async function resolveMemberAgencyLogo(
   const stored = await getStoredAgencySettings(memberId)
   if (stored?.logoUrl) return stored.logoUrl
   if (typeof fallback === "string" && fallback.startsWith("/")) return fallback.slice(0, 300)
+  if (
+    typeof fallback === "string" &&
+    (fallback.startsWith("http://") || fallback.startsWith("https://"))
+  ) {
+    return fallback.slice(0, 400)
+  }
   if (typeof fallback === "string" && fallback.startsWith("data:") && fallback.length < 400_000) {
     return fallback
   }
