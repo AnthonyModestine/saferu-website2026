@@ -129,18 +129,7 @@ export async function generatePostMessageFromInput(opts: {
 
   const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) {
-    const fallback = fillScriptDeterministic(script.template, placeholders)
-    if (!fallback.trim()) return { ok: false, reason: "missing_api_key" }
-    return {
-      ok: true,
-      data: {
-        status: "ready",
-        postText: fallback,
-        usedFactIds: input.verifiedFacts.map((f) => f.id),
-        sourceAttribution: placeholders.issuingAuthority || null,
-        humanReviewReason: null,
-      },
-    }
+    return { ok: false, reason: "missing_api_key" }
   }
 
   const prompt = `Write the Facebook post using the approved script and verified placeholders.
@@ -174,20 +163,26 @@ Return the required JSON only.`
     })
 
     const raw = completion.choices[0]?.message?.content
-    if (!raw) return deterministicFallback(input, script.template, placeholders)
+    if (!raw) return { ok: false, reason: "empty_response" }
 
     const parsed = writerResultSchema.safeParse(JSON.parse(raw))
-    if (!parsed.success) return deterministicFallback(input, script.template, placeholders)
+    if (!parsed.success) {
+      return { ok: false, reason: "invalid_json", detail: parsed.error.message }
+    }
 
     const validIds = new Set(input.verifiedFacts.map((f) => f.id))
     if (parsed.data.usedFactIds.some((id) => !validIds.has(id))) {
-      return deterministicFallback(input, script.template, placeholders)
+      return { ok: false, reason: "invalid_json", detail: "Model cited facts not in the verified list." }
     }
     if (parsed.data.status === "ready" && !parsed.data.postText.trim()) {
-      return deterministicFallback(input, script.template, placeholders)
+      return { ok: false, reason: "empty_response" }
     }
     if (/\[[^\]]+\]/.test(parsed.data.postText)) {
-      return deterministicFallback(input, script.template, placeholders)
+      return {
+        ok: false,
+        reason: "invalid_json",
+        detail: "Model returned unfilled script placeholders.",
+      }
     }
 
     return { ok: true, data: normalizeResult(parsed.data, input) }
@@ -197,27 +192,6 @@ Return the required JSON only.`
       reason: "openai_error",
       detail: error instanceof Error ? error.message : String(error),
     }
-  }
-}
-
-function deterministicFallback(
-  input: PostMessageInput,
-  template: string,
-  placeholders: PostMessagePlaceholders
-): AiResult<PioWriterResult> {
-  const postText = fillScriptDeterministic(template, placeholders)
-  if (!postText.trim()) {
-    return { ok: false, reason: "empty_response", detail: "Insufficient verified placeholders for script." }
-  }
-  return {
-    ok: true,
-    data: {
-      status: "ready",
-      postText,
-      usedFactIds: input.verifiedFacts.map((f) => f.id),
-      sourceAttribution: placeholders.issuingAuthority || null,
-      humanReviewReason: null,
-    },
   }
 }
 

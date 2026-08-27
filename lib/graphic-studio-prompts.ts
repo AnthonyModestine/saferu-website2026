@@ -70,11 +70,11 @@ Do not insert SaferU branding.`
 
   return `OFFICIAL AGENCY LOGO
 
-An official agency logo is provided as an image input.
+An official agency logo is provided as a separate reference image input.
 
-The attached image is ONLY the agency logo — not the background of the graphic.
+That reference image is ONLY the logo file — it is NOT the background canvas and must NOT be enlarged to fill the frame.
 
-You MUST incorporate the exact supplied agency logo into the finished composition exactly ONCE.
+You MUST place the exact supplied agency logo into the finished composition exactly ONCE.
 
 Place the logo in the BOTTOM-RIGHT corner. Do not move it elsewhere.
 
@@ -83,6 +83,8 @@ Target visual size: approximately 10–12% of canvas width with proportional hei
 Maintain approximately 3–4% padding from the right and bottom edges.
 
 DO NOT duplicate the logo.
+DO NOT overlay a second copy on top of the first.
+DO NOT use the logo image as a background, watermark, or large central element.
 DO NOT invent a second badge, seal, or department emblem.
 DO NOT recreate, stretch, distort, crop, or recolor the supplied logo.
 
@@ -96,6 +98,16 @@ The bottom-right zone (roughly the right 20% and bottom 18% of the canvas) must 
 - Nothing may appear underneath, behind, overlapping, or immediately adjacent to the agency logo.
 - Do not place headline, safety instructions, emergency instructions, faces, important objects, diagrams, arrows, warning symbols, or safety zones inside the logo area.
 - The logo must sit on clean open space so it is fully readable and nothing is blocked by it.`
+}
+
+/** Prepended when the model receives a blank canvas + logo via multi-image edit. */
+export function buildLogoReferenceInputRolesBlock(): string {
+  return `IMAGE INPUT ROLES (read before designing)
+
+- Input image 1: Blank 16:9 landscape canvas. Build the ENTIRE finished graphic on this canvas.
+- Input image 2: Official agency logo ONLY. Place it once, small, bottom-right. Never duplicate, never enlarge to fill the canvas.
+
+The logo reference is not part of the scene — do not treat it as a background layer or repeat it anywhere.`
 }
 
 export const GRAPHIC_MARGIN_RULES = `MARGINS AND SAFE ZONES (mandatory — failure to follow means the graphic is unusable)
@@ -266,6 +278,49 @@ FINAL QUALITY TARGET
 The final graphic should look like something a professional PIO would publish on an official agency account.
 
 Prioritize: 1) Safety accuracy 2) Immediate comprehension 3) Visual accuracy 4) Readability 5) Professional design 6) Agency branding`
+}
+
+/** Social post graphic — message and visual must match the approved post copy. */
+export function buildPostOpportunityImagePrompt(opts: {
+  title: string
+  category: string
+  sourceLabel: string
+  headline: string
+  mainMessage: string
+  visualConcept: string
+  agencyLogoPresent: boolean
+}): string {
+  const display = graphicOnImageCopy({
+    headline: opts.headline,
+    supportingLine: "",
+    body: opts.mainMessage,
+    emergencyMessage: "",
+  })
+
+  return `Create a professional 16:9 public-agency social media graphic paired with an official Facebook post.
+
+This graphic will be published alongside the post copy below. The on-image text and visual MUST match the post topic — residents should recognize the same story in both.
+
+${buildAgencyLogoPromptBlock(opts.agencyLogoPresent)}
+
+${GRAPHIC_MARGIN_RULES}
+
+POST TOPIC
+Title: ${opts.title}
+Category: ${opts.category}
+Source context: ${opts.sourceLabel}
+
+ON-IMAGE COPY (use only this — keep short)
+Headline: ${display.headline}
+Primary message: ${display.mainMessage}
+
+VISUAL DIRECTION
+${opts.visualConcept}
+
+DESIGN
+One dominant visual that supports the post topic. Large readable headline. Concise message. Professional PIO quality.
+Do not invent facts, incidents, or agency branding. No SaferU branding.
+Teach or highlight ONE idea extremely well — this is a social post graphic, not a brochure.`
 }
 
 function paletteForCategory(category: string): string {

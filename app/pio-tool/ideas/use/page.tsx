@@ -27,17 +27,7 @@ import {
   opportunityFingerprint,
   topicKey,
 } from "@/lib/post-generator/rank-opportunities"
-import {
-  createWeatherAlertImage,
-  isWeatherAlertOpportunity,
-  weatherAlertHeadline,
-} from "@/lib/pio-weather-graphic"
-import {
-  createHolidayImage,
-  holidaySlogan,
-  holidayTheme,
-  isHolidayOpportunity,
-} from "@/lib/pio-holiday-graphic"
+import { formatPostingTimeDisplay } from "@/lib/post-generator/posting-time-display"
 
 const CUSTOMIZE_OPTIONS = [
   { mode: "shorten", label: "Shorten" },
@@ -70,60 +60,116 @@ export default function UsePostPage() {
   const [markedPosted, setMarkedPosted] = useState(false)
   const [graphicFailed, setGraphicFailed] = useState(false)
   const [generatedGraphic, setGeneratedGraphic] = useState<string | null>(null)
+  const [packageLoading, setPackageLoading] = useState(false)
+  const [packageError, setPackageError] = useState<string | null>(null)
+  const [packageReady, setPackageReady] = useState(false)
 
   useEffect(() => {
     let cancelled = false
     void loadStashedOpportunity().then((stashed) => {
       if (cancelled || !stashed) return
       setOpp(stashed)
-      const msg = stashed.curatedMessage || stashed.curated?.message || ""
-      setMessage(msg)
-      setOriginalMessage(msg)
+      if (guestPreview) {
+        const msg = stashed.curatedMessage || stashed.curated?.message || ""
+        setMessage(msg)
+        setOriginalMessage(msg)
+        setPackageReady(true)
+      }
     })
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [guestPreview])
 
-  // Safety net: generate alert or holiday graphic on the client if missing.
   useEffect(() => {
-    if (!opp || opp.graphicUrl?.startsWith("data:")) return
+    if (!opp || guestPreview || packageReady || packageLoading) return
+    if (!canCustomize) return
+
     let cancelled = false
+    setPackageLoading(true)
+    setPackageError(null)
 
-    const generate = async () => {
-      if (isHolidayOpportunity(opp)) {
-        const dataUrl = await createHolidayImage({
-          logoUrl: settings.logoUrl,
-          agencyName: settings.agencyName,
-          slogan: holidaySlogan(opp),
-          theme: holidayTheme(opp),
-        })
-        if (!cancelled && dataUrl) setGeneratedGraphic(dataUrl)
-        return
-      }
-      if (isWeatherAlertOpportunity(opp)) {
-        const dataUrl = await createWeatherAlertImage({
-          logoUrl: settings.logoUrl,
-          agencyName: settings.agencyName,
-          headline: weatherAlertHeadline(opp),
-          subtitle: opp.title,
-        })
-        if (!cancelled && dataUrl) setGeneratedGraphic(dataUrl)
-      }
-    }
+    void fetch("/api/pio/generate-post-package", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({
+        title: opp.title,
+        whyItMatters: opp.whyItMatters || opp.summary || opp.title,
+        summary: opp.summary || "",
+        verifiedFacts: opp.verifiedFacts ?? [],
+        doNotClaim: opp.doNotClaim ?? [],
+        publicCallToAction: opp.publicCallToAction ?? [],
+        recommendedAction: opp.recommendedAction || "",
+        sourceLabel: opp.sourceLabel || "",
+        category: opp.category || opp.curated?.category || "",
+        messagingAngle: opp.whyThisAgency || "",
+        jurisdictionFit: opp.jurisdictionFit,
+        visualConcept: opp.summary || opp.whyItMatters || opp.title,
+        seedMessage: opp.curatedMessage || opp.curated?.message || "",
+        agencyName: settings.agencyName,
+        agencyType: settings.agencyType,
+        agencyTypeOther: settings.agencyTypeOther,
+        city: settings.city,
+        state: settings.state,
+        agencyLogoUrl: settings.logoUrl?.startsWith("/") ? settings.logoUrl : null,
+      }),
+    })
+      .then(async (res) => {
+        const data = (await res.json()) as {
+          message?: string
+          imageDataUrl?: string
+          error?: string
+        }
+        if (cancelled) return
+        if (!res.ok) {
+          setPackageError(data.error || "Could not generate this post package.")
+          return
+        }
+        const nextMessage = data.message?.trim()
+        const nextGraphic = data.imageDataUrl?.startsWith("data:") ? data.imageDataUrl : null
+        if (!nextMessage || !nextGraphic) {
+          setPackageError("OpenAI did not return a complete message and graphic.")
+          return
+        }
+        setMessage(nextMessage)
+        setOriginalMessage(nextMessage)
+        setGeneratedGraphic(nextGraphic)
+        setOpp((prev) => (prev ? { ...prev, curatedMessage: nextMessage } : prev))
+        setPackageReady(true)
+      })
+      .catch(() => {
+        if (!cancelled) setPackageError("Network error while generating this post.")
+      })
+      .finally(() => {
+        if (!cancelled) setPackageLoading(false)
+      })
 
-    void generate()
     return () => {
       cancelled = true
     }
-  }, [opp, settings.logoUrl, settings.agencyName])
+  }, [
+    opp,
+    guestPreview,
+    packageReady,
+    packageLoading,
+    canCustomize,
+    settings.agencyName,
+    settings.agencyType,
+    settings.agencyTypeOther,
+    settings.city,
+    settings.state,
+    settings.logoUrl,
+  ])
 
   const graphic =
     generatedGraphic ||
-    opp?.graphicUrl ||
-    opp?.graphicThumbnailUrl ||
-    opp?.curated?.graphicUrl ||
-    opp?.curated?.graphicThumbnailUrl
+    (guestPreview
+      ? opp?.graphicUrl ||
+        opp?.graphicThumbnailUrl ||
+        opp?.curated?.graphicUrl ||
+        opp?.curated?.graphicThumbnailUrl
+      : null)
 
   useEffect(() => {
     setGraphicFailed(false)
@@ -152,7 +198,9 @@ export default function UsePostPage() {
           message,
           agencyName: settings.agencyName,
           agencyType: settings.agencyType,
+          agencyTypeOther: settings.agencyTypeOther,
           city: settings.city,
+          county: settings.county,
           state: settings.state,
           verifiedFacts: opp?.verifiedFacts ?? [],
         }),
@@ -165,7 +213,12 @@ export default function UsePostPage() {
         return
       }
       if (!res.ok) {
-        setCustomizeError(data.error || "Could not customize this message. Try again.")
+        const rateLimited = res.status === 429 || data.code === "rate_limited"
+        setCustomizeError(
+          rateLimited
+            ? "Hourly AI edit limit reached. You can still edit the message below, or try again in a few minutes."
+            : data.error || "Could not customize this message. Try again."
+        )
         return
       }
       const next = data.message?.trim()
@@ -258,7 +311,14 @@ export default function UsePostPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="rounded-2xl border border-[#e2e8f5] bg-white p-4 shadow-sm">
           <h2 className="text-sm font-bold text-[#0f1c3f]">Graphic</h2>
-          {graphic && !graphicFailed ? (
+          {packageLoading ? (
+            <div className="mt-3 flex items-center gap-2 text-sm text-[#64748B]">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              OpenAI is creating your paired graphic…
+            </div>
+          ) : packageError ? (
+            <p className="mt-3 text-sm text-red-600">{packageError}</p>
+          ) : graphic && !graphicFailed ? (
             <div className="relative mt-3 aspect-video overflow-hidden rounded-xl bg-[#0d1526]">
               <Image
                 src={graphic}
@@ -271,7 +331,9 @@ export default function UsePostPage() {
               />
             </div>
           ) : (
-            <p className="mt-3 text-sm text-[#94A3B8]">No graphic available for this post.</p>
+            <p className="mt-3 text-sm text-[#94A3B8]">
+              {canCustomize ? "No graphic available for this post." : "Sign in to generate a paired graphic."}
+            </p>
           )}
           {graphic && !graphicFailed && (
             <Button asChild variant="outline" size="sm" className="mt-3">
@@ -301,7 +363,18 @@ export default function UsePostPage() {
           {opp.curated?.category && (
             <p className="mt-3 text-xs text-[#94A3B8]">Category: {opp.curated.category}</p>
           )}
-          <p className="mt-1 text-xs text-[#2563EB]">{opp.recommendedPostTiming}</p>
+          {(() => {
+            const posting = formatPostingTimeDisplay(opp.recommendedPostTiming || "")
+            if (!posting) return null
+            return (
+              <div className="mt-1 text-xs text-[#2563EB]">
+                <p className="font-semibold">{posting.headline}</p>
+                {posting.rationale && (
+                  <p className="mt-0.5 font-normal text-[#334155]">{posting.rationale}</p>
+                )}
+              </div>
+            )
+          })()}
         </section>
 
         <section className="rounded-2xl border border-[#e2e8f5] bg-white p-4 shadow-sm">
@@ -322,8 +395,18 @@ export default function UsePostPage() {
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             rows={10}
-            className="mt-3 w-full resize-y rounded-xl border border-[#e2e8f5] bg-[#F8FAFC] p-3 text-sm leading-relaxed text-[#405172] focus:border-[#7C5CFC] focus:outline-none focus:ring-1 focus:ring-[#7C5CFC]"
+            disabled={packageLoading}
+            className="mt-3 w-full resize-y rounded-xl border border-[#e2e8f5] bg-[#F8FAFC] p-3 text-sm leading-relaxed text-[#405172] focus:border-[#7C5CFC] focus:outline-none focus:ring-1 focus:ring-[#7C5CFC] disabled:opacity-60"
           />
+          {packageLoading && (
+            <p className="mt-2 flex items-center gap-2 text-xs text-[#64748B]">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              OpenAI is writing your post message…
+            </p>
+          )}
+          {packageError && !packageLoading && (
+            <p className="mt-2 text-xs text-red-600">{packageError}</p>
+          )}
 
           <div className="mt-3 flex flex-wrap gap-2">
             <Button type="button" size="sm" variant="outline" onClick={() => void copyMessage()}>

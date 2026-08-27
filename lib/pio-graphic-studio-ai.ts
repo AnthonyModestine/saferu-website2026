@@ -4,7 +4,6 @@ import { readFile } from "fs/promises"
 import path from "path"
 import { toFile } from "openai"
 import {
-  buildFallbackSafetyResearchBrief,
   normalizeSafetyResearchBrief,
   SAFETY_RESEARCH_RESPONSE_FORMAT,
   safetyResearchBriefSchema,
@@ -12,11 +11,14 @@ import {
 import { graphicOnImageCopy } from "@/lib/graphic-studio-display-copy"
 import {
   buildAgencyLogoPromptBlock,
+  buildLogoReferenceInputRolesBlock,
+  buildPostOpportunityImagePrompt,
   buildSafetyImagePrompt,
   GRAPHIC_MARGIN_RULES,
   researchSourceGuidance,
   SAFETY_RESEARCH_SYSTEM,
 } from "@/lib/graphic-studio-prompts"
+import { createBlankLandscapeCanvas } from "@/lib/graphic-studio-blank-canvas"
 import { runPioStructuredCall } from "@/lib/pio-structured-call"
 import type { AiResult } from "@/lib/ai-result"
 import {
@@ -135,15 +137,6 @@ export async function draftSafetyTipGraphicCopy(opts: {
     research,
   })
 
-  const fallbackBrief = () =>
-    buildFallbackSafetyResearchBrief({
-      category,
-      residentNeed,
-      audience,
-      style,
-      visualRequest: opts.visualRequest,
-    })
-
   try {
     const { default: OpenAI } = await import("openai")
     const openai = new OpenAI({ apiKey })
@@ -162,16 +155,12 @@ export async function draftSafetyTipGraphicCopy(opts: {
       return { ok: true, data: buildCopy(normalizeSafetyResearchBrief(result.data)) }
     }
 
-    console.warn(
-      "[graphic-studio-ai] structured brief failed, using fallback:",
-      result.reason,
-      result.detail
-    )
-    return { ok: true, data: buildCopy(fallbackBrief()) }
+    console.warn("[graphic-studio-ai] structured brief failed:", result.reason, result.detail)
+    return { ok: false, reason: result.reason, detail: result.detail }
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err)
     console.error("[graphic-studio-ai] safety research error:", detail)
-    return { ok: true, data: buildCopy(fallbackBrief()) }
+    return { ok: false, reason: "openai_error", detail }
   }
 }
 
@@ -209,6 +198,35 @@ async function resolveLogoFile(logoUrl?: string | null) {
   return null
 }
 
+async function resolveLogoDataUrl(logoUrl?: string | null): Promise<string | null> {
+  if (!logoUrl?.trim()) return null
+  if (logoUrl.startsWith("data:")) return logoUrl
+  const file = await resolveLogoFile(logoUrl)
+  if (!file) return null
+  try {
+    const arrayBuffer = await file.arrayBuffer()
+    const type = file.type || "image/png"
+    return `data:${type};base64,${Buffer.from(arrayBuffer).toString("base64")}`
+  } catch {
+    return null
+  }
+}
+
+function graphicResponseModel(): string {
+  return process.env.OPENAI_GRAPHIC_RESPONSE_MODEL?.trim() || "gpt-4.1"
+}
+
+function extractImageGenerationResult(response: {
+  output?: ReadonlyArray<{ type?: string; result?: string | null }>
+}): string | null {
+  for (const item of response.output || []) {
+    if (item.type === "image_generation_call" && item.result) {
+      return item.result
+    }
+  }
+  return null
+}
+
 function truncateForDallE(prompt: string, max = 3950): string {
   if (prompt.length <= max) return prompt
   return `${prompt.slice(0, max - 40).trimEnd()}\n\n[Prompt shortened for DALL-E]`
@@ -228,15 +246,90 @@ async function fetchImageAsDataUrl(url: string): Promise<string | null> {
 
 type GeneratedImage = { dataUrl: string; model: string }
 
+async function generateWithLogoReference(opts: {
+  prompt: string
+  logoDataUrl: string
+  openai: InstanceType<(typeof import("openai"))["default"]>
+}): Promise<GeneratedImage | null> {
+  try {
+    const response = await opts.openai.responses.create({
+      model: graphicResponseModel(),
+      input: [
+        {
+          role: "user",
+          content: [
+            { type: "input_text", text: opts.prompt },
+            {
+              type: "input_image",
+              image_url: opts.logoDataUrl,
+              detail: "high",
+            },
+          ],
+        },
+      ],
+      tools: [
+        {
+          type: "image_generation",
+          size: "1536x1024",
+          quality: "high",
+        },
+      ],
+    })
+    const b64 = extractImageGenerationResult(response)
+    if (b64) {
+      return { dataUrl: `data:image/png;base64,${b64}`, model: `${graphicResponseModel()}+image_generation` }
+    }
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err)
+    console.warn("[graphic-studio-ai] responses image_generation failed:", detail)
+  }
+  return null
+}
+
+async function generateWithCanvasAndLogoEdit(opts: {
+  prompt: string
+  logoFile: Awaited<ReturnType<typeof resolveLogoFile>>
+  openai: InstanceType<(typeof import("openai"))["default"]>
+}): Promise<GeneratedImage | null> {
+  if (!opts.logoFile) return null
+  try {
+    const canvasFile = await toFile(createBlankLandscapeCanvas(), "blank-16x9-canvas.png", {
+      type: "image/png",
+    })
+    const prompt = `${buildLogoReferenceInputRolesBlock()}\n\n${opts.prompt}`
+    const response = await opts.openai.images.edit({
+      model: "gpt-image-1",
+      image: [canvasFile, opts.logoFile],
+      prompt,
+      n: 1,
+      size: "1536x1024",
+      input_fidelity: "high",
+    })
+    const b64 =
+      "data" in response && Array.isArray(response.data)
+        ? response.data[0]?.b64_json
+        : undefined
+    if (b64) {
+      return { dataUrl: `data:image/png;base64,${b64}`, model: "gpt-image-1+canvas_logo_edit" }
+    }
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err)
+    console.warn("[graphic-studio-ai] canvas+logo edit failed:", detail)
+  }
+  return null
+}
+
 async function generateImageFromPrompt(opts: {
   prompt: string
   logoUrl?: string | null
   sourceImageDataUrl?: string | null
+  logoRequired?: boolean
 }): Promise<AiResult<GeneratedImage>> {
   const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) return { ok: false, reason: "missing_api_key" }
 
   const fullPrompt = opts.prompt
+  const logoRequired = opts.logoRequired ?? Boolean(opts.logoUrl)
   const sourceFile = opts.sourceImageDataUrl
     ? await resolveLogoFile(opts.sourceImageDataUrl)
     : null
@@ -245,6 +338,7 @@ async function generateImageFromPrompt(opts: {
     const { default: OpenAI } = await import("openai")
     const openai = new OpenAI({ apiKey })
 
+    // Revision path: edit the existing full graphic (correct use of images.edit).
     if (sourceFile) {
       try {
         const response = await openai.images.edit({
@@ -262,21 +356,22 @@ async function generateImageFromPrompt(opts: {
       }
     }
 
-    const logoFile = sourceFile ? null : await resolveLogoFile(opts.logoUrl)
-    if (logoFile) {
-      try {
-        const response = await openai.images.edit({
-          model: "gpt-image-1",
-          image: logoFile,
-          prompt: fullPrompt,
-          n: 1,
-          size: "1536x1024",
-        })
-        const b64 = response.data?.[0]?.b64_json
-        if (b64) return { ok: true, data: { dataUrl: `data:image/png;base64,${b64}`, model: "gpt-image-1" } }
-      } catch (editErr) {
-        const detail = editErr instanceof Error ? editErr.message : String(editErr)
-        console.warn("[graphic-studio-ai] logo edit failed, trying generate:", detail)
+    const logoDataUrl = sourceFile ? null : await resolveLogoDataUrl(opts.logoUrl)
+    const logoFile = logoDataUrl ? await resolveLogoFile(logoDataUrl) : null
+
+    // New graphic with agency logo: never pass logo-only to images.edit (causes duplicate logos + clipped text).
+    if (logoDataUrl && logoFile) {
+      const viaResponses = await generateWithLogoReference({ prompt: fullPrompt, logoDataUrl, openai })
+      if (viaResponses) return { ok: true, data: viaResponses }
+
+      const viaCanvasEdit = await generateWithCanvasAndLogoEdit({ prompt: fullPrompt, logoFile, openai })
+      if (viaCanvasEdit) return { ok: true, data: viaCanvasEdit }
+
+      return {
+        ok: false,
+        reason: "openai_error",
+        detail:
+          "Could not compose the agency logo into the graphic. Logo-only image edit is not used because it produces duplicate logos and clipped text.",
       }
     }
 
@@ -286,13 +381,21 @@ async function generateImageFromPrompt(opts: {
         prompt: fullPrompt,
         n: 1,
         size: "1536x1024",
-        quality: "medium",
+        quality: "high",
       })
       const b64 = response.data?.[0]?.b64_json
       if (b64) return { ok: true, data: { dataUrl: `data:image/png;base64,${b64}`, model: "gpt-image-1" } }
     } catch (gptErr) {
       const detail = gptErr instanceof Error ? gptErr.message : String(gptErr)
-      console.warn("[graphic-studio-ai] gpt-image-1 failed, trying dall-e-3:", detail)
+      console.warn("[graphic-studio-ai] gpt-image-1 failed:", detail)
+    }
+
+    if (logoRequired) {
+      return {
+        ok: false,
+        reason: "openai_error",
+        detail: "Image generation failed and DALL-E fallback is disabled when an agency logo is required.",
+      }
     }
 
     const dallePrompt = truncateForDallE(fullPrompt)
@@ -454,6 +557,7 @@ ${basePrompt}`
     prompt,
     logoUrl: opts.sourceImageDataUrl ? null : opts.agencyLogoUrl,
     sourceImageDataUrl: opts.sourceImageDataUrl,
+    logoRequired: agencyLogoExpected,
   })
   if (!image.ok) return image
 
@@ -468,16 +572,95 @@ ${basePrompt}`
     agencyLogoExpected,
   })
 
-  if (review.status === "REGENERATE" && review.revision_instructions.length) {
+  if (
+    review.status === "REGENERATE" &&
+    (review.revision_instructions.length > 0 || review.problems.length > 0)
+  ) {
+    const instructions =
+      review.revision_instructions.length > 0
+        ? review.revision_instructions
+        : review.problems
+    const problemLines = review.problems.length
+      ? review.problems.map((item) => `- ${item}`).join("\n")
+      : ""
     const retryPrompt = `${prompt}
 
 AUTOMATIC CORRECTIONS REQUIRED:
-${review.revision_instructions.map((item) => `- ${item}`).join("\n")}
+${instructions.map((item) => `- ${item}`).join("\n")}
+${problemLines && review.revision_instructions.length ? `\nProblems detected:\n${problemLines}` : ""}
+
+Fix ONLY these issues. Preserve the approved topic, headline, and safety message unless they were wrong.
+Ensure all text sits at least 14% inside the canvas edges with no clipping. Place the agency logo exactly once in the bottom-right on a clean background.
 `
     const retry = await generateImageFromPrompt({
       prompt: retryPrompt,
       logoUrl: null,
       sourceImageDataUrl: image.data.dataUrl,
+      logoRequired: agencyLogoExpected,
+    })
+    if (retry.ok) image = retry
+  }
+
+  return image
+}
+
+export async function generatePostOpportunityGraphicImage(opts: {
+  title: string
+  category: string
+  sourceLabel: string
+  headline: string
+  mainMessage: string
+  visualConcept: string
+  agencyLogoUrl?: string | null
+}): Promise<AiResult<GeneratedImage>> {
+  const agencyLogoExpected = Boolean(opts.agencyLogoUrl)
+  const prompt = buildPostOpportunityImagePrompt({
+    title: opts.title,
+    category: opts.category,
+    sourceLabel: opts.sourceLabel,
+    headline: opts.headline,
+    mainMessage: opts.mainMessage,
+    visualConcept: opts.visualConcept,
+    agencyLogoPresent: agencyLogoExpected,
+  })
+
+  let image = await generateImageFromPrompt({
+    prompt,
+    logoUrl: opts.agencyLogoUrl,
+    logoRequired: agencyLogoExpected,
+  })
+  if (!image.ok) return image
+
+  const review = await validateGeneratedGraphic({
+    imageDataUrl: image.data.dataUrl,
+    category: opts.category,
+    verifiedTopic: opts.title,
+    headline: opts.headline,
+    supportingLine: "",
+    body: opts.mainMessage,
+    emergencyMessage: "",
+    agencyLogoExpected,
+  })
+
+  if (
+    review.status === "REGENERATE" &&
+    (review.revision_instructions.length > 0 || review.problems.length > 0)
+  ) {
+    const instructions =
+      review.revision_instructions.length > 0 ? review.revision_instructions : review.problems
+    const retryPrompt = `${prompt}
+
+AUTOMATIC CORRECTIONS REQUIRED:
+${instructions.map((item) => `- ${item}`).join("\n")}
+
+Fix ONLY these issues. Keep the post topic and approved on-image copy.
+Ensure all text sits at least 14% inside the canvas edges with no clipping. Place the agency logo exactly once in the bottom-right on a clean background.
+`
+    const retry = await generateImageFromPrompt({
+      prompt: retryPrompt,
+      logoUrl: null,
+      sourceImageDataUrl: image.data.dataUrl,
+      logoRequired: agencyLogoExpected,
     })
     if (retry.ok) image = retry
   }
@@ -607,5 +790,9 @@ export async function generateEventGraphicImage(opts: {
     style: opts.style || "Let SaferU Decide",
     agencyLogoPresent: Boolean(opts.agencyLogoUrl),
   })
-  return generateImageFromPrompt({ prompt, logoUrl: opts.agencyLogoUrl })
+  return generateImageFromPrompt({
+    prompt,
+    logoUrl: opts.agencyLogoUrl,
+    logoRequired: Boolean(opts.agencyLogoUrl),
+  })
 }
