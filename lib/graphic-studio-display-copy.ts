@@ -10,19 +10,19 @@ export function graphicOnImageCopy(opts: {
   mainMessage: string
   emergencyMessage: string
 } {
-  const headline = opts.headline.trim().slice(0, 72)
-  const supportingLine = opts.supportingLine.trim().slice(0, 90)
+  const headline = opts.headline.trim().slice(0, 48)
+  const supportingLine = opts.supportingLine.trim().slice(0, 60)
 
   const bodyWords = opts.body.trim().split(/\s+/).filter(Boolean)
   const mainMessage =
-    bodyWords.length <= 22
+    bodyWords.length <= 14
       ? bodyWords.join(" ")
-      : `${bodyWords.slice(0, 22).join(" ").replace(/[,.;:!?]+$/, "")}…`
+      : `${bodyWords.slice(0, 14).join(" ").replace(/[,.;:!?]+$/, "")}…`
 
   const emergencyRaw = opts.emergencyMessage.trim()
   const emergencyWords = emergencyRaw.split(/\s+/).filter(Boolean)
   const emergencyMessage =
-    emergencyWords.length > 0 && emergencyWords.length <= 14 ? emergencyRaw.slice(0, 100) : ""
+    emergencyWords.length > 0 && emergencyWords.length <= 10 ? emergencyRaw.slice(0, 80) : ""
 
   return { headline, supportingLine, mainMessage, emergencyMessage }
 }

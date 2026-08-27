@@ -34,24 +34,82 @@ function pngChunk(type: string, data: Buffer): Buffer {
   return Buffer.concat([len, combined, crc])
 }
 
-/** Neutral light-gray 16:9 PNG — substrate only, not the final design. */
-export function createBlankLandscapeCanvas(): Buffer {
-  const { width, height } = { width: GRAPHIC_CANVAS_WIDTH, height: GRAPHIC_CANVAS_HEIGHT }
-  const r = 240
-  const g = 240
-  const b = 242
+function setPixel(
+  raw: Buffer,
+  width: number,
+  x: number,
+  y: number,
+  r: number,
+  g: number,
+  b: number
+) {
+  if (x < 0 || y < 0 || x >= width) return
+  const rowSize = 1 + width * 3
+  const rowStart = y * rowSize
+  if (rowStart >= raw.length) return
+  const i = rowStart + 1 + x * 3
+  raw[i] = r
+  raw[i + 1] = g
+  raw[i + 2] = b
+}
 
+/**
+ * Layout-guide 16:9 PNG — substrate only.
+ * Shows content safe area (left) and empty logo corner (bottom-right) for the model.
+ */
+export function createBlankLandscapeCanvas(): Buffer {
+  const width = GRAPHIC_CANVAS_WIDTH
+  const height = GRAPHIC_CANVAS_HEIGHT
   const rowSize = 1 + width * 3
   const raw = Buffer.alloc(rowSize * height)
+
+  const marginX = Math.round(width * 0.18)
+  const marginY = Math.round(height * 0.18)
+  const textMaxX = Math.round(width * 0.48)
+  const logoMinX = Math.round(width * 0.76)
+  const logoMinY = Math.round(height * 0.78)
+
   for (let y = 0; y < height; y++) {
     const rowStart = y * rowSize
     raw[rowStart] = 0
     for (let x = 0; x < width; x++) {
+      let r = 228
+      let g = 230
+      let b = 235
+
+      // Logo reserve — bottom-right
+      if (x >= logoMinX && y >= logoMinY) {
+        r = 210
+        g = 214
+        b = 222
+      } else if (x >= marginX && x <= textMaxX && y >= marginY && y <= height - marginY) {
+        // Text/content safe column — upper-left
+        r = 245
+        g = 246
+        b = 248
+      }
+
       const i = rowStart + 1 + x * 3
       raw[i] = r
       raw[i + 1] = g
       raw[i + 2] = b
     }
+  }
+
+  // Subtle guide borders (will be painted over — layout hints only)
+  for (let x = marginX; x <= textMaxX; x++) {
+    setPixel(raw, width, x, marginY, 200, 204, 212)
+    setPixel(raw, width, x, height - marginY, 200, 204, 212)
+  }
+  for (let y = marginY; y <= height - marginY; y++) {
+    setPixel(raw, width, marginX, y, 200, 204, 212)
+    setPixel(raw, width, textMaxX, y, 200, 204, 212)
+  }
+  for (let x = logoMinX; x < width; x++) {
+    setPixel(raw, width, x, logoMinY, 190, 196, 206)
+  }
+  for (let y = logoMinY; y < height; y++) {
+    setPixel(raw, width, logoMinX, y, 190, 196, 206)
   }
 
   const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])

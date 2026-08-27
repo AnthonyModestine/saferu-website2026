@@ -11,10 +11,13 @@ import {
 import { graphicOnImageCopy } from "@/lib/graphic-studio-display-copy"
 import {
   buildAgencyLogoPromptBlock,
+  buildLogoPlacementInputRolesBlock,
   buildLogoReferenceInputRolesBlock,
   buildPostOpportunityImagePrompt,
   buildSafetyImagePrompt,
   GRAPHIC_MARGIN_RULES,
+  LOGO_RESERVE_ZONE,
+  LOGO_RESERVE_ZONE,
   researchSourceGuidance,
   SAFETY_RESEARCH_SYSTEM,
 } from "@/lib/graphic-studio-prompts"
@@ -198,31 +201,21 @@ async function resolveLogoFile(logoUrl?: string | null) {
   return null
 }
 
-async function resolveLogoDataUrl(logoUrl?: string | null): Promise<string | null> {
-  if (!logoUrl?.trim()) return null
-  if (logoUrl.startsWith("data:")) return logoUrl
-  const file = await resolveLogoFile(logoUrl)
-  if (!file) return null
-  try {
-    const arrayBuffer = await file.arrayBuffer()
-    const type = file.type || "image/png"
-    return `data:${type};base64,${Buffer.from(arrayBuffer).toString("base64")}`
-  } catch {
-    return null
-  }
-}
-
-function graphicResponseModel(): string {
-  return process.env.OPENAI_GRAPHIC_RESPONSE_MODEL?.trim() || "gpt-4.1"
-}
-
-function extractImageGenerationResult(response: {
-  output?: ReadonlyArray<{ type?: string; result?: string | null }>
+function extractImageB64FromGenerate(response: {
+  data?: Array<{ b64_json?: string | null }> | null
 }): string | null {
-  for (const item of response.output || []) {
-    if (item.type === "image_generation_call" && item.result) {
-      return item.result
-    }
+  return response.data?.[0]?.b64_json ?? null
+}
+
+function extractImageB64FromEdit(response: unknown): string | null {
+  if (
+    response &&
+    typeof response === "object" &&
+    "data" in response &&
+    Array.isArray((response as { data?: unknown }).data)
+  ) {
+    const item = (response as { data: Array<{ b64_json?: string | null }> }).data[0]
+    return item?.b64_json ?? null
   }
   return null
 }
@@ -246,44 +239,70 @@ async function fetchImageAsDataUrl(url: string): Promise<string | null> {
 
 type GeneratedImage = { dataUrl: string; model: string }
 
-async function generateWithLogoReference(opts: {
+const MAX_QUALITY_ATTEMPTS = 3
+
+async function generateBaseGraphic(opts: {
   prompt: string
-  logoDataUrl: string
   openai: InstanceType<(typeof import("openai"))["default"]>
 }): Promise<GeneratedImage | null> {
   try {
-    const response = await opts.openai.responses.create({
-      model: graphicResponseModel(),
-      input: [
-        {
-          role: "user",
-          content: [
-            { type: "input_text", text: opts.prompt },
-            {
-              type: "input_image",
-              image_url: opts.logoDataUrl,
-              detail: "high",
-            },
-          ],
-        },
-      ],
-      tools: [
-        {
-          type: "image_generation",
-          size: "1536x1024",
-          quality: "high",
-        },
-      ],
+    const response = await opts.openai.images.generate({
+      model: "gpt-image-1",
+      prompt: opts.prompt,
+      n: 1,
+      size: "1536x1024",
+      quality: "high",
     })
-    const b64 = extractImageGenerationResult(response)
+    const b64 = extractImageB64FromGenerate(response)
+    if (b64) return { dataUrl: `data:image/png;base64,${b64}`, model: "gpt-image-1" }
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err)
+    console.warn("[graphic-studio-ai] base generate failed:", detail)
+  }
+  return null
+}
+
+async function placeLogoOnGraphic(opts: {
+  graphicDataUrl: string
+  logoFile: Awaited<ReturnType<typeof resolveLogoFile>>
+  openai: InstanceType<(typeof import("openai"))["default"]>
+}): Promise<GeneratedImage | null> {
+  if (!opts.logoFile) return null
+  const graphicFile = await resolveLogoFile(opts.graphicDataUrl)
+  if (!graphicFile) return null
+  try {
+    const response = await opts.openai.images.edit({
+      model: "gpt-image-1",
+      image: [graphicFile, opts.logoFile],
+      prompt: buildLogoPlacementInputRolesBlock(),
+      n: 1,
+      size: "1536x1024",
+      input_fidelity: "high",
+    })
+    const b64 = extractImageB64FromEdit(response)
     if (b64) {
-      return { dataUrl: `data:image/png;base64,${b64}`, model: `${graphicResponseModel()}+image_generation` }
+      return { dataUrl: `data:image/png;base64,${b64}`, model: "gpt-image-1+logo_placement" }
     }
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err)
-    console.warn("[graphic-studio-ai] responses image_generation failed:", detail)
+    console.warn("[graphic-studio-ai] logo placement failed:", detail)
   }
   return null
+}
+
+async function generateTwoStepGraphicWithLogo(opts: {
+  designPrompt: string
+  logoFile: Awaited<ReturnType<typeof resolveLogoFile>>
+  openai: InstanceType<(typeof import("openai"))["default"]>
+}): Promise<GeneratedImage | null> {
+  const base = await generateBaseGraphic({ prompt: opts.designPrompt, openai: opts.openai })
+  if (!base) return null
+  const placed = await placeLogoOnGraphic({
+    graphicDataUrl: base.dataUrl,
+    logoFile: opts.logoFile,
+    openai: opts.openai,
+  })
+  return placed ?? base
 }
 
 async function generateWithCanvasAndLogoEdit(opts: {
@@ -305,10 +324,7 @@ async function generateWithCanvasAndLogoEdit(opts: {
       size: "1536x1024",
       input_fidelity: "high",
     })
-    const b64 =
-      "data" in response && Array.isArray(response.data)
-        ? response.data[0]?.b64_json
-        : undefined
+    const b64 = extractImageB64FromEdit(response)
     if (b64) {
       return { dataUrl: `data:image/png;base64,${b64}`, model: "gpt-image-1+canvas_logo_edit" }
     }
@@ -324,6 +340,8 @@ async function generateImageFromPrompt(opts: {
   logoUrl?: string | null
   sourceImageDataUrl?: string | null
   logoRequired?: boolean
+  /** When true, step 1 leaves logo zone empty; step 2 places logo once. */
+  twoStepLogo?: boolean
 }): Promise<AiResult<GeneratedImage>> {
   const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) return { ok: false, reason: "missing_api_key" }
@@ -348,21 +366,25 @@ async function generateImageFromPrompt(opts: {
           n: 1,
           size: "1536x1024",
         })
-        const b64 = response.data?.[0]?.b64_json
+        const b64 = extractImageB64FromEdit(response)
         if (b64) return { ok: true, data: { dataUrl: `data:image/png;base64,${b64}`, model: "gpt-image-1" } }
       } catch (editErr) {
         const detail = editErr instanceof Error ? editErr.message : String(editErr)
-        console.warn("[graphic-studio-ai] images.edit failed, trying generate:", detail)
+        console.warn("[graphic-studio-ai] images.edit failed:", detail)
       }
+      return { ok: false, reason: "openai_error", detail: "Could not edit the existing graphic." }
     }
 
-    const logoDataUrl = sourceFile ? null : await resolveLogoDataUrl(opts.logoUrl)
-    const logoFile = logoDataUrl ? await resolveLogoFile(logoDataUrl) : null
+    const logoFile = await resolveLogoFile(opts.logoUrl)
 
-    // New graphic with agency logo: never pass logo-only to images.edit (causes duplicate logos + clipped text).
-    if (logoDataUrl && logoFile) {
-      const viaResponses = await generateWithLogoReference({ prompt: fullPrompt, logoDataUrl, openai })
-      if (viaResponses) return { ok: true, data: viaResponses }
+    // Two-step logo: generate full graphic with empty corner, then place logo exactly once.
+    if (opts.twoStepLogo && logoFile) {
+      const twoStep = await generateTwoStepGraphicWithLogo({
+        designPrompt: fullPrompt,
+        logoFile,
+        openai,
+      })
+      if (twoStep) return { ok: true, data: twoStep }
 
       const viaCanvasEdit = await generateWithCanvasAndLogoEdit({ prompt: fullPrompt, logoFile, openai })
       if (viaCanvasEdit) return { ok: true, data: viaCanvasEdit }
@@ -370,8 +392,7 @@ async function generateImageFromPrompt(opts: {
       return {
         ok: false,
         reason: "openai_error",
-        detail:
-          "Could not compose the agency logo into the graphic. Logo-only image edit is not used because it produces duplicate logos and clipped text.",
+        detail: "Could not generate the graphic and place the agency logo.",
       }
     }
 
@@ -383,7 +404,7 @@ async function generateImageFromPrompt(opts: {
         size: "1536x1024",
         quality: "high",
       })
-      const b64 = response.data?.[0]?.b64_json
+      const b64 = extractImageB64FromGenerate(response)
       if (b64) return { ok: true, data: { dataUrl: `data:image/png;base64,${b64}`, model: "gpt-image-1" } }
     } catch (gptErr) {
       const detail = gptErr instanceof Error ? gptErr.message : String(gptErr)
@@ -394,7 +415,7 @@ async function generateImageFromPrompt(opts: {
       return {
         ok: false,
         reason: "openai_error",
-        detail: "Image generation failed and DALL-E fallback is disabled when an agency logo is required.",
+        detail: "Image generation failed when an agency logo was required.",
       }
     }
 
@@ -434,8 +455,15 @@ export async function validateGeneratedGraphic(opts: {
   agencyLogoExpected: boolean
 }): Promise<{ status: "PASS" | "REGENERATE"; problems: string[]; revision_instructions: string[] }> {
   const apiKey = process.env.OPENAI_API_KEY?.trim()
-  const fallback = { status: "PASS" as const, problems: [] as string[], revision_instructions: [] as string[] }
-  if (!apiKey) return fallback
+  const failClosed = {
+    status: "REGENERATE" as const,
+    problems: ["Quality check could not confirm this graphic is acceptable."],
+    revision_instructions: [
+      "Move all text at least 18% inward from every canvas edge so no letters are clipped.",
+      "Ensure the agency logo appears exactly once in the bottom-right on a clean background.",
+    ],
+  }
+  if (!apiKey) return failClosed
 
   const onImage = graphicOnImageCopy({
     headline: opts.headline,
@@ -473,9 +501,10 @@ REGENERATE if the graphic shows a different safety topic than the verified topic
 REGENERATE if the headline is missing or replaced with unrelated messaging.
 REGENERATE if any text is cropped, clipped, or cut off by the canvas edge.
 REGENERATE if text runs edge-to-edge or fills a full-width footer bar across the bottom.
-REGENERATE if any text or important visual sits too close to the canvas edge (less than roughly 12–14% inset).
+REGENERATE if any text or important visual sits too close to the canvas edge (less than roughly 18% inset from left, top, or bottom).
 REGENERATE if there is too much text to read quickly (wall of text).
-REGENERATE if the agency logo appears more than once, or if anything is drawn behind/under the logo.
+REGENERATE if the agency logo appears more than once, overlaps itself, or if anything is drawn behind/under the logo.
+REGENERATE if two versions of the same agency badge/seal are visible.
 
 Return JSON:
 {"status":"PASS"|"REGENERATE","problems":[],"revision_instructions":[]}
@@ -493,7 +522,7 @@ Fail it when something materially affects accuracy, readability, professionalism
       ],
     })
     const parsed = parseJsonObject(completion.choices?.[0]?.message?.content || "")
-    if (!parsed) return fallback
+    if (!parsed) return failClosed
     const status = asString(parsed.status).toUpperCase() === "REGENERATE" ? "REGENERATE" : "PASS"
     return {
       status,
@@ -503,7 +532,79 @@ Fail it when something materially affects accuracy, readability, professionalism
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err)
     console.warn("[graphic-studio-ai] validation skipped:", detail)
-    return fallback
+    return failClosed
+  }
+}
+
+type GraphicQualityInput = {
+  category: string
+  verifiedTopic: string
+  headline: string
+  supportingLine: string
+  body: string
+  emergencyMessage: string
+  agencyLogoUrl?: string | null
+  agencyLogoExpected: boolean
+  prompt: string
+  twoStepLogo: boolean
+  sourceImageDataUrl?: string | null
+}
+
+async function generateGraphicWithQualityLoop(
+  input: GraphicQualityInput
+): Promise<AiResult<GeneratedImage>> {
+  let lastProblems: string[] = []
+  let image: AiResult<GeneratedImage> | null = null
+
+  for (let attempt = 0; attempt < MAX_QUALITY_ATTEMPTS; attempt++) {
+    const prompt =
+      attempt === 0
+        ? input.prompt
+        : `${input.prompt}
+
+AUTOMATIC CORRECTIONS REQUIRED (attempt ${attempt + 1}):
+${lastProblems.map((item) => `- ${item}`).join("\n")}
+
+Move ALL text at least 18% inward from every edge — no clipped letters.
+Keep the agency logo exactly once in the bottom-right on a clean background.
+Do not duplicate the logo.`
+
+    image = await generateImageFromPrompt({
+      prompt,
+      logoUrl: input.sourceImageDataUrl ? null : input.agencyLogoUrl,
+      sourceImageDataUrl: input.sourceImageDataUrl ?? null,
+      logoRequired: input.agencyLogoExpected,
+      twoStepLogo: input.twoStepLogo && !input.sourceImageDataUrl,
+    })
+    if (!image.ok) return image
+
+    const review = await validateGeneratedGraphic({
+      imageDataUrl: image.data.dataUrl,
+      category: input.category,
+      verifiedTopic: input.verifiedTopic,
+      headline: input.headline,
+      supportingLine: input.supportingLine,
+      body: input.body,
+      emergencyMessage: input.emergencyMessage,
+      agencyLogoExpected: input.agencyLogoExpected,
+    })
+
+    if (review.status === "PASS") return image
+
+    lastProblems = [
+      ...review.problems,
+      ...review.revision_instructions,
+      "Text must sit at least 18% inside the canvas — no letters cut off.",
+      "Agency logo must appear exactly once in the bottom-right corner.",
+    ]
+  }
+
+  return {
+    ok: false,
+    reason: "openai_error",
+    detail:
+      lastProblems.join(" ") ||
+      "Graphic did not pass quality checks for readable margins and single logo placement.",
   }
 }
 
@@ -526,6 +627,7 @@ export async function generateSafetyTipGraphicImage(opts: {
 }): Promise<AiResult<GeneratedImage>> {
   const verifiedTopic = opts.verifiedTopic?.trim() || opts.category
   const agencyLogoExpected = Boolean(opts.agencyLogoUrl)
+  const isRevision = Boolean(opts.sourceImageDataUrl || opts.revisionRequest)
   const basePrompt = buildSafetyImagePrompt({
     category: opts.category,
     verifiedTopic,
@@ -539,7 +641,8 @@ export async function generateSafetyTipGraphicImage(opts: {
     style: opts.style || "Let SaferU Decide",
     mustShow: opts.mustShow || [],
     mustAvoid: opts.mustAvoid || [],
-    agencyLogoPresent: agencyLogoExpected,
+    agencyLogoPresent: agencyLogoExpected && isRevision,
+    reserveLogoZone: agencyLogoExpected && !isRevision,
   })
   const prompt = opts.revisionRequest
     ? `Edit the supplied existing graphic. This is a PRECISION REVISION.
@@ -553,55 +656,19 @@ Preserve layout, headline, wording, people, vehicles, background, icons, logo, c
 ${basePrompt}`
     : basePrompt
 
-  let image = await generateImageFromPrompt({
-    prompt,
-    logoUrl: opts.sourceImageDataUrl ? null : opts.agencyLogoUrl,
-    sourceImageDataUrl: opts.sourceImageDataUrl,
-    logoRequired: agencyLogoExpected,
-  })
-  if (!image.ok) return image
-
-  const review = await validateGeneratedGraphic({
-    imageDataUrl: image.data.dataUrl,
+  return generateGraphicWithQualityLoop({
     category: opts.category,
     verifiedTopic,
     headline: opts.headline,
     supportingLine: opts.supportingLine || "",
     body: opts.body,
     emergencyMessage: opts.emergencyMessage || "",
+    agencyLogoUrl: opts.agencyLogoUrl,
     agencyLogoExpected,
+    prompt,
+    twoStepLogo: agencyLogoExpected && !isRevision,
+    sourceImageDataUrl: opts.sourceImageDataUrl,
   })
-
-  if (
-    review.status === "REGENERATE" &&
-    (review.revision_instructions.length > 0 || review.problems.length > 0)
-  ) {
-    const instructions =
-      review.revision_instructions.length > 0
-        ? review.revision_instructions
-        : review.problems
-    const problemLines = review.problems.length
-      ? review.problems.map((item) => `- ${item}`).join("\n")
-      : ""
-    const retryPrompt = `${prompt}
-
-AUTOMATIC CORRECTIONS REQUIRED:
-${instructions.map((item) => `- ${item}`).join("\n")}
-${problemLines && review.revision_instructions.length ? `\nProblems detected:\n${problemLines}` : ""}
-
-Fix ONLY these issues. Preserve the approved topic, headline, and safety message unless they were wrong.
-Ensure all text sits at least 14% inside the canvas edges with no clipping. Place the agency logo exactly once in the bottom-right on a clean background.
-`
-    const retry = await generateImageFromPrompt({
-      prompt: retryPrompt,
-      logoUrl: null,
-      sourceImageDataUrl: image.data.dataUrl,
-      logoRequired: agencyLogoExpected,
-    })
-    if (retry.ok) image = retry
-  }
-
-  return image
 }
 
 export async function generatePostOpportunityGraphicImage(opts: {
@@ -621,51 +688,22 @@ export async function generatePostOpportunityGraphicImage(opts: {
     headline: opts.headline,
     mainMessage: opts.mainMessage,
     visualConcept: opts.visualConcept,
-    agencyLogoPresent: agencyLogoExpected,
+    agencyLogoPresent: false,
+    reserveLogoZone: agencyLogoExpected,
   })
 
-  let image = await generateImageFromPrompt({
-    prompt,
-    logoUrl: opts.agencyLogoUrl,
-    logoRequired: agencyLogoExpected,
-  })
-  if (!image.ok) return image
-
-  const review = await validateGeneratedGraphic({
-    imageDataUrl: image.data.dataUrl,
+  return generateGraphicWithQualityLoop({
     category: opts.category,
     verifiedTopic: opts.title,
     headline: opts.headline,
     supportingLine: "",
     body: opts.mainMessage,
     emergencyMessage: "",
+    agencyLogoUrl: opts.agencyLogoUrl,
     agencyLogoExpected,
+    prompt,
+    twoStepLogo: agencyLogoExpected,
   })
-
-  if (
-    review.status === "REGENERATE" &&
-    (review.revision_instructions.length > 0 || review.problems.length > 0)
-  ) {
-    const instructions =
-      review.revision_instructions.length > 0 ? review.revision_instructions : review.problems
-    const retryPrompt = `${prompt}
-
-AUTOMATIC CORRECTIONS REQUIRED:
-${instructions.map((item) => `- ${item}`).join("\n")}
-
-Fix ONLY these issues. Keep the post topic and approved on-image copy.
-Ensure all text sits at least 14% inside the canvas edges with no clipping. Place the agency logo exactly once in the bottom-right on a clean background.
-`
-    const retry = await generateImageFromPrompt({
-      prompt: retryPrompt,
-      logoUrl: null,
-      sourceImageDataUrl: image.data.dataUrl,
-      logoRequired: agencyLogoExpected,
-    })
-    if (retry.ok) image = retry
-  }
-
-  return image
 }
 
 export async function createSafetyTipGraphicPackage(opts: {
@@ -734,12 +772,17 @@ export function buildEventImagePrompt(opts: {
   contact: string
   style: string
   agencyLogoPresent: boolean
+  reserveLogoZone?: boolean
 }): string {
+  const logoBlock = opts.reserveLogoZone
+    ? LOGO_RESERVE_ZONE
+    : buildAgencyLogoPromptBlock(opts.agencyLogoPresent)
+
   return `Create a professional 16:9 public-agency event graphic.
 
 This graphic will be posted by an official police, fire, EMS, emergency management, municipal, or other public agency.
 
-${buildAgencyLogoPromptBlock(opts.agencyLogoPresent)}
+${logoBlock}
 
 ${GRAPHIC_MARGIN_RULES}
 
@@ -778,6 +821,7 @@ export async function generateEventGraphicImage(opts: {
   style?: string
   agencyLogoUrl?: string | null
 }): Promise<AiResult<GeneratedImage>> {
+  const agencyLogoExpected = Boolean(opts.agencyLogoUrl)
   const prompt = buildEventImagePrompt({
     eventType: opts.eventType,
     eventName: opts.eventName,
@@ -788,11 +832,19 @@ export async function generateEventGraphicImage(opts: {
     cta: opts.cta || "",
     contact: opts.contact || "",
     style: opts.style || "Let SaferU Decide",
-    agencyLogoPresent: Boolean(opts.agencyLogoUrl),
+    agencyLogoPresent: false,
+    reserveLogoZone: agencyLogoExpected,
   })
-  return generateImageFromPrompt({
+  return generateGraphicWithQualityLoop({
+    category: opts.eventType,
+    verifiedTopic: opts.eventName,
+    headline: opts.eventName,
+    supportingLine: `${opts.date} ${opts.time}`.trim(),
+    body: opts.location,
+    emergencyMessage: "",
+    agencyLogoUrl: opts.agencyLogoUrl,
+    agencyLogoExpected,
     prompt,
-    logoUrl: opts.agencyLogoUrl,
-    logoRequired: Boolean(opts.agencyLogoUrl),
+    twoStepLogo: agencyLogoExpected,
   })
 }

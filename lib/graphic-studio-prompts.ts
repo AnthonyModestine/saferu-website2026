@@ -110,22 +110,52 @@ export function buildLogoReferenceInputRolesBlock(): string {
 The logo reference is not part of the scene — do not treat it as a background layer or repeat it anywhere.`
 }
 
+/** Step 1 of two-step logo pipeline — graphic is generated with an empty branding corner. */
+export const LOGO_RESERVE_ZONE = `LOGO PLACEHOLDER (mandatory)
+
+Do NOT draw any agency logo, badge, seal, patch, or department emblem anywhere on this graphic.
+
+Reserve the bottom-right corner for branding added later:
+- Keep the right 24% and bottom 22% of the canvas completely empty.
+- That zone must be a plain solid color or soft gradient only.
+- No text, no icons, no faces, no equipment, and no illustrations in that zone.`
+
+/** Step 2 of two-step logo pipeline — composite logo onto finished graphic. */
+export function buildLogoPlacementInputRolesBlock(): string {
+  return `IMAGE INPUT ROLES (read carefully)
+
+- Image 1: Finished 16:9 public-safety graphic. It intentionally has NO logo yet. The bottom-right corner was left empty.
+- Image 2: Official agency logo file ONLY — not a background, not part of the scene.
+
+YOUR ONLY TASK: Place image 2 onto image 1 exactly ONE time in the empty bottom-right corner.
+
+Rules:
+- Use the exact logo pixels from image 2. Do not redraw, trace, or recreate the logo.
+- Size: approximately 10% of canvas width, keep aspect ratio.
+- Padding: approximately 3–4% from the right and bottom edges.
+- Do NOT duplicate the logo. Do NOT overlay a second copy. Do NOT show two logos.
+- Do NOT change, move, resize, retype, or recrop ANY existing text or artwork on image 1.
+- Do NOT place the logo anywhere except the bottom-right empty zone.
+- Do NOT use image 2 as a background layer or repeat it across the canvas.`
+}
+
 export const GRAPHIC_MARGIN_RULES = `MARGINS AND SAFE ZONES (mandatory — failure to follow means the graphic is unusable)
 
 The entire composition must fit comfortably INSIDE the canvas with NO text cropped or cut off by the edges.
 
 MINIMUM INSET — no exceptions:
-- Top: at least 14% empty padding before the first line of text or top of any foreground object.
-- Left: at least 14% empty padding before any text begins.
-- Right: at least 14% empty padding before any text ends (more clearance when the logo is bottom-right).
-- Bottom: at least 16% empty padding before any text (the logo occupies the bottom-right corner below text).
+- Top: at least 18% empty padding before the first line of text or top of any foreground object.
+- Left: at least 18% empty padding before any text begins.
+- Right: at least 18% empty padding before any text ends (more clearance when the logo zone is bottom-right).
+- Bottom: at least 20% empty padding before any text (the logo occupies the bottom-right corner below text).
 
 TEXT RULES:
-- Place ALL text in the upper-left or left third only — never across the full width, never in a bottom footer strip.
-- Text column starts at 14% from the left and must not extend past 52% of canvas width.
+- Place ALL text in the upper-left quadrant only — never centered edge-to-edge, never across the full width, never in a bottom footer strip.
+- Text column starts at 18% from the left edge and must not extend past 48% of canvas width.
 - Every letter of every word must be fully visible — nothing clipped, truncated, or touching the canvas border.
 - Use large mobile-readable type with generous line spacing.
-- Total on-image words: under 40.
+- Total on-image words: under 30.
+- Prefer fewer words over smaller type — if copy does not fit with large type inside the safe zone, shorten it.
 
 MAIN VISUAL:
 - Foreground subjects, icons, and labels stay inside the center 72% of the canvas.
@@ -149,6 +179,8 @@ export function buildSafetyImagePrompt(opts: {
   mustShow: string[]
   mustAvoid: string[]
   agencyLogoPresent: boolean
+  /** When true, leave bottom-right empty — logo is composited in a separate step. */
+  reserveLogoZone?: boolean
 }): string {
   const display = graphicOnImageCopy({
     headline: opts.headline,
@@ -171,13 +203,17 @@ export function buildSafetyImagePrompt(opts: {
     ? `Emergency callout: "${display.emergencyMessage}"`
     : "Emergency message: (none)"
 
+  const logoBlock = opts.reserveLogoZone
+    ? LOGO_RESERVE_ZONE
+    : buildAgencyLogoPromptBlock(opts.agencyLogoPresent)
+
   return `Create a professional 16:9 public-safety social media graphic.
 
 This graphic will be published by an official police department, sheriff's office, fire department, EMS agency, emergency management agency, municipality, or other public agency.
 
 It must look credible, polished, modern, and appropriate for an official agency social media account.
 
-${buildAgencyLogoPromptBlock(opts.agencyLogoPresent)}
+${logoBlock}
 
 ${GRAPHIC_MARGIN_RULES}
 
@@ -289,6 +325,7 @@ export function buildPostOpportunityImagePrompt(opts: {
   mainMessage: string
   visualConcept: string
   agencyLogoPresent: boolean
+  reserveLogoZone?: boolean
 }): string {
   const display = graphicOnImageCopy({
     headline: opts.headline,
@@ -297,11 +334,15 @@ export function buildPostOpportunityImagePrompt(opts: {
     emergencyMessage: "",
   })
 
+  const logoBlock = opts.reserveLogoZone
+    ? LOGO_RESERVE_ZONE
+    : buildAgencyLogoPromptBlock(opts.agencyLogoPresent)
+
   return `Create a professional 16:9 public-agency social media graphic paired with an official Facebook post.
 
 This graphic will be published alongside the post copy below. The on-image text and visual MUST match the post topic — residents should recognize the same story in both.
 
-${buildAgencyLogoPromptBlock(opts.agencyLogoPresent)}
+${logoBlock}
 
 ${GRAPHIC_MARGIN_RULES}
 
