@@ -1,6 +1,6 @@
 import "server-only"
 
-import sharp from "sharp"
+import { getSharp } from "@/lib/graphic-studio/sharp"
 import {
   GRAPHIC_HEIGHT,
   GRAPHIC_WIDTH,
@@ -11,6 +11,7 @@ import {
 } from "@/lib/graphic-studio/constants"
 
 export async function normalizeArtworkSize(artwork: Buffer): Promise<Buffer> {
+  const sharp = await getSharp()
   const meta = await sharp(artwork).metadata()
   if (meta.width === GRAPHIC_WIDTH && meta.height === GRAPHIC_HEIGHT) {
     return artwork
@@ -25,6 +26,7 @@ export async function compositeAgencyLogo(
   artwork: Buffer,
   logo: Buffer
 ): Promise<Buffer> {
+  const sharp = await getSharp()
   const normalized = await normalizeArtworkSize(artwork)
 
   const resizedLogo = await sharp(logo)

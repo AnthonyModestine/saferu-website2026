@@ -2,7 +2,7 @@ import "server-only"
 
 import { readFile } from "fs/promises"
 import path from "path"
-import sharp from "sharp"
+import { getSharp } from "@/lib/graphic-studio/sharp"
 
 export type LogoAsset = {
   buffer: Buffer
@@ -37,6 +37,7 @@ export async function loadLogoAsset(logoUrl: string | null | undefined): Promise
       return null
     }
 
+    const sharp = await getSharp()
     const meta = await sharp(buffer).metadata()
     return {
       buffer,
@@ -50,6 +51,7 @@ export async function loadLogoAsset(logoUrl: string | null | undefined): Promise
 }
 
 export async function createBlankCanvasBuffer(): Promise<Buffer> {
+  const sharp = await getSharp()
   return sharp({
     create: {
       width: 2048,

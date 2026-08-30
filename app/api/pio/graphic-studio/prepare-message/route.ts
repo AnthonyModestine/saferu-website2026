@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { graphicStudioErrorPayload } from "@/lib/ai-result"
 import { requireGraphicStudioAccess } from "@/lib/graphic-studio/api-auth"
-import { researchSafetyGraphic } from "@/lib/graphic-studio/generate"
+import { researchSafetyGraphic } from "@/lib/graphic-studio/research"
 import {
   isSafetyAudience,
   isSafetyGraphicStyle,
