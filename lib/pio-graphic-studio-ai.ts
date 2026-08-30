@@ -17,7 +17,6 @@ import {
   buildSafetyImagePrompt,
   GRAPHIC_MARGIN_RULES,
   LOGO_RESERVE_ZONE,
-  LOGO_RESERVE_ZONE,
   researchSourceGuidance,
   SAFETY_RESEARCH_SYSTEM,
 } from "@/lib/graphic-studio-prompts"
@@ -610,63 +609,45 @@ Do not duplicate the logo.`
 
 export async function generateSafetyTipGraphicImage(opts: {
   category: string
-  headline: string
+  headline?: string
   supportingLine?: string
-  body: string
+  body?: string
   emergencyMessage?: string
-  audience: string
-  visualDirection: string
+  audience?: string
+  visualDirection?: string
   style?: string
   mustShow?: string[]
   mustAvoid?: string[]
   verifiedTopic?: string
   residentNeed?: string
+  agencyName?: string
   agencyLogoUrl?: string | null
   sourceImageDataUrl?: string | null
   revisionRequest?: string
 }): Promise<AiResult<GeneratedImage>> {
-  const verifiedTopic = opts.verifiedTopic?.trim() || opts.category
-  const agencyLogoExpected = Boolean(opts.agencyLogoUrl)
-  const isRevision = Boolean(opts.sourceImageDataUrl || opts.revisionRequest)
-  const basePrompt = buildSafetyImagePrompt({
+  const { generateSimpleSafetyGraphic } = await import("@/lib/graphic-studio-simple")
+
+  const topic =
+    opts.residentNeed?.trim() ||
+    [opts.headline, opts.body].filter(Boolean).join(" — ") ||
+    opts.verifiedTopic?.trim() ||
+    opts.category
+
+  const visualParts = [
+    opts.visualDirection?.trim(),
+    opts.supportingLine?.trim() && `Supporting line: ${opts.supportingLine}`,
+    opts.emergencyMessage?.trim() && `Emergency note: ${opts.emergencyMessage}`,
+    opts.mustShow?.length ? `Must show: ${opts.mustShow.join(", ")}` : "",
+    opts.mustAvoid?.length ? `Avoid: ${opts.mustAvoid.join(", ")}` : "",
+  ].filter(Boolean)
+
+  return generateSimpleSafetyGraphic({
+    topic,
     category: opts.category,
-    verifiedTopic,
-    originalRequest: opts.residentNeed?.trim() || verifiedTopic,
-    audience: opts.audience,
-    headline: opts.headline,
-    supportingLine: opts.supportingLine || "",
-    residentMessage: opts.body,
-    emergencyMessage: opts.emergencyMessage || "",
-    visualConcept: opts.visualDirection,
-    style: opts.style || "Let SaferU Decide",
-    mustShow: opts.mustShow || [],
-    mustAvoid: opts.mustAvoid || [],
-    agencyLogoPresent: agencyLogoExpected && isRevision,
-    reserveLogoZone: agencyLogoExpected && !isRevision,
-  })
-  const prompt = opts.revisionRequest
-    ? `Edit the supplied existing graphic. This is a PRECISION REVISION.
-
-The user requested ONLY the following change:
-${opts.revisionRequest}
-
-Everything else should remain visually unchanged unless changing it is absolutely necessary.
-Preserve layout, headline, wording, people, vehicles, background, icons, logo, colors, and composition unless required for this edit.
-
-${basePrompt}`
-    : basePrompt
-
-  return generateGraphicWithQualityLoop({
-    category: opts.category,
-    verifiedTopic,
-    headline: opts.headline,
-    supportingLine: opts.supportingLine || "",
-    body: opts.body,
-    emergencyMessage: opts.emergencyMessage || "",
+    visualNotes: visualParts.length ? visualParts.join("\n") : undefined,
+    agencyName: opts.agencyName,
     agencyLogoUrl: opts.agencyLogoUrl,
-    agencyLogoExpected,
-    prompt,
-    twoStepLogo: agencyLogoExpected && !isRevision,
+    revisionRequest: opts.revisionRequest,
     sourceImageDataUrl: opts.sourceImageDataUrl,
   })
 }

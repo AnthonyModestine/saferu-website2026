@@ -5,42 +5,28 @@ import Link from "next/link"
 import Image from "next/image"
 import { ArrowLeft, Copy, Download, Expand, Loader2, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
 import { PostMediaLightbox } from "@/components/post-media-lightbox"
 import { useAgency } from "@/lib/agency-context"
 import { GraphicStudioSelect } from "@/components/pio/graphic-studio-select"
 import {
-  SAFETY_AUDIENCES,
-  SAFETY_GRAPHIC_STYLES,
   SAFETY_TIP_CATEGORIES,
-  type SafetyAudience,
-  type SafetyGraphicStyle,
-  type SafetyResearchBrief,
   type SafetyTipCategory,
 } from "@/lib/pio-graphic-studio-types"
 
 export default function SafetyTipGraphicPage() {
   const { settings } = useAgency()
   const [category, setCategory] = useState<SafetyTipCategory>("Other / Custom")
-  const [residentNeed, setResidentNeed] = useState("")
-  const [audience, setAudience] = useState<SafetyAudience>("General Community")
-  const [style, setStyle] = useState<SafetyGraphicStyle>("Let SaferU Decide")
-  const [visualRequest, setVisualRequest] = useState("")
-  const [headline, setHeadline] = useState("")
-  const [supportingLine, setSupportingLine] = useState("")
-  const [body, setBody] = useState("")
-  const [emergencyMessage, setEmergencyMessage] = useState("")
+  const [topic, setTopic] = useState("")
+  const [visualNotes, setVisualNotes] = useState("")
   const [caption, setCaption] = useState("")
-  const [research, setResearch] = useState<SafetyResearchBrief | null>(null)
-  const [showSources, setShowSources] = useState(false)
   const [preview, setPreview] = useState<string | null>(null)
   const [history, setHistory] = useState<string[]>([])
   const [graphicId, setGraphicId] = useState<string | null>(null)
   const [revisionRequest, setRevisionRequest] = useState("")
   const [lightboxOpen, setLightboxOpen] = useState(false)
-  const [researching, setResearching] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [revising, setRevising] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -48,54 +34,13 @@ export default function SafetyTipGraphicPage() {
 
   const agencyPayload = {
     agencyName: settings.agencyName,
-    agencyType: settings.agencyType,
-    agencyTypeOther: settings.agencyTypeOther,
-    city: settings.city,
-    state: settings.state,
-  }
-
-  const prepareMessage = async () => {
-    const need = residentNeed.trim()
-    if (need.length < 8) {
-      setError("Tell us what you want residents to know — you do not need a finished headline.")
-      return
-    }
-    setResearching(true)
-    setError(null)
-    try {
-      const res = await fetch("/api/pio/graphic-studio/safety-research", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          category,
-          residentNeed: need,
-          audience,
-          style,
-          visualRequest,
-          ...agencyPayload,
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        setError(String(data.error || "Could not research this topic."))
-        return
-      }
-      setHeadline(String(data.headline || ""))
-      setSupportingLine(String(data.supportingLine || ""))
-      setBody(String(data.body || ""))
-      setEmergencyMessage(String(data.emergencyMessage || ""))
-      setCaption(String(data.caption || data.body || ""))
-      setResearch(data.research || null)
-    } catch {
-      setError("Something went wrong researching this topic. Please try again.")
-    } finally {
-      setResearching(false)
-    }
+    agencyLogoUrl: settings.logoUrl?.startsWith("/") ? settings.logoUrl : null,
   }
 
   const generateGraphic = async () => {
-    if (!headline.trim() || !body.trim()) {
-      setError("Prepare and review the message before generating the graphic.")
+    const need = topic.trim()
+    if (need.length < 8) {
+      setError("Describe what you want residents to know — a short sentence is enough.")
       return
     }
     setGenerating(true)
@@ -106,21 +51,8 @@ export default function SafetyTipGraphicPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           category,
-          residentNeed,
-          audience,
-          style,
-          visualRequest,
-          headline,
-          supportingLine,
-          body,
-          emergencyMessage,
-          visualDirection: research?.visual_concept || visualRequest,
-          verifiedTopic: research?.verified_topic || category,
-          mustShow: research?.visual_must_show || [],
-          mustAvoid: research?.visual_must_avoid || [],
-          sources: research?.sources || [],
-          research,
-          caption,
+          residentNeed: need,
+          visualRequest: visualNotes.trim() || undefined,
           ...agencyPayload,
         }),
       })
@@ -134,6 +66,9 @@ export default function SafetyTipGraphicPage() {
       if (aiImage) {
         setHistory((prev) => (preview ? [...prev, preview] : prev))
         setPreview(aiImage)
+        if (typeof data.caption === "string" && data.caption.trim()) {
+          setCaption(data.caption.trim())
+        }
         return
       }
       setError("Could not generate graphic. Please try again.")
@@ -156,15 +91,7 @@ export default function SafetyTipGraphicPage() {
           graphicId,
           revisionRequest,
           sourceImageDataUrl: preview,
-          headline,
-          supportingLine,
-          body,
-          emergencyMessage,
-          audience,
-          style,
-          category,
-          visualDirection: research?.visual_concept || "",
-          agencyLogoUrl: settings.logoUrl?.startsWith("/") ? settings.logoUrl : null,
+          topic: topic.trim(),
         }),
       })
       const data = await res.json()
@@ -220,9 +147,8 @@ export default function SafetyTipGraphicPage() {
         </Button>
         <h1 className="text-3xl font-bold text-[#0f1c3f]">Safety Graphic</h1>
         <p className="mt-2 text-[#64748B]">
-          Tell us what residents should know. SaferU researches the topic, drafts a clear message,
-          and designs a 16:9 graphic with your agency logo in the bottom-right — no SaferU branding
-          on the public image.
+          Describe what you want to educate your community about. We create a 16:9 graphic and place
+          your agency logo in the bottom-right when one is saved in your profile.
         </p>
       </div>
 
@@ -230,52 +156,32 @@ export default function SafetyTipGraphicPage() {
         <section className="space-y-5 rounded-2xl border border-[#e2e8f5] bg-white p-5 shadow-sm">
           <GraphicStudioSelect
             id="safety-category"
-            label="What type of safety content are you creating?"
+            label="Category (optional)"
             value={category}
             options={SAFETY_TIP_CATEGORIES}
             onChange={(value) => setCategory(value as SafetyTipCategory)}
           />
 
           <div className="space-y-2">
-            <Label htmlFor="residentNeed">What do you want residents to know?</Label>
+            <Label htmlFor="topic">What do you want residents to know?</Label>
             <Textarea
-              id="residentNeed"
-              rows={4}
-              value={residentNeed}
-              onChange={(e) => setResidentNeed(e.target.value)}
+              id="topic"
+              rows={5}
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
               placeholder="Example: Remind residents not to charge e-scooters in front of their apartment door because it may block their only exit."
               maxLength={500}
             />
-            <p className="text-xs text-[#94A3B8]">
-              You do not need to write the final message — we will help turn it into clear
-              public-safety content.
-            </p>
           </div>
 
-          <GraphicStudioSelect
-            id="safety-audience"
-            label="Who is this message for?"
-            value={audience}
-            options={SAFETY_AUDIENCES}
-            onChange={(value) => setAudience(value as SafetyAudience)}
-          />
-
-          <GraphicStudioSelect
-            id="safety-style"
-            label="What style would you like?"
-            value={style}
-            options={SAFETY_GRAPHIC_STYLES}
-            onChange={(value) => setStyle(value as SafetyGraphicStyle)}
-          />
-
           <div className="space-y-2">
-            <Label htmlFor="visualRequest">Anything you want shown in the graphic? (optional)</Label>
+            <Label htmlFor="visualNotes">Anything specific to show in the graphic? (optional)</Label>
             <Textarea
-              id="visualRequest"
+              id="visualNotes"
               rows={2}
-              value={visualRequest}
-              onChange={(e) => setVisualRequest(e.target.value)}
-              placeholder="Example: Show the inside of an apartment with an e-scooter charging directly in front of the front door."
+              value={visualNotes}
+              onChange={(e) => setVisualNotes(e.target.value)}
+              placeholder="Example: Apartment hallway with a scooter charging in front of the door."
               maxLength={300}
             />
           </div>
@@ -286,106 +192,28 @@ export default function SafetyTipGraphicPage() {
 
           <Button
             type="button"
-            onClick={() => void prepareMessage()}
-            disabled={researching || residentNeed.trim().length < 8}
-            className="w-full bg-[#0f1c3f] hover:bg-[#1e293b]"
+            onClick={() => void generateGraphic()}
+            disabled={generating || topic.trim().length < 8}
+            className="w-full bg-[#2563EB] hover:bg-[#1d4ed8]"
           >
-            {researching ? (
+            {generating ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Researching safety guidance…
+                Creating your graphic…
               </>
             ) : (
-              "Prepare message"
+              <>
+                <Sparkles className="mr-2 h-4 w-4" />
+                Generate 16:9 graphic
+              </>
             )}
           </Button>
 
-          {(headline || body) && (
-            <div className="space-y-3 rounded-xl border border-[#e2e8f5] bg-[#F8FAFC] p-3">
-              {research?.user_request_corrected && research.correction_explanation ? (
-                <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                  We adjusted the message to match current safety guidance:{" "}
-                  {research.correction_explanation}
-                </p>
-              ) : null}
-              <div className="space-y-1">
-                <Label htmlFor="headline">Headline</Label>
-                <Input
-                  id="headline"
-                  value={headline}
-                  onChange={(e) => setHeadline(e.target.value)}
-                  maxLength={80}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="supportingLine">Supporting line</Label>
-                <Input
-                  id="supportingLine"
-                  value={supportingLine}
-                  onChange={(e) => setSupportingLine(e.target.value)}
-                  maxLength={160}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="body">Main safety message</Label>
-                <Textarea
-                  id="body"
-                  rows={3}
-                  value={body}
-                  onChange={(e) => setBody(e.target.value)}
-                  maxLength={320}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="emergencyMessage">Emergency message (optional)</Label>
-                <Input
-                  id="emergencyMessage"
-                  value={emergencyMessage}
-                  onChange={(e) => setEmergencyMessage(e.target.value)}
-                  maxLength={160}
-                />
-              </div>
-              {research?.sources?.length ? (
-                <div>
-                  <button
-                    type="button"
-                    className="text-xs font-semibold text-[#2563EB]"
-                    onClick={() => setShowSources((v) => !v)}
-                  >
-                    {showSources ? "Hide" : "Show"} verified safety sources
-                  </button>
-                  {showSources && (
-                    <ul className="mt-2 space-y-1 text-xs text-[#64748B]">
-                      {research.sources.map((source, idx) => (
-                        <li key={`${source.url}-${idx}`}>
-                          {source.organization}
-                          {source.title ? ` — ${source.title}` : ""}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              ) : null}
-              <Button
-                type="button"
-                onClick={() => void generateGraphic()}
-                disabled={generating || !headline.trim() || !body.trim()}
-                className="w-full bg-[#2563EB] hover:bg-[#1d4ed8]"
-              >
-                {generating ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Designing graphic…
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Generate graphic
-                  </>
-                )}
-              </Button>
-            </div>
-          )}
+          <p className="text-xs text-[#94A3B8]">
+            {settings.logoUrl
+              ? "Your agency logo from profile settings will be placed bottom-right."
+              : "Add your agency logo in settings to include it automatically."}
+          </p>
         </section>
 
         <section className="space-y-3">
@@ -409,7 +237,7 @@ export default function SafetyTipGraphicPage() {
               ) : (
                 <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center text-sm text-[#94A3B8]">
                   <Sparkles className="h-5 w-5" />
-                  Prepare the message, then generate a 16:9 graphic.
+                  Your 16:9 safety graphic will appear here.
                 </div>
               )}
             </div>
@@ -453,7 +281,7 @@ export default function SafetyTipGraphicPage() {
                 id="revision"
                 value={revisionRequest}
                 onChange={(e) => setRevisionRequest(e.target.value)}
-                placeholder="Example: Make the headline larger. Keep everything else the same."
+                placeholder="Example: Make the headline larger."
                 maxLength={200}
               />
               <Button

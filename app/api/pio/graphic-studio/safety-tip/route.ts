@@ -5,11 +5,12 @@ import { isOnActiveTrial } from "@/lib/pio-trial"
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
 import { isLocalPreviewServer } from "@/lib/local-preview-server"
 import { graphicStudioErrorPayload } from "@/lib/ai-result"
-import { generateSafetyTipGraphicImage } from "@/lib/pio-graphic-studio-ai"
+import {
+  generateSimpleSafetyGraphic,
+  suggestSafetyGraphicCaption,
+} from "@/lib/graphic-studio-simple"
 import { saveGraphicStudioRecord, resolveMemberAgencyLogo } from "@/lib/graphic-studio-store"
 import {
-  isSafetyAudience,
-  isSafetyGraphicStyle,
   isSafetyTipCategory,
   type GraphicStudioSource,
 } from "@/lib/pio-graphic-studio-types"
@@ -45,16 +46,10 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json()
-    const category = String(body.category || "").trim()
-    const residentNeed = String(body.residentNeed || body.prompt || "").trim()
-    const audience = String(body.audience || "General Community").trim()
-    const style = String(body.style || "Let SaferU Decide").trim()
-    const headline = String(body.headline || "").trim()
-    const supportingLine = String(body.supportingLine || "").trim()
-    const copyBody = String(body.body || "").trim()
-    const emergencyMessage = String(body.emergencyMessage || "").trim()
-    const visualDirection = String(body.visualDirection || body.visualConcept || "").trim()
-    const verifiedTopic = String(body.verifiedTopic || category).trim()
+    const category = String(body.category || "Other / Custom").trim()
+    const topic = String(body.residentNeed || body.prompt || body.topic || "").trim()
+    const visualNotes = String(body.visualRequest || body.visualDirection || body.visualConcept || "").trim()
+    const agencyName = String(body.agencyName || "").trim()
     const agencyLogoUrl = await resolveMemberAgencyLogo(
       session.memberId,
       typeof body.agencyLogoUrl === "string" ? body.agencyLogoUrl : null
@@ -63,36 +58,18 @@ export async function POST(request: Request) {
     if (!isSafetyTipCategory(category)) {
       return NextResponse.json({ error: "Choose a safety graphic category." }, { status: 400 })
     }
-    if (!isSafetyAudience(audience) || !isSafetyGraphicStyle(style)) {
-      return NextResponse.json({ error: "Choose audience and style." }, { status: 400 })
-    }
-    if (!headline || !copyBody) {
+    if (topic.length < 8) {
       return NextResponse.json(
-        { error: "Approve a headline and safety message before generating." },
+        { error: "Describe what you want residents to know (at least a short sentence)." },
         { status: 400 }
       )
     }
 
-    const mustShow = Array.isArray(body.mustShow)
-      ? body.mustShow.map((item: unknown) => String(item || "").trim()).filter(Boolean)
-      : []
-    const mustAvoid = Array.isArray(body.mustAvoid)
-      ? body.mustAvoid.map((item: unknown) => String(item || "").trim()).filter(Boolean)
-      : []
-
-    const result = await generateSafetyTipGraphicImage({
+    const result = await generateSimpleSafetyGraphic({
+      topic,
       category,
-      headline,
-      supportingLine,
-      body: copyBody,
-      emergencyMessage,
-      audience,
-      visualDirection,
-      style,
-      mustShow,
-      mustAvoid,
-      verifiedTopic,
-      residentNeed,
+      visualNotes: visualNotes || undefined,
+      agencyName: agencyName || undefined,
       agencyLogoUrl,
     })
 
@@ -100,24 +77,29 @@ export async function POST(request: Request) {
       return NextResponse.json(graphicStudioErrorPayload(result.reason, result.detail), { status: 503 })
     }
 
+    const caption = await suggestSafetyGraphicCaption({
+      topic,
+      agencyName: agencyName || undefined,
+    })
+
     const graphicId = crypto.randomUUID()
     const sources = (Array.isArray(body.sources) ? body.sources : []) as GraphicStudioSource[]
     const saved = await saveGraphicStudioRecord({
       graphic_id: graphicId,
-      agency_id: String(body.agencyName || session.email),
+      agency_id: agencyName || session.email,
       user_id: session.email,
       graphic_type: "safety",
       category,
-      audience,
-      original_user_request: residentNeed,
-      approved_headline: headline,
-      approved_supporting_line: supportingLine,
-      approved_body_copy: copyBody,
-      approved_emergency_message: emergencyMessage,
-      visual_style: style,
-      research_json: body.research ?? null,
+      audience: "General Community",
+      original_user_request: topic,
+      approved_headline: "",
+      approved_supporting_line: "",
+      approved_body_copy: topic,
+      approved_emergency_message: "",
+      visual_style: "Let SaferU Decide",
+      research_json: null,
       source_records: sources,
-      image_prompt: verifiedTopic,
+      image_prompt: topic,
       agency_logo_used: Boolean(agencyLogoUrl),
       generation_model: result.data.model,
       generated_at: new Date().toISOString(),
@@ -132,11 +114,7 @@ export async function POST(request: Request) {
       imageDataUrl: result.data.dataUrl,
       generationModel: result.data.model,
       graphicId,
-      headline,
-      supportingLine,
-      body: copyBody,
-      emergencyMessage,
-      caption: String(body.caption || copyBody),
+      caption,
     })
   } catch (err) {
     console.error("[api/pio/graphic-studio/safety-tip]", err)

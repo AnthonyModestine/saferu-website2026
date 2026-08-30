@@ -5,8 +5,8 @@ import { isOnActiveTrial } from "@/lib/pio-trial"
 import { checkRateLimit } from "@/lib/rate-limit"
 import { isLocalPreviewServer } from "@/lib/local-preview-server"
 import { graphicStudioErrorPayload } from "@/lib/ai-result"
-import { generateSafetyTipGraphicImage } from "@/lib/pio-graphic-studio-ai"
-import { getGraphicStudioRecord, saveGraphicStudioRecord, resolveMemberAgencyLogo } from "@/lib/graphic-studio-store"
+import { generateSimpleSafetyGraphic } from "@/lib/graphic-studio-simple"
+import { getGraphicStudioRecord, saveGraphicStudioRecord } from "@/lib/graphic-studio-store"
 
 export const maxDuration = 120
 
@@ -46,23 +46,10 @@ export async function POST(request: Request) {
       )
     }
 
-    const agencyLogoUrl = await resolveMemberAgencyLogo(
-      session.memberId,
-      typeof body.agencyLogoUrl === "string" ? body.agencyLogoUrl : null
-    )
-
-    const result = await generateSafetyTipGraphicImage({
-      category: String(body.category || "Other / Custom"),
-      headline: String(body.headline || ""),
-      supportingLine: String(body.supportingLine || ""),
-      body: String(body.body || ""),
-      emergencyMessage: String(body.emergencyMessage || ""),
-      audience: String(body.audience || "General Community"),
-      visualDirection: String(body.visualDirection || ""),
-      style: String(body.style || "Let SaferU Decide"),
-      agencyLogoUrl,
-      sourceImageDataUrl,
+    const result = await generateSimpleSafetyGraphic({
+      topic: String(body.residentNeed || body.topic || "safety graphic").trim(),
       revisionRequest,
+      sourceImageDataUrl,
     })
 
     if (!result.ok) {
