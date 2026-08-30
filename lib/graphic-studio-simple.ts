@@ -8,7 +8,13 @@ import type { AiResult } from "@/lib/ai-result"
 export type SimpleSafetyGraphicOpts = {
   topic: string
   category?: string
+  audience?: string
+  style?: string
   visualNotes?: string
+  headline?: string
+  supportingLine?: string
+  body?: string
+  emergencyMessage?: string
   agencyName?: string
   agencyLogoUrl?: string | null
   revisionRequest?: string
@@ -24,28 +30,52 @@ function responseModel(): string {
 export function buildSimpleSafetyGraphicPrompt(opts: {
   topic: string
   category?: string
+  audience?: string
+  style?: string
   visualNotes?: string
+  headline?: string
+  supportingLine?: string
+  body?: string
+  emergencyMessage?: string
   agencyName?: string
   hasLogo: boolean
 }): string {
   const topic = opts.topic.trim()
   const category = opts.category?.trim()
+  const audience = opts.audience?.trim()
+  const style = opts.style?.trim()
   const agency = opts.agencyName?.trim()
   const visual = opts.visualNotes?.trim()
+  const headline = opts.headline?.trim()
+  const supportingLine = opts.supportingLine?.trim()
+  const body = opts.body?.trim()
+  const emergency = opts.emergencyMessage?.trim()
+
+  const hasApprovedCopy = Boolean(headline || body)
 
   const logoLines = opts.hasLogo
-    ? `I attached our department logo. Place that exact logo once in the bottom-right corner — small, with a little padding from the edges. Do not duplicate it and do not invent a different badge or seal.`
+    ? `I attached our department logo image. Place that EXACT logo once in the bottom-right corner with a little padding. Do NOT redraw, recolor, restyle, distort, crop, or alter the logo in any way. Do NOT duplicate it. Do NOT invent a different badge or seal.`
     : `Do not invent a fake department badge, seal, or logo.`
+
+  const copyBlock = hasApprovedCopy
+    ? `Use this EXACT text on the graphic (word-for-word — do not rewrite or shorten):
+Headline: ${headline || "(none)"}
+${supportingLine ? `Supporting line: ${supportingLine}` : ""}
+Main message: ${body || topic}
+${emergency ? `Emergency note: ${emergency}` : ""}`
+    : `Educate the community about: ${topic}`
 
   return `Create a professional 16:9 landscape social media safety graphic${agency ? ` for ${agency}` : " for a public safety agency"}.
 
-Educate the community about: ${topic}
+${copyBlock}
 ${category ? `Category: ${category}` : ""}
+${audience ? `Audience: ${audience}` : ""}
+${style ? `Visual style: ${style}` : ""}
 ${visual ? `Visual notes: ${visual}` : ""}
 
 Requirements:
 - 16:9 landscape, high quality, polished PIO / public-safety style
-- Short headline plus one clear safety message — large readable text with comfortable margins so nothing is cut off at the edges
+- Display the approved text large and readable with comfortable margins — nothing cut off at the edges
 - ${logoLines}
 - No SaferU branding
 - Calm, accurate, professional tone`
@@ -208,7 +238,13 @@ Keep the department logo once in the bottom-right if it is already there. Do not
     const prompt = buildSimpleSafetyGraphicPrompt({
       topic,
       category: opts.category,
+      audience: opts.audience,
+      style: opts.style,
       visualNotes: opts.visualNotes,
+      headline: opts.headline,
+      supportingLine: opts.supportingLine,
+      body: opts.body,
+      emergencyMessage: opts.emergencyMessage,
       agencyName: opts.agencyName,
       hasLogo,
     })

@@ -635,8 +635,6 @@ export async function generateSafetyTipGraphicImage(opts: {
 
   const visualParts = [
     opts.visualDirection?.trim(),
-    opts.supportingLine?.trim() && `Supporting line: ${opts.supportingLine}`,
-    opts.emergencyMessage?.trim() && `Emergency note: ${opts.emergencyMessage}`,
     opts.mustShow?.length ? `Must show: ${opts.mustShow.join(", ")}` : "",
     opts.mustAvoid?.length ? `Avoid: ${opts.mustAvoid.join(", ")}` : "",
   ].filter(Boolean)
@@ -644,7 +642,13 @@ export async function generateSafetyTipGraphicImage(opts: {
   return generateSimpleSafetyGraphic({
     topic,
     category: opts.category,
+    audience: opts.audience,
+    style: opts.style,
     visualNotes: visualParts.length ? visualParts.join("\n") : undefined,
+    headline: opts.headline,
+    supportingLine: opts.supportingLine,
+    body: opts.body,
+    emergencyMessage: opts.emergencyMessage,
     agencyName: opts.agencyName,
     agencyLogoUrl: opts.agencyLogoUrl,
     revisionRequest: opts.revisionRequest,
