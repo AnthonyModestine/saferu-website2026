@@ -7,7 +7,7 @@
 export const PRESS_CENTER_FEATURES = {
   /** When false, hide /pio-tool/ideas from nav, dashboard, and marketing. */
   postGeneratorVisible: false,
-  /** Graphic Studio: safety tips + event flyers. */
+  /** Graphic Studio: safety graphics (rebuilding). */
   graphicStudioVisible: true,
 } as const
 

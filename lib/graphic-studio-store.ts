@@ -13,7 +13,7 @@ export type GraphicStudioRecord = {
   graphic_id: string
   agency_id: string
   user_id: string
-  graphic_type: "safety" | "event"
+  graphic_type: "safety"
   category: string
   audience: string
   original_user_request: string

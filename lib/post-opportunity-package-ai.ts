@@ -1,7 +1,6 @@
 import "server-only"
 
 import type { AiResult } from "@/lib/ai-result"
-import { generatePostOpportunityGraphicImage } from "@/lib/pio-graphic-studio-ai"
 import { generateMessageFromOpportunity } from "@/lib/post-generator-ai"
 
 export type PostOpportunityPackage = {
@@ -50,36 +49,10 @@ export async function generatePostOpportunityPackage(opts: {
   )
   if (!messageResult.ok) return messageResult
 
-  const message = messageResult.data
-  const headline = opts.title.trim() || message.split(/[.!?]/)[0]?.trim() || "Community update"
-  const visualConcept =
-    opts.visualConcept?.trim() ||
-    `A clear public-safety social graphic illustrating: ${opts.title}. Match the tone of a ${opts.sourceLabel || "community"} post.`
-
-  const image = await generatePostOpportunityGraphicImage({
-    title: opts.title,
-    category: opts.category || opts.sourceLabel || "Community",
-    sourceLabel: opts.sourceLabel || "Community post",
-    headline,
-    mainMessage: message,
-    visualConcept,
-    agencyLogoUrl: opts.agencyLogoUrl,
-  })
-
-  if (!image.ok) {
-    return {
-      ok: false,
-      reason: image.reason,
-      detail: image.detail || "Could not generate a paired graphic for this post.",
-    }
-  }
-
   return {
-    ok: true,
-    data: {
-      message,
-      imageDataUrl: image.data.dataUrl,
-      generationModel: image.data.model,
-    },
+    ok: false,
+    reason: "openai_error",
+    detail:
+      "Graphic generation is temporarily unavailable while Graphic Studio is rebuilt.",
   }
 }

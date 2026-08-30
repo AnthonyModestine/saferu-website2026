@@ -17,63 +17,60 @@ import {
   SAFETY_TIP_CATEGORIES,
   type SafetyAudience,
   type SafetyGraphicStyle,
-  type SafetyResearchBrief,
   type SafetyTipCategory,
 } from "@/lib/pio-graphic-studio-types"
 
+type PreparedMessage = {
+  headline: string
+  message: string
+  visualConcept: string
+  importantVisualDetails: string[]
+  sourceRecords: Array<{ organization: string; url: string; claim_supported: string }>
+}
+
 export default function SafetyTipGraphicPage() {
   const { settings } = useAgency()
-  const [category, setCategory] = useState<SafetyTipCategory>("Other / Custom")
-  const [residentNeed, setResidentNeed] = useState("")
-  const [audience, setAudience] = useState<SafetyAudience>("General Community")
-  const [style, setStyle] = useState<SafetyGraphicStyle>("Let SaferU Decide")
-  const [visualRequest, setVisualRequest] = useState("")
+  const [category, setCategory] = useState<SafetyTipCategory>("Child & Family Safety")
+  const [topic, setTopic] = useState("")
+  const [audience, setAudience] = useState<SafetyAudience>("Parents")
+  const [style, setStyle] = useState<SafetyGraphicStyle>("Friendly / Family")
+  const [visualNotes, setVisualNotes] = useState("")
   const [headline, setHeadline] = useState("")
-  const [supportingLine, setSupportingLine] = useState("")
-  const [body, setBody] = useState("")
-  const [emergencyMessage, setEmergencyMessage] = useState("")
-  const [caption, setCaption] = useState("")
-  const [research, setResearch] = useState<SafetyResearchBrief | null>(null)
-  const [showSources, setShowSources] = useState(false)
+  const [message, setMessage] = useState("")
+  const [prepared, setPrepared] = useState<PreparedMessage | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
-  const [history, setHistory] = useState<string[]>([])
   const [graphicId, setGraphicId] = useState<string | null>(null)
-  const [revisionRequest, setRevisionRequest] = useState("")
   const [lightboxOpen, setLightboxOpen] = useState(false)
-  const [researching, setResearching] = useState(false)
+  const [preparing, setPreparing] = useState(false)
   const [generating, setGenerating] = useState(false)
-  const [revising, setRevising] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
   const agencyPayload = {
     agencyName: settings.agencyName,
-    agencyType: settings.agencyType,
-    agencyTypeOther: settings.agencyTypeOther,
-    city: settings.city,
-    state: settings.state,
     agencyLogoUrl: settings.logoUrl?.startsWith("/") ? settings.logoUrl : null,
   }
 
   const prepareMessage = async () => {
-    const need = residentNeed.trim()
+    const need = topic.trim()
     if (need.length < 8) {
       setError("Tell us what you want residents to know — you do not need a finished headline.")
       return
     }
-    setResearching(true)
+    setPreparing(true)
     setError(null)
+    setPrepared(null)
+    setPreview(null)
     try {
-      const res = await fetch("/api/pio/graphic-studio/safety-research", {
+      const res = await fetch("/api/pio/graphic-studio/prepare-message", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           category,
-          residentNeed: need,
+          topic: need,
           audience,
           style,
-          visualRequest,
-          ...agencyPayload,
+          visualNotes,
         }),
       })
       const data = await res.json()
@@ -81,46 +78,47 @@ export default function SafetyTipGraphicPage() {
         setError(String(data.error || "Could not prepare this message."))
         return
       }
-      setHeadline(String(data.headline || ""))
-      setSupportingLine(String(data.supportingLine || ""))
-      setBody(String(data.body || ""))
-      setEmergencyMessage(String(data.emergencyMessage || ""))
-      setCaption(String(data.caption || data.body || ""))
-      setResearch(data.research || null)
+      const next: PreparedMessage = {
+        headline: String(data.headline || ""),
+        message: String(data.message || ""),
+        visualConcept: String(data.visualConcept || ""),
+        importantVisualDetails: Array.isArray(data.importantVisualDetails)
+          ? data.importantVisualDetails.map(String)
+          : [],
+        sourceRecords: Array.isArray(data.sourceRecords) ? data.sourceRecords : [],
+      }
+      setHeadline(next.headline)
+      setMessage(next.message)
+      setPrepared(next)
     } catch {
       setError("Something went wrong preparing the message. Please try again.")
     } finally {
-      setResearching(false)
+      setPreparing(false)
     }
   }
 
   const generateGraphic = async () => {
-    if (!headline.trim() || !body.trim()) {
+    if (!headline.trim() || !message.trim() || !prepared?.visualConcept) {
       setError("Prepare and review the message before generating the graphic.")
       return
     }
     setGenerating(true)
     setError(null)
     try {
-      const res = await fetch("/api/pio/graphic-studio/safety-tip", {
+      const res = await fetch("/api/pio/graphic-studio/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           category,
-          residentNeed,
+          topic,
           audience,
           style,
-          visualRequest,
           headline,
-          supportingLine,
-          body,
-          emergencyMessage,
-          visualDirection: research?.visual_concept || visualRequest,
-          mustShow: research?.visual_must_show || [],
-          mustAvoid: research?.visual_must_avoid || [],
-          sources: research?.sources || [],
-          research,
-          caption,
+          message,
+          visualConcept: prepared.visualConcept,
+          importantVisualDetails: prepared.importantVisualDetails,
+          visualNotes,
+          sourceRecords: prepared.sourceRecords,
           ...agencyPayload,
         }),
       })
@@ -130,60 +128,16 @@ export default function SafetyTipGraphicPage() {
         return
       }
       setGraphicId(typeof data.graphicId === "string" ? data.graphicId : null)
-      const aiImage = typeof data.imageDataUrl === "string" ? data.imageDataUrl : ""
-      if (aiImage) {
-        setHistory((prev) => (preview ? [...prev, preview] : prev))
-        setPreview(aiImage)
-        return
+      if (typeof data.imageDataUrl === "string") {
+        setPreview(data.imageDataUrl)
+      } else {
+        setError("Could not generate graphic. Please try again.")
       }
-      setError("Could not generate graphic. Please try again.")
     } catch {
       setError("Something went wrong generating the graphic. Please try again.")
     } finally {
       setGenerating(false)
     }
-  }
-
-  const reviseGraphic = async () => {
-    if (!preview || !revisionRequest.trim()) return
-    setRevising(true)
-    setError(null)
-    try {
-      const res = await fetch("/api/pio/graphic-studio/revise", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          graphicId,
-          revisionRequest,
-          sourceImageDataUrl: preview,
-          topic: residentNeed.trim() || body.trim(),
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        setError(String(data.error || "Could not revise graphic."))
-        return
-      }
-      const next = typeof data.imageDataUrl === "string" ? data.imageDataUrl : null
-      if (next) {
-        setHistory((prev) => [...prev, preview])
-        setPreview(next)
-        setRevisionRequest("")
-      }
-    } catch {
-      setError("Could not revise this graphic. Please try again.")
-    } finally {
-      setRevising(false)
-    }
-  }
-
-  const undo = () => {
-    setHistory((prev) => {
-      if (!prev.length) return prev
-      const last = prev[prev.length - 1]!
-      setPreview(last)
-      return prev.slice(0, -1)
-    })
   }
 
   const download = () => {
@@ -194,9 +148,9 @@ export default function SafetyTipGraphicPage() {
     a.click()
   }
 
-  const copyCaption = async () => {
-    if (!caption.trim()) return
-    await navigator.clipboard.writeText(caption)
+  const copyMessage = async () => {
+    const text = `${headline}\n\n${message}`
+    await navigator.clipboard.writeText(text)
     setCopied(true)
     window.setTimeout(() => setCopied(false), 1500)
   }
@@ -212,9 +166,9 @@ export default function SafetyTipGraphicPage() {
         </Button>
         <h1 className="text-3xl font-bold text-[#0f1c3f]">Safety Graphic</h1>
         <p className="mt-2 text-[#64748B]">
-          Tell us what residents should know. OpenAI drafts the message for your graphic, then
-          designs a 16:9 image with that exact text and your agency logo in the bottom-right —
-          unaltered.
+          Describe your topic. OpenAI researches and drafts the on-graphic message. After you
+          approve the copy, we generate a 16:9 graphic and place your exact agency logo
+          bottom-right.
         </p>
       </div>
 
@@ -229,13 +183,13 @@ export default function SafetyTipGraphicPage() {
           />
 
           <div className="space-y-2">
-            <Label htmlFor="residentNeed">What do you want residents to know?</Label>
+            <Label htmlFor="topic">What do you want residents to know?</Label>
             <Textarea
-              id="residentNeed"
+              id="topic"
               rows={4}
-              value={residentNeed}
-              onChange={(e) => setResidentNeed(e.target.value)}
-              placeholder="Example: Signs your child might be getting bullied and what parents can do."
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              placeholder="Example: Signs your child might be getting bullied and what parents can watch for."
               maxLength={500}
             />
             <p className="text-xs text-[#94A3B8]">
@@ -261,13 +215,13 @@ export default function SafetyTipGraphicPage() {
           />
 
           <div className="space-y-2">
-            <Label htmlFor="visualRequest">Anything you want shown in the graphic? (optional)</Label>
+            <Label htmlFor="visualNotes">Anything you want shown in the graphic? (optional)</Label>
             <Textarea
-              id="visualRequest"
+              id="visualNotes"
               rows={2}
-              value={visualRequest}
-              onChange={(e) => setVisualRequest(e.target.value)}
-              placeholder="Example: Show the inside of an apartment with an e-scooter charging directly in front of the front door."
+              value={visualNotes}
+              onChange={(e) => setVisualNotes(e.target.value)}
+              placeholder="Example: A parent calmly talking with a child at home."
               maxLength={300}
             />
           </div>
@@ -279,27 +233,21 @@ export default function SafetyTipGraphicPage() {
           <Button
             type="button"
             onClick={() => void prepareMessage()}
-            disabled={researching || residentNeed.trim().length < 8}
+            disabled={preparing || topic.trim().length < 8}
             className="w-full bg-[#0f1c3f] hover:bg-[#1e293b]"
           >
-            {researching ? (
+            {preparing ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Preparing message…
+                Researching & drafting message…
               </>
             ) : (
               "Prepare message"
             )}
           </Button>
 
-          {(headline || body) && (
+          {prepared && (
             <div className="space-y-3 rounded-xl border border-[#e2e8f5] bg-[#F8FAFC] p-3">
-              {research?.user_request_corrected && research.correction_explanation ? (
-                <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                  We adjusted the message to match current safety guidance:{" "}
-                  {research.correction_explanation}
-                </p>
-              ) : null}
               <div className="space-y-1">
                 <Label htmlFor="headline">Headline (on the graphic)</Label>
                 <Input
@@ -310,75 +258,36 @@ export default function SafetyTipGraphicPage() {
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="supportingLine">Supporting line</Label>
-                <Input
-                  id="supportingLine"
-                  value={supportingLine}
-                  onChange={(e) => setSupportingLine(e.target.value)}
-                  maxLength={160}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="body">Main safety message (on the graphic)</Label>
+                <Label htmlFor="message">On-graphic message</Label>
                 <Textarea
-                  id="body"
+                  id="message"
                   rows={3}
-                  value={body}
-                  onChange={(e) => setBody(e.target.value)}
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
                   maxLength={320}
                 />
               </div>
-              <div className="space-y-1">
-                <Label htmlFor="emergencyMessage">Emergency message (optional)</Label>
-                <Input
-                  id="emergencyMessage"
-                  value={emergencyMessage}
-                  onChange={(e) => setEmergencyMessage(e.target.value)}
-                  maxLength={160}
-                />
-              </div>
-              {research?.sources?.length ? (
-                <div>
-                  <button
-                    type="button"
-                    className="text-xs font-semibold text-[#2563EB]"
-                    onClick={() => setShowSources((v) => !v)}
-                  >
-                    {showSources ? "Hide" : "Show"} verified safety sources
-                  </button>
-                  {showSources && (
-                    <ul className="mt-2 space-y-1 text-xs text-[#64748B]">
-                      {research.sources.map((source, idx) => (
-                        <li key={`${source.url}-${idx}`}>
-                          {source.organization}
-                          {source.title ? ` — ${source.title}` : ""}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              ) : null}
               <Button
                 type="button"
                 onClick={() => void generateGraphic()}
-                disabled={generating || !headline.trim() || !body.trim()}
+                disabled={generating || !headline.trim() || !message.trim()}
                 className="w-full bg-[#2563EB] hover:bg-[#1d4ed8]"
               >
                 {generating ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Designing graphic…
+                    Generating 16:9 graphic…
                   </>
                 ) : (
                   <>
                     <Sparkles className="mr-2 h-4 w-4" />
-                    Generate 16:9 graphic
+                    Generate graphic
                   </>
                 )}
               </Button>
               <p className="text-xs text-[#94A3B8]">
                 {settings.logoUrl
-                  ? "Your agency logo will be sent to OpenAI and placed bottom-right without alteration."
+                  ? "Your original agency logo will be composited bottom-right after generation."
                   : "Add your agency logo in settings to include it automatically."}
               </p>
             </div>
@@ -406,7 +315,7 @@ export default function SafetyTipGraphicPage() {
               ) : (
                 <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center text-sm text-[#94A3B8]">
                   <Sparkles className="h-5 w-5" />
-                  Prepare the message, then generate a 16:9 graphic.
+                  Prepare the message, approve the copy, then generate your graphic.
                 </div>
               )}
             </div>
@@ -426,60 +335,22 @@ export default function SafetyTipGraphicPage() {
               <Download className="mr-2 h-4 w-4" />
               Download PNG
             </Button>
-            <Button type="button" variant="outline" onClick={undo} disabled={!history.length}>
-              Undo
-            </Button>
             <Button
               type="button"
               variant="outline"
-              onClick={() => void copyCaption()}
-              disabled={!caption.trim()}
+              onClick={() => void copyMessage()}
+              disabled={!headline.trim() && !message.trim()}
             >
               <Copy className="mr-2 h-4 w-4" />
-              {copied ? "Copied" : "Copy caption"}
+              {copied ? "Copied" : "Copy text"}
             </Button>
             <Button asChild type="button" variant="outline">
               <Link href="/pio-tool/settings">Agency logo settings</Link>
             </Button>
           </div>
 
-          {preview && (
-            <div className="space-y-2 rounded-xl border border-[#e2e8f5] bg-white p-4">
-              <Label htmlFor="revision">Revise this graphic</Label>
-              <Input
-                id="revision"
-                value={revisionRequest}
-                onChange={(e) => setRevisionRequest(e.target.value)}
-                placeholder="Example: Make the headline larger. Keep everything else the same."
-                maxLength={200}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => void reviseGraphic()}
-                disabled={revising || !revisionRequest.trim()}
-              >
-                {revising ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Revising…
-                  </>
-                ) : (
-                  "Apply revision"
-                )}
-              </Button>
-            </div>
-          )}
-
-          {caption && (
-            <div className="rounded-xl border border-[#e2e8f5] bg-white p-4">
-              <p className="text-xs font-bold uppercase tracking-wider text-[#94A3B8]">
-                Suggested caption
-              </p>
-              <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-[#334155]">
-                {caption}
-              </p>
-            </div>
+          {graphicId && preview && (
+            <p className="text-xs text-[#94A3B8]">Graphic ID: {graphicId}</p>
           )}
         </section>
       </div>
