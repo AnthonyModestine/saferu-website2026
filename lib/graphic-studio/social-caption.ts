@@ -42,7 +42,7 @@ async function completeCaption(
     const openai = new OpenAI({ apiKey })
     const completion = await openai.chat.completions.create({
       model: researchModel(),
-      temperature: 0.4,
+      temperature: 0.55,
       messages: [
         { role: "system", content: system },
         { role: "user", content: user },
@@ -58,15 +58,21 @@ async function completeCaption(
   }
 }
 
-const CAPTION_SYSTEM = `You write Facebook/Instagram captions for official U.S. public-safety agencies (police, fire, EMS, emergency management, local government).
+const CAPTION_SYSTEM = `You are a social media guru who helps public safety agencies (police, fire, EMS, emergency management, and local government) educate their communities on a wide variety of safety topics.
+
+Your job is to write the Facebook/Instagram caption that accompanies a safety graphic — the post text residents will read in their feed.
+
+Write captions that are:
+- Strong and eye-catching — stop the scroll without clickbait or fearmongering
+- Clear about WHAT the issue/hazard is
+- Clear about HOW to resolve it / what residents should do
+- Personal when it fits — like the agency wrote it themselves for their own community (warm, human, credible), not generic corporate PSA copy
 
 Rules:
-- Professional PIO voice. Calm, clear, credible.
-- Residents must understand the hazard and what to do.
-- Match the graphic's approved headline/message — do not invent laws, stats, penalties, or new tips.
-- Short paragraphs for mobile (usually 2–3 sentences for a default caption).
-- Zero or one emoji max. No hashtag stuffing. No "Stay safe!" filler closers.
-- If an agency name is provided, attribute the post naturally to that agency. If not, write in neutral agency voice without inventing a department name.
+- Stay faithful to the graphic's approved headline and on-graphic message. Do not invent laws, stats, penalties, or new tips.
+- If an agency name is provided, write in that agency's voice and name them naturally when it helps. If not, use a neutral official agency voice — never invent a department name.
+- Mobile-friendly short paragraphs (usually 2–4 sentences for a default caption).
+- Zero or one emoji max. No hashtag stuffing. No empty closers like "Stay safe!" or "Safety starts with you."
 - Return ONLY the caption text — no quotes, labels, or commentary.`
 
 export async function generateSafetySocialCaption(opts: {
@@ -79,17 +85,17 @@ export async function generateSafetySocialCaption(opts: {
     return { ok: false, reason: "empty_input" }
   }
 
-  const agency = opts.agencyName?.trim() || "(agency name not provided — use neutral official voice)"
+  const agency = opts.agencyName?.trim() || "(agency name not provided — write in a natural local public-safety voice)"
   return completeCaption(
     CAPTION_SYSTEM,
-    `Write a ready-to-post social caption to accompany this safety graphic.
+    `Create a ready-to-post social media caption for this safety graphic.
 
 Agency: ${agency}
 Topic notes: ${opts.topic || "(none)"}
 On-graphic headline: ${opts.headline}
 On-graphic message: ${opts.message}
 
-Default length: about 2–4 short sentences. Lead with the safety point, then what residents should do.`
+Make it strong and eye-catching. Make sure a resident instantly understands the issue and how to handle it. When it fits, make it feel personal — like this agency wrote it for their own community.`
   )
 }
 
@@ -105,7 +111,7 @@ export async function adjustSafetySocialCaption(opts: {
   const agency = opts.agencyName?.trim() || "(agency name not provided)"
   return completeCaption(
     CAPTION_SYSTEM,
-    `Revise this social caption for the same safety graphic.
+    `Revise this social caption for the same safety graphic. Keep the social-media-guru voice: strong, eye-catching, clear on the issue and the fix, and personal when it fits.
 
 Adjust: ${adjustInstruction(opts.mode)}
 

@@ -21,6 +21,11 @@ import {
   type CaptionAdjustMode,
 } from "@/lib/graphic-studio/caption-adjust"
 import { compressGraphicDataUrlForUpload } from "@/lib/graphic-studio/compress-for-upload"
+import {
+  GRAPHIC_GENERATE_EXPECTED_MS,
+  GRAPHIC_REVISE_EXPECTED_MS,
+  useEstimatedProgress,
+} from "@/lib/graphic-studio/use-estimated-progress"
 
 type PreparedMessage = {
   headline: string
@@ -50,6 +55,11 @@ export default function SafetyTipGraphicPage() {
   const [adjustingCaption, setAdjustingCaption] = useState<CaptionAdjustMode | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+
+  const imageProgress = useEstimatedProgress(
+    generating || revising,
+    revising ? GRAPHIC_REVISE_EXPECTED_MS : GRAPHIC_GENERATE_EXPECTED_MS
+  )
 
   const agencyPayload = {
     agencyName: settings.agencyName,
@@ -415,8 +425,21 @@ export default function SafetyTipGraphicPage() {
                         : "This may take a moment — Rome wasn't built in a day."}
                     </p>
                   </div>
-                  <div className="h-1.5 w-48 overflow-hidden rounded-full bg-white/10">
-                    <div className="h-full w-1/2 animate-[pulse_1.2s_ease-in-out_infinite] rounded-full bg-[#60A5FA]" />
+                  <div className="w-56 space-y-2">
+                    <div
+                      className="h-1.5 overflow-hidden rounded-full bg-white/10"
+                      role="progressbar"
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={Math.round(imageProgress)}
+                      aria-label={revising ? "Edit progress" : "Graphic creation progress"}
+                    >
+                      <div
+                        className="h-full rounded-full bg-[#60A5FA] transition-[width] duration-150 ease-out"
+                        style={{ width: `${imageProgress}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-[#64748B]">{Math.round(imageProgress)}%</p>
                   </div>
                 </div>
               ) : preparing ? (
