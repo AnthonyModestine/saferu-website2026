@@ -39,23 +39,29 @@ export async function qaSafetyGraphic(opts: {
           content: [
             {
               type: "text",
-              text: `Check this graphic BEFORE the real agency logo is composited on top.
+              text: `Check this FINAL public-safety graphic (OpenAI was supposed to place the real agency logo on the image — nothing is pasted afterward).
 
 Approved headline: ${opts.approvedHeadline}
 Approved on-graphic message: ${opts.approvedMessage}
-Agency logo will be added programmatically bottom-right: ${opts.hasLogo ? "yes" : "no"}
+Agency logo expected on graphic: ${opts.hasLogo ? "yes — bottom-right, reasonably large" : "no"}
 
 Check:
 - headline matches approved headline (minor punctuation ok)
 - message matches approved message (minor punctuation ok)
 - no wording is clipped or cut off at edges
 - text is readable on mobile
-- bottom-right area is clear enough for a logo overlay (if logo expected)
-- NO agency badge, seal, patch, crest, or logo-like graphic was generated in the artwork
 - visual supports the safety message
 - not overcrowded
+- NO empty white/blank rectangle, cutout, or reserved "logo placeholder" box
+- the main scene is NOT cropped short to leave empty logo space
 
-Set accidental_logo true if the artwork itself contains any badge, seal, patch, crest, or logo-like branding.`,
+If agency logo expected:
+- a logo should appear bottom-right at a useful size (not tiny)
+- set accidental_logo=true if there is an empty placeholder box OR a clearly fake/invented second badge/seal instead of a real logo placement
+- missing logo alone → fail with an issue; accidental_logo=false unless there is also a fake badge or empty placeholder
+
+If no logo expected:
+- set accidental_logo=true only if a fake badge/seal/patch/crest was invented`,
             },
             { type: "image_url", image_url: { url: dataUrl, detail: "high" } },
           ],

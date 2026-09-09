@@ -44,9 +44,10 @@ export function isSafetyAudience(value: string): value is SafetyAudience {
 
 export const SAFETY_GRAPHIC_STYLES = [
   "Let SaferU Decide",
-  "Bold Public Safety",
   "Realistic",
+  "Cartoon",
   "Illustrated",
+  "Bold Public Safety",
   "Friendly / Family",
   "Clean Infographic",
   "Modern",

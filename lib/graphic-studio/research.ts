@@ -10,6 +10,8 @@ import {
   type SafetyResearchResult,
 } from "@/lib/graphic-studio/schemas"
 
+type OpenAIClient = InstanceType<(typeof import("openai"))["default"]>
+
 function extractResponsesText(response: {
   output?: ReadonlyArray<{
     type?: string
@@ -25,13 +27,32 @@ function extractResponsesText(response: {
   return null
 }
 
+function parseResearchJson(raw: string): AiResult<SafetyResearchResult> {
+  let json: unknown
+  try {
+    json = JSON.parse(raw)
+  } catch {
+    const parsed = parseModelJson<Record<string, unknown>>(raw)
+    if (!parsed) return { ok: false, reason: "invalid_json", detail: "Research response was not JSON." }
+    json = parsed
+  }
+
+  const result = safetyResearchSchema.safeParse(json)
+  if (!result.success) {
+    return { ok: false, reason: "invalid_json", detail: result.error.message }
+  }
+  return { ok: true, data: result.data }
+}
+
 async function researchViaResponsesApi(
   prompt: string,
-  openai: InstanceType<(typeof import("openai"))["default"]>
+  openai: OpenAIClient,
+  model: string,
+  useWebSearch: boolean
 ): Promise<AiResult<SafetyResearchResult>> {
   const response = await openai.responses.create({
-    model: researchModel(),
-    tools: [{ type: "web_search_preview" }],
+    model,
+    ...(useWebSearch ? { tools: [{ type: "web_search_preview" as const }] } : {}),
     input: prompt,
     text: {
       format: {
@@ -45,49 +66,51 @@ async function researchViaResponsesApi(
 
   const raw = extractResponsesText(response)
   if (!raw) return { ok: false, reason: "empty_response" }
-
-  let json: unknown
-  try {
-    json = JSON.parse(raw)
-  } catch {
-    return { ok: false, reason: "invalid_json", detail: "Research response was not JSON." }
-  }
-
-  const parsed = safetyResearchSchema.safeParse(json)
-  if (!parsed.success) {
-    return { ok: false, reason: "invalid_json", detail: parsed.error.message }
-  }
-  return { ok: true, data: parsed.data }
+  return parseResearchJson(raw)
 }
 
-async function researchViaSearchChat(
+async function researchViaStructuredChat(
   prompt: string,
-  openai: InstanceType<(typeof import("openai"))["default"]>
+  openai: OpenAIClient,
+  model: string
 ): Promise<AiResult<SafetyResearchResult>> {
   const completion = await openai.chat.completions.create({
-    model: "gpt-4o-mini-search-preview",
-    web_search_options: { search_context_size: "high" },
+    model,
+    temperature: 0.3,
     messages: [
       {
         role: "system",
         content:
-          "You are a public-safety content editor. Research the topic with web search, then return ONLY valid JSON matching the requested schema. No prose outside JSON.",
+          "You are a public-safety content editor. Turn the user's topic note into a short headline + on-graphic message (~25–45 words). Default message_format to paragraph — use bullets only when 2–3 distinct steps are truly needed. Every message MUST include what to do AND why it matters (consequence). Return only JSON.",
       },
       { role: "user", content: prompt },
     ],
+    response_format: {
+      type: "json_schema",
+      json_schema: {
+        name: "safety_graphic_research",
+        schema: SAFETY_RESEARCH_JSON_SCHEMA,
+        strict: true,
+      },
+    } as never,
   })
 
   const raw = completion.choices?.[0]?.message?.content?.trim()
   if (!raw) return { ok: false, reason: "empty_response" }
+  return parseResearchJson(raw)
+}
 
-  const json = parseModelJson<Record<string, unknown>>(raw)
-  if (!json) return { ok: false, reason: "invalid_json" }
-
-  const parsed = safetyResearchSchema.safeParse(json)
-  if (!parsed.success) {
-    return { ok: false, reason: "invalid_json", detail: parsed.error.message }
-  }
-  return { ok: true, data: parsed.data }
+function isRetryableOpenAiError(err: unknown): boolean {
+  const detail = (err instanceof Error ? err.message : String(err)).toLowerCase()
+  return (
+    detail.includes("deprecated") ||
+    detail.includes("404") ||
+    detail.includes("not found") ||
+    detail.includes("model") ||
+    detail.includes("429") ||
+    detail.includes("rate") ||
+    detail.includes("credit")
+  )
 }
 
 export async function researchSafetyGraphic(opts: {
@@ -108,17 +131,56 @@ export async function researchSafetyGraphic(opts: {
     visualNotes: opts.visualNotes?.trim() || "",
   })
 
+  const primary = researchModel()
+  const attempts: Array<{
+    label: string
+    run: (openai: OpenAIClient) => Promise<AiResult<SafetyResearchResult>>
+  }> = [
+    {
+      label: `${primary}+web_search`,
+      run: (openai) => researchViaResponsesApi(prompt, openai, primary, true),
+    },
+    {
+      label: "gpt-4.1+web_search",
+      run: (openai) => researchViaResponsesApi(prompt, openai, "gpt-4.1", true),
+    },
+    {
+      label: "gpt-4o-mini+web_search",
+      run: (openai) => researchViaResponsesApi(prompt, openai, "gpt-4o-mini", true),
+    },
+    {
+      label: "gpt-4o-mini",
+      run: (openai) => researchViaStructuredChat(prompt, openai, "gpt-4o-mini"),
+    },
+    {
+      label: "gpt-4.1",
+      run: (openai) => researchViaStructuredChat(prompt, openai, "gpt-4.1"),
+    },
+  ]
+
+  let lastDetail = ""
+
   try {
     const { default: OpenAI } = await import("openai")
     const openai = new OpenAI({ apiKey })
 
-    try {
-      return await researchViaResponsesApi(prompt, openai)
-    } catch (err) {
-      const detail = err instanceof Error ? err.message : String(err)
-      console.warn("[graphic-studio/research] responses API failed, falling back:", detail)
-      return await researchViaSearchChat(prompt, openai)
+    for (const attempt of attempts) {
+      try {
+        const result = await attempt.run(openai)
+        if (result.ok) return result
+        lastDetail = result.detail || result.reason
+        console.warn(`[graphic-studio/research] ${attempt.label} failed:`, lastDetail)
+      } catch (err) {
+        lastDetail = err instanceof Error ? err.message : String(err)
+        if (!isRetryableOpenAiError(err)) {
+          console.error(`[graphic-studio/research] ${attempt.label} error:`, lastDetail)
+          return { ok: false, reason: "openai_error", detail: lastDetail }
+        }
+        console.warn(`[graphic-studio/research] ${attempt.label} retrying after:`, lastDetail)
+      }
     }
+
+    return { ok: false, reason: "openai_error", detail: lastDetail || "All research models failed." }
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err)
     console.error("[graphic-studio/research] error:", detail)

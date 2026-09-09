@@ -12,17 +12,19 @@ import { PostMediaLightbox } from "@/components/post-media-lightbox"
 import { useAgency } from "@/lib/agency-context"
 import { GraphicStudioSelect } from "@/components/pio/graphic-studio-select"
 import {
-  SAFETY_AUDIENCES,
   SAFETY_GRAPHIC_STYLES,
-  SAFETY_TIP_CATEGORIES,
-  type SafetyAudience,
   type SafetyGraphicStyle,
-  type SafetyTipCategory,
 } from "@/lib/pio-graphic-studio-types"
+import {
+  CAPTION_ADJUST_LABELS,
+  CAPTION_ADJUST_MODES,
+  type CaptionAdjustMode,
+} from "@/lib/graphic-studio/caption-adjust"
 
 type PreparedMessage = {
   headline: string
   message: string
+  messageFormat: string
   visualConcept: string
   importantVisualDetails: string[]
   sourceRecords: Array<{ organization: string; url: string; claim_supported: string }>
@@ -30,19 +32,21 @@ type PreparedMessage = {
 
 export default function SafetyTipGraphicPage() {
   const { settings } = useAgency()
-  const [category, setCategory] = useState<SafetyTipCategory>("Child & Family Safety")
   const [topic, setTopic] = useState("")
-  const [audience, setAudience] = useState<SafetyAudience>("Parents")
-  const [style, setStyle] = useState<SafetyGraphicStyle>("Friendly / Family")
+  const [style, setStyle] = useState<SafetyGraphicStyle>("Let SaferU Decide")
   const [visualNotes, setVisualNotes] = useState("")
   const [headline, setHeadline] = useState("")
   const [message, setMessage] = useState("")
   const [prepared, setPrepared] = useState<PreparedMessage | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
   const [graphicId, setGraphicId] = useState<string | null>(null)
+  const [caption, setCaption] = useState("")
+  const [editRequest, setEditRequest] = useState("")
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [preparing, setPreparing] = useState(false)
   const [generating, setGenerating] = useState(false)
+  const [revising, setRevising] = useState(false)
+  const [adjustingCaption, setAdjustingCaption] = useState<CaptionAdjustMode | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
@@ -61,14 +65,14 @@ export default function SafetyTipGraphicPage() {
     setError(null)
     setPrepared(null)
     setPreview(null)
+    setCaption("")
+    setEditRequest("")
     try {
       const res = await fetch("/api/pio/graphic-studio/prepare-message", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          category,
           topic: need,
-          audience,
           style,
           visualNotes,
         }),
@@ -81,6 +85,7 @@ export default function SafetyTipGraphicPage() {
       const next: PreparedMessage = {
         headline: String(data.headline || ""),
         message: String(data.message || ""),
+        messageFormat: String(data.messageFormat || "paragraph"),
         visualConcept: String(data.visualConcept || ""),
         importantVisualDetails: Array.isArray(data.importantVisualDetails)
           ? data.importantVisualDetails.map(String)
@@ -109,12 +114,11 @@ export default function SafetyTipGraphicPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          category,
           topic,
-          audience,
           style,
           headline,
           message,
+          messageFormat: prepared.messageFormat,
           visualConcept: prepared.visualConcept,
           importantVisualDetails: prepared.importantVisualDetails,
           visualNotes,
@@ -132,11 +136,114 @@ export default function SafetyTipGraphicPage() {
         setPreview(data.imageDataUrl)
       } else {
         setError("Could not generate graphic. Please try again.")
+        return
+      }
+      if (typeof data.caption === "string" && data.caption.trim()) {
+        setCaption(data.caption.trim())
+      } else {
+        await refreshCaption()
       }
     } catch {
       setError("Something went wrong generating the graphic. Please try again.")
     } finally {
       setGenerating(false)
+    }
+  }
+
+  const refreshCaption = async () => {
+    try {
+      const res = await fetch("/api/pio/graphic-studio/caption", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "generate",
+          topic,
+          headline,
+          message,
+          agencyName: settings.agencyName,
+        }),
+      })
+      const data = await res.json()
+      if (res.ok && typeof data.caption === "string") {
+        setCaption(data.caption)
+      }
+    } catch {
+      // Caption is secondary — graphic can still succeed without it.
+    }
+  }
+
+  const adjustCaption = async (mode: CaptionAdjustMode) => {
+    if (!caption.trim()) {
+      setError("Generate the graphic first so we can craft a social caption.")
+      return
+    }
+    setAdjustingCaption(mode)
+    setError(null)
+    try {
+      const res = await fetch("/api/pio/graphic-studio/caption", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "adjust",
+          mode,
+          caption,
+          headline,
+          message,
+          agencyName: settings.agencyName,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(String(data.error || "Could not adjust caption."))
+        return
+      }
+      if (typeof data.caption === "string") setCaption(data.caption)
+    } catch {
+      setError("Something went wrong adjusting the caption.")
+    } finally {
+      setAdjustingCaption(null)
+    }
+  }
+
+  const reviseGraphic = async () => {
+    if (!preview) {
+      setError("Generate a graphic before requesting an edit.")
+      return
+    }
+    const notes = editRequest.trim()
+    if (notes.length < 4) {
+      setError("Describe the specific change you want (example: make the pan larger).")
+      return
+    }
+    setRevising(true)
+    setError(null)
+    try {
+      const res = await fetch("/api/pio/graphic-studio/revise", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageDataUrl: preview,
+          editRequest: notes,
+          headline,
+          message,
+          ...agencyPayload,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(String(data.error || "Could not revise graphic."))
+        return
+      }
+      if (typeof data.imageDataUrl === "string") {
+        setPreview(data.imageDataUrl)
+        setEditRequest("")
+      } else {
+        setError("Could not revise graphic. Please try again.")
+      }
+    } catch {
+      setError("Something went wrong revising the graphic.")
+    } finally {
+      setRevising(false)
     }
   }
 
@@ -148,12 +255,14 @@ export default function SafetyTipGraphicPage() {
     a.click()
   }
 
-  const copyMessage = async () => {
-    const text = `${headline}\n\n${message}`
-    await navigator.clipboard.writeText(text)
+  const copyCaption = async () => {
+    if (!caption.trim()) return
+    await navigator.clipboard.writeText(caption)
     setCopied(true)
     window.setTimeout(() => setCopied(false), 1500)
   }
+
+  const busy = preparing || generating || revising || Boolean(adjustingCaption)
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-6 md:p-8">
@@ -166,49 +275,32 @@ export default function SafetyTipGraphicPage() {
         </Button>
         <h1 className="text-3xl font-bold text-[#0f1c3f]">Safety Graphic</h1>
         <p className="mt-2 text-[#64748B]">
-          Describe your topic. OpenAI researches and drafts the on-graphic message. After you
-          approve the copy, we generate a 16:9 graphic and place your exact agency logo
-          bottom-right.
+          Describe what residents should know, approve the short message, then generate a 16:9
+          safety graphic with your agency logo.
         </p>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_1.15fr]">
         <section className="space-y-5 rounded-2xl border border-[#e2e8f5] bg-white p-5 shadow-sm">
-          <GraphicStudioSelect
-            id="safety-category"
-            label="What type of safety content are you creating?"
-            value={category}
-            options={SAFETY_TIP_CATEGORIES}
-            onChange={(value) => setCategory(value as SafetyTipCategory)}
-          />
-
           <div className="space-y-2">
             <Label htmlFor="topic">What do you want residents to know?</Label>
             <Textarea
               id="topic"
-              rows={4}
+              rows={5}
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
-              placeholder="Example: Signs your child might be getting bullied and what parents can watch for."
-              maxLength={500}
+              placeholder="Example: Grease fires — never put them out with water"
+              maxLength={800}
             />
             <p className="text-xs text-[#94A3B8]">
-              You do not need to write the final message — we will help turn it into clear
-              public-safety content.
+              Jot the topic in your own words. We&apos;ll turn it into the on-graphic headline and
+              message.
             </p>
           </div>
 
           <GraphicStudioSelect
-            id="safety-audience"
-            label="Who is this message for?"
-            value={audience}
-            options={SAFETY_AUDIENCES}
-            onChange={(value) => setAudience(value as SafetyAudience)}
-          />
-
-          <GraphicStudioSelect
             id="safety-style"
-            label="What style would you like?"
+            label="Graphic style"
             value={style}
             options={SAFETY_GRAPHIC_STYLES}
             onChange={(value) => setStyle(value as SafetyGraphicStyle)}
@@ -221,7 +313,7 @@ export default function SafetyTipGraphicPage() {
               rows={2}
               value={visualNotes}
               onChange={(e) => setVisualNotes(e.target.value)}
-              placeholder="Example: A parent calmly talking with a child at home."
+              placeholder="Example: Show an e-scooter blocking an apartment exit."
               maxLength={300}
             />
           </div>
@@ -233,16 +325,16 @@ export default function SafetyTipGraphicPage() {
           <Button
             type="button"
             onClick={() => void prepareMessage()}
-            disabled={preparing || topic.trim().length < 8}
+            disabled={busy || topic.trim().length < 8}
             className="w-full bg-[#0f1c3f] hover:bg-[#1e293b]"
           >
             {preparing ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Researching & drafting message…
+                Crafting your safety message…
               </>
             ) : (
-              "Prepare message"
+              "Craft message from my notes"
             )}
           </Button>
 
@@ -261,16 +353,17 @@ export default function SafetyTipGraphicPage() {
                 <Label htmlFor="message">On-graphic message</Label>
                 <Textarea
                   id="message"
-                  rows={3}
+                  rows={5}
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  maxLength={320}
+                  maxLength={420}
                 />
+                <p className="text-xs text-[#94A3B8]">Edit freely before generating graphic</p>
               </div>
               <Button
                 type="button"
                 onClick={() => void generateGraphic()}
-                disabled={generating || !headline.trim() || !message.trim()}
+                disabled={busy || !headline.trim() || !message.trim()}
                 className="w-full bg-[#2563EB] hover:bg-[#1d4ed8]"
               >
                 {generating ? (
@@ -285,11 +378,6 @@ export default function SafetyTipGraphicPage() {
                   </>
                 )}
               </Button>
-              <p className="text-xs text-[#94A3B8]">
-                {settings.logoUrl
-                  ? "Your original agency logo will be composited bottom-right after generation."
-                  : "Add your agency logo in settings to include it automatically."}
-              </p>
             </div>
           )}
         </section>
@@ -297,7 +385,53 @@ export default function SafetyTipGraphicPage() {
         <section className="space-y-3">
           <div className="overflow-hidden rounded-2xl border border-[#e2e8f5] bg-[#0d1526] shadow-sm">
             <div className="relative aspect-video w-full">
-              {preview ? (
+              {generating || revising ? (
+                <div
+                  className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-gradient-to-br from-[#0d1526] via-[#132038] to-[#1a2744] px-6 text-center"
+                  role="status"
+                  aria-live="polite"
+                  aria-busy="true"
+                >
+                  <div className="relative flex h-20 w-20 items-center justify-center">
+                    <span className="absolute inset-0 animate-ping rounded-full bg-[#3B82F6]/25" />
+                    <span className="absolute inset-2 animate-pulse rounded-full border-2 border-[#60A5FA]/40" />
+                    <Loader2 className="relative h-10 w-10 animate-spin text-[#93C5FD]" />
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-xl font-semibold tracking-tight text-white">
+                      {revising ? "Applying your edit…" : "Creating your graphic…"}
+                    </p>
+                    <p className="max-w-sm text-sm leading-relaxed text-[#94A3B8]">
+                      {revising
+                        ? "Only the change you asked for — agency logo stays untouched."
+                        : "This may take a moment — Rome wasn't built in a day."}
+                    </p>
+                  </div>
+                  <div className="h-1.5 w-48 overflow-hidden rounded-full bg-white/10">
+                    <div className="h-full w-1/2 animate-[pulse_1.2s_ease-in-out_infinite] rounded-full bg-[#60A5FA]" />
+                  </div>
+                </div>
+              ) : preparing ? (
+                <div
+                  className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-gradient-to-br from-[#0d1526] via-[#132038] to-[#1a2744] px-6 text-center"
+                  role="status"
+                  aria-live="polite"
+                  aria-busy="true"
+                >
+                  <div className="relative flex h-20 w-20 items-center justify-center">
+                    <span className="absolute inset-0 animate-ping rounded-full bg-[#3B82F6]/25" />
+                    <Loader2 className="relative h-10 w-10 animate-spin text-[#93C5FD]" />
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-xl font-semibold tracking-tight text-white">
+                      Crafting your message…
+                    </p>
+                    <p className="max-w-sm text-sm leading-relaxed text-[#94A3B8]">
+                      Turning your notes into a clear headline and actionable on-graphic copy.
+                    </p>
+                  </div>
+                </div>
+              ) : preview ? (
                 <button
                   type="button"
                   onClick={() => setLightboxOpen(true)}
@@ -315,7 +449,7 @@ export default function SafetyTipGraphicPage() {
               ) : (
                 <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center text-sm text-[#94A3B8]">
                   <Sparkles className="h-5 w-5" />
-                  Prepare the message, approve the copy, then generate your graphic.
+                  Describe your topic → craft the message → generate the graphic.
                 </div>
               )}
             </div>
@@ -335,19 +469,89 @@ export default function SafetyTipGraphicPage() {
               <Download className="mr-2 h-4 w-4" />
               Download PNG
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => void copyMessage()}
-              disabled={!headline.trim() && !message.trim()}
-            >
-              <Copy className="mr-2 h-4 w-4" />
-              {copied ? "Copied" : "Copy text"}
-            </Button>
             <Button asChild type="button" variant="outline">
               <Link href="/pio-tool/settings">Agency logo settings</Link>
             </Button>
           </div>
+
+          {preview && (
+            <>
+              <div className="space-y-3 rounded-2xl border border-[#e2e8f5] bg-white p-4 shadow-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="social-caption">Social media caption</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void copyCaption()}
+                    disabled={!caption.trim()}
+                  >
+                    <Copy className="mr-2 h-3.5 w-3.5" />
+                    {copied ? "Copied" : "Copy caption"}
+                  </Button>
+                </div>
+                <Textarea
+                  id="social-caption"
+                  rows={5}
+                  value={caption}
+                  onChange={(e) => setCaption(e.target.value)}
+                  placeholder="Your ready-to-post caption will appear here after the graphic is created."
+                  maxLength={1200}
+                />
+                <p className="text-xs text-[#94A3B8]">
+                  Ready for Facebook/Instagram with the graphic. Adjust tone or length, then copy.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {CAPTION_ADJUST_MODES.map((mode) => (
+                    <Button
+                      key={mode}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={busy || !caption.trim()}
+                      onClick={() => void adjustCaption(mode)}
+                    >
+                      {adjustingCaption === mode ? (
+                        <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                      ) : null}
+                      {CAPTION_ADJUST_LABELS[mode]}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-3 rounded-2xl border border-[#e2e8f5] bg-white p-4 shadow-sm">
+                <Label htmlFor="edit-request">Need a change to the graphic?</Label>
+                <Textarea
+                  id="edit-request"
+                  rows={3}
+                  value={editRequest}
+                  onChange={(e) => setEditRequest(e.target.value)}
+                  placeholder="Example: Make the stove flame smaller — keep everything else the same"
+                  maxLength={400}
+                />
+                <p className="text-xs text-[#94A3B8]">
+                  Describe only what to change. We keep the rest of the graphic and never alter
+                  your agency logo.
+                </p>
+                <Button
+                  type="button"
+                  onClick={() => void reviseGraphic()}
+                  disabled={busy || editRequest.trim().length < 4}
+                  className="w-full bg-[#0f1c3f] hover:bg-[#1e293b]"
+                >
+                  {revising ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Applying edit…
+                    </>
+                  ) : (
+                    "Apply edit"
+                  )}
+                </Button>
+              </div>
+            </>
+          )}
 
           {graphicId && preview && (
             <p className="text-xs text-[#94A3B8]">Graphic ID: {graphicId}</p>

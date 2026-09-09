@@ -10,7 +10,7 @@ export const LOGO_MARGIN_BOTTOM = 48
 export const MAX_GENERATION_ATTEMPTS = 3
 
 export function researchModel(): string {
-  return process.env.OPENAI_GRAPHIC_RESEARCH_MODEL?.trim() || "gpt-5.6"
+  return process.env.OPENAI_GRAPHIC_RESEARCH_MODEL?.trim() || "gpt-4.1"
 }
 
 export function imageModel(): string {

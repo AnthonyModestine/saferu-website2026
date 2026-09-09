@@ -1,8 +1,12 @@
 import { z } from "zod"
 
+export const MESSAGE_FORMATS = ["paragraph", "bullets", "callout"] as const
+export type MessageFormat = (typeof MESSAGE_FORMATS)[number]
+
 export const safetyResearchSchema = z.object({
   headline: z.string().min(1),
   message: z.string().min(1),
+  message_format: z.enum(MESSAGE_FORMATS).default("paragraph"),
   visual_concept: z.string().min(1),
   important_visual_details: z.array(z.string()).default([]),
   source_records: z
@@ -24,6 +28,7 @@ export const SAFETY_RESEARCH_JSON_SCHEMA = {
   required: [
     "headline",
     "message",
+    "message_format",
     "visual_concept",
     "important_visual_details",
     "source_records",
@@ -31,6 +36,7 @@ export const SAFETY_RESEARCH_JSON_SCHEMA = {
   properties: {
     headline: { type: "string" },
     message: { type: "string" },
+    message_format: { type: "string", enum: [...MESSAGE_FORMATS] },
     visual_concept: { type: "string" },
     important_visual_details: { type: "array", items: { type: "string" } },
     source_records: {

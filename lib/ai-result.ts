@@ -33,15 +33,22 @@ export function aiErrorPayload(reason: AiFailureReason, detail?: string) {
   }
 }
 
-export function graphicStudioErrorMessage(reason: AiFailureReason): string {
+export function graphicStudioErrorMessage(reason: AiFailureReason, detail?: string): string {
   if (reason === "missing_api_key") {
     return "Graphic Studio is not configured on the server. Add OPENAI_API_KEY in Vercel and redeploy."
   }
   if (reason === "openai_error") {
-    return "OpenAI returned an error. Please try again in a minute."
+    const lower = detail?.toLowerCase() || ""
+    if (lower.includes("credit") || lower.includes("billing") || lower.includes("insufficient")) {
+      return "OpenAI credits are exhausted for this API key. Add billing or credits at platform.openai.com, then try again."
+    }
+    if (lower.includes("429")) {
+      return "OpenAI rate limit or quota reached. Wait a minute or check billing at platform.openai.com."
+    }
+    return "We could not craft your safety message right now. Please try again."
   }
   if (reason === "empty_input") {
-    return "Tell us what residents should know."
+    return "Tell us what residents should know in your own words."
   }
   if (reason === "invalid_json" || reason === "empty_response") {
     return "We could not finish this graphic brief. Please try again."
@@ -51,7 +58,7 @@ export function graphicStudioErrorMessage(reason: AiFailureReason): string {
 
 export function graphicStudioErrorPayload(reason: AiFailureReason, detail?: string) {
   return {
-    error: graphicStudioErrorMessage(reason),
+    error: graphicStudioErrorMessage(reason, detail),
     code: reason,
     ...(process.env.NODE_ENV === "development" && detail ? { detail } : {}),
   }

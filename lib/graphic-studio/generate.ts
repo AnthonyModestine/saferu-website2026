@@ -4,7 +4,6 @@ import type { AiResult } from "@/lib/ai-result"
 import { MAX_GENERATION_ATTEMPTS } from "@/lib/graphic-studio/constants"
 import { generateSafetyArtwork } from "@/lib/graphic-studio/generate-image"
 import { loadLogoAsset, bufferToDataUrl } from "@/lib/graphic-studio/logo-assets"
-import { compositeAgencyLogo } from "@/lib/graphic-studio/logo-composite"
 import { qaSafetyGraphic } from "@/lib/graphic-studio/qa"
 import { researchSafetyGraphic } from "@/lib/graphic-studio/research"
 import type { SafetyResearchResult } from "@/lib/graphic-studio/schemas"
@@ -21,6 +20,7 @@ export { researchSafetyGraphic, type SafetyResearchResult }
 export async function generateSafetyGraphic(opts: {
   approvedHeadline: string
   approvedMessage: string
+  messageFormat?: string
   visualConcept: string
   importantVisualDetails: string[]
   visualNotes?: string
@@ -35,6 +35,7 @@ export async function generateSafetyGraphic(opts: {
     const artworkResult = await generateSafetyArtwork({
       approvedHeadline: opts.approvedHeadline,
       approvedMessage: opts.approvedMessage,
+      messageFormat: opts.messageFormat,
       visualConcept: opts.visualConcept,
       importantVisualDetails: opts.importantVisualDetails,
       visualNotes: opts.visualNotes,
@@ -55,23 +56,19 @@ export async function generateSafetyGraphic(opts: {
     const qa = qaResult.ok ? qaResult.data : { pass: true, issues: [], accidental_logo: false }
     lastIssues = qa.issues
 
+    // accidental_logo = empty placeholder box OR fake invented badge (not the real attached logo)
     if (!qa.pass || qa.accidental_logo) {
       console.warn(
         `[graphic-studio] QA failed attempt ${attempt}/${MAX_GENERATION_ATTEMPTS}:`,
-        qa.issues.join("; ") || "accidental logo"
+        qa.issues.join("; ") || "logo placeholder / fake branding"
       )
       if (attempt < MAX_GENERATION_ATTEMPTS) continue
-    }
-
-    let finalBuffer = artworkResult.data.buffer
-    if (logo) {
-      finalBuffer = await compositeAgencyLogo(artworkResult.data.buffer, logo.buffer)
     }
 
     return {
       ok: true,
       data: {
-        imageDataUrl: bufferToDataUrl(finalBuffer),
+        imageDataUrl: bufferToDataUrl(artworkResult.data.buffer),
         generationModel: lastModel,
         qaPassed: qa.pass && !qa.accidental_logo,
         qaIssues: lastIssues,

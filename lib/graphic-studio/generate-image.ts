@@ -33,12 +33,14 @@ async function generateArtworkTextOnly(
   }
 }
 
-async function generateArtworkWithLogoReference(
+async function generateArtworkWithLogo(
   prompt: string,
   logo: LogoAsset,
   openai: InstanceType<(typeof import("openai"))["default"]>
 ): Promise<GeneratedArtwork | null> {
   try {
+    // Blank 16:9 canvas + real agency logo. OpenAI must place the logo ON the graphic
+    // (scale only) — we no longer paste a logo afterward.
     const canvas = await createBlankCanvasBuffer()
     const canvasFile = await toFile(canvas, "canvas.png", { type: "image/png" })
     const ext = logo.mimeType.includes("jpeg") || logo.mimeType.includes("jpg") ? "jpg" : "png"
@@ -54,10 +56,10 @@ async function generateArtworkWithLogoReference(
     })
     const b64 = response.data?.[0]?.b64_json
     if (!b64) return null
-    return { buffer: Buffer.from(b64, "base64"), model: `${imageModel()}+edit` }
+    return { buffer: Buffer.from(b64, "base64"), model: `${imageModel()}+edit+logo` }
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err)
-    console.warn("[graphic-studio/generate-image] images.edit failed:", detail)
+    console.warn("[graphic-studio/generate-image] images.edit with logo failed:", detail)
     return null
   }
 }
@@ -65,6 +67,7 @@ async function generateArtworkWithLogoReference(
 export async function generateSafetyArtwork(opts: {
   approvedHeadline: string
   approvedMessage: string
+  messageFormat?: string
   visualConcept: string
   importantVisualDetails: string[]
   visualNotes?: string
@@ -77,6 +80,7 @@ export async function generateSafetyArtwork(opts: {
   const prompt = buildImagePrompt({
     approvedHeadline: opts.approvedHeadline,
     approvedMessage: opts.approvedMessage,
+    messageFormat: opts.messageFormat,
     visualConcept: opts.visualConcept,
     importantVisualDetails: opts.importantVisualDetails,
     visualNotes: opts.visualNotes || "",
@@ -90,21 +94,21 @@ export async function generateSafetyArtwork(opts: {
     const { default: OpenAI } = await import("openai")
     const openai = new OpenAI({ apiKey })
 
-    const artwork = opts.logo
-      ? await generateArtworkWithLogoReference(prompt, opts.logo, openai)
-      : await generateArtworkTextOnly(prompt, openai)
-
-    if (!artwork) {
-      if (!opts.logo) {
-        return { ok: false, reason: "openai_error", detail: "Image generation failed." }
+    if (opts.logo) {
+      const withLogo = await generateArtworkWithLogo(prompt, opts.logo, openai)
+      if (withLogo) return { ok: true, data: withLogo }
+      // Do not silently fall back to text-only — that recreates the empty logo-box problem.
+      return {
+        ok: false,
+        reason: "openai_error",
+        detail: "OpenAI could not generate the graphic with your agency logo.",
       }
-      const fallback = await generateArtworkTextOnly(prompt, openai)
-      if (!fallback) {
-        return { ok: false, reason: "openai_error", detail: "Image generation failed." }
-      }
-      return { ok: true, data: fallback }
     }
 
+    const artwork = await generateArtworkTextOnly(prompt, openai)
+    if (!artwork) {
+      return { ok: false, reason: "openai_error", detail: "Image generation failed." }
+    }
     return { ok: true, data: artwork }
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err)

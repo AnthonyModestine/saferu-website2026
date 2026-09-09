@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { graphicStudioErrorPayload } from "@/lib/ai-result"
 import { requireGraphicStudioAccess } from "@/lib/graphic-studio/api-auth"
 import { generateSafetyGraphic } from "@/lib/graphic-studio/generate"
+import { generateSafetySocialCaption } from "@/lib/graphic-studio/social-caption"
 import { saveGraphicStudioRecord, resolveMemberAgencyLogo } from "@/lib/graphic-studio-store"
 import {
   isSafetyAudience,
@@ -30,6 +31,13 @@ export async function POST(request: Request) {
     const importantVisualDetails = Array.isArray(body.importantVisualDetails)
       ? body.importantVisualDetails.map((v: unknown) => String(v || "").trim()).filter(Boolean)
       : []
+    const messageFormatRaw = String(body.messageFormat || "paragraph").trim().toLowerCase()
+    const messageFormat =
+      message.includes("•") || /^[-*]\s/m.test(message)
+        ? "bullets"
+        : messageFormatRaw === "callout" || messageFormatRaw === "bullets"
+          ? messageFormatRaw
+          : "paragraph"
     const agencyName = String(body.agencyName || "").trim()
 
     const agencyLogoUrl = await resolveMemberAgencyLogo(
@@ -37,11 +45,11 @@ export async function POST(request: Request) {
       typeof body.agencyLogoUrl === "string" ? body.agencyLogoUrl : null
     )
 
-    if (!isSafetyTipCategory(category)) {
-      return NextResponse.json({ error: "Choose a safety graphic category." }, { status: 400 })
+    if (category && !isSafetyTipCategory(category)) {
+      return NextResponse.json({ error: "Invalid safety category." }, { status: 400 })
     }
-    if (!isSafetyAudience(audience) || !isSafetyGraphicStyle(style)) {
-      return NextResponse.json({ error: "Choose audience and style." }, { status: 400 })
+    if ((audience && !isSafetyAudience(audience)) || (style && !isSafetyGraphicStyle(style))) {
+      return NextResponse.json({ error: "Invalid audience or style." }, { status: 400 })
     }
     if (!headline || !message) {
       return NextResponse.json(
@@ -56,6 +64,7 @@ export async function POST(request: Request) {
     const result = await generateSafetyGraphic({
       approvedHeadline: headline,
       approvedMessage: message,
+      messageFormat,
       visualConcept,
       importantVisualDetails,
       visualNotes,
@@ -66,6 +75,14 @@ export async function POST(request: Request) {
     if (!result.ok) {
       return NextResponse.json(graphicStudioErrorPayload(result.reason, result.detail), { status: 503 })
     }
+
+    const captionResult = await generateSafetySocialCaption({
+      topic,
+      headline,
+      message,
+      agencyName,
+    })
+    const caption = captionResult.ok ? captionResult.data : ""
 
     const graphicId = crypto.randomUUID()
     const sources = (Array.isArray(body.sourceRecords) ? body.sourceRecords : []) as GraphicStudioSource[]
@@ -85,6 +102,7 @@ export async function POST(request: Request) {
       research_json: {
         visual_concept: visualConcept,
         important_visual_details: importantVisualDetails,
+        social_caption: caption || undefined,
       },
       source_records: sources,
       image_prompt: [headline, message].join(" — "),
@@ -100,6 +118,7 @@ export async function POST(request: Request) {
       generationModel: result.data.generationModel,
       graphicId,
       qaPassed: result.data.qaPassed,
+      caption,
     })
   } catch (err) {
     console.error("[api/pio/graphic-studio/generate]", err)
