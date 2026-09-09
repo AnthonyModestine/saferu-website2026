@@ -10,7 +10,7 @@ export function buildResearchPrompt(opts: {
 SaferU helps police departments, sheriff's offices, fire departments, EMS agencies, emergency management agencies and local governments create educational community safety graphics for residents on social media.
 
 The user typed a short topic note — not finished graphic copy. Example:
-"Grease fires — never put them out with water"
+"E-scooter charging — keep hallways and exits clear because of battery fire risk"
 Your job is to turn THAT note into clear, official-ready copy for a social graphic — short enough to read fast, specific enough that residents know exactly how to stay safe.
 
 Infer the safety topic and audience from the user's request. Default audience is the general community unless they clearly specify otherwise (parents, drivers, renters, etc.).

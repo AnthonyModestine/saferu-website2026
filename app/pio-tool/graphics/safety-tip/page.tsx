@@ -20,6 +20,7 @@ import {
   CAPTION_ADJUST_MODES,
   type CaptionAdjustMode,
 } from "@/lib/graphic-studio/caption-adjust"
+import { compressGraphicDataUrlForUpload } from "@/lib/graphic-studio/compress-for-upload"
 
 type PreparedMessage = {
   headline: string
@@ -192,14 +193,16 @@ export default function SafetyTipGraphicPage() {
           agencyName: settings.agencyName,
         }),
       })
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setError(String(data.error || "Could not adjust caption."))
+        setError(String((data as { error?: string }).error || "Could not adjust caption."))
         return
       }
-      if (typeof data.caption === "string") setCaption(data.caption)
+      if (typeof (data as { caption?: string }).caption === "string") {
+        setCaption((data as { caption: string }).caption)
+      }
     } catch {
-      setError("Something went wrong adjusting the caption.")
+      setError("Could not adjust the caption. Please try again.")
     } finally {
       setAdjustingCaption(null)
     }
@@ -218,30 +221,35 @@ export default function SafetyTipGraphicPage() {
     setRevising(true)
     setError(null)
     try {
+      const compressed = await compressGraphicDataUrlForUpload(preview)
       const res = await fetch("/api/pio/graphic-studio/revise", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          imageDataUrl: preview,
+          imageDataUrl: compressed,
           editRequest: notes,
           headline,
           message,
           ...agencyPayload,
         }),
       })
-      const data = await res.json()
-      if (!res.ok) {
-        setError(String(data.error || "Could not revise graphic."))
+      const data = await res.json().catch(() => ({}))
+      if (res.status === 413) {
+        setError("That graphic file is too large to edit in one request. Please try again.")
         return
       }
-      if (typeof data.imageDataUrl === "string") {
-        setPreview(data.imageDataUrl)
+      if (!res.ok) {
+        setError(String((data as { error?: string }).error || "Could not revise graphic."))
+        return
+      }
+      if (typeof (data as { imageDataUrl?: string }).imageDataUrl === "string") {
+        setPreview((data as { imageDataUrl: string }).imageDataUrl)
         setEditRequest("")
       } else {
         setError("Could not revise graphic. Please try again.")
       }
     } catch {
-      setError("Something went wrong revising the graphic.")
+      setError("Could not revise the graphic. Please try again.")
     } finally {
       setRevising(false)
     }
@@ -289,7 +297,7 @@ export default function SafetyTipGraphicPage() {
               rows={5}
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
-              placeholder="Example: Grease fires — never put them out with water"
+              placeholder="Example: E-scooter charging — keep hallways and exits clear because of battery fire risk"
               maxLength={800}
             />
             <p className="text-xs text-[#94A3B8]">

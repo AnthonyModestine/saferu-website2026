@@ -21,6 +21,16 @@ export async function POST(request: Request) {
     if (!imageDataUrl.startsWith("data:image/")) {
       return NextResponse.json({ error: "Current graphic is required to make an edit." }, { status: 400 })
     }
+    // Vercel request body limit ~4.5MB — reject early with a clear message
+    if (imageDataUrl.length > 3_800_000) {
+      return NextResponse.json(
+        {
+          error:
+            "This graphic is too large to edit in one request. Refresh and try the edit again.",
+        },
+        { status: 413 }
+      )
+    }
     if (editRequest.length < 4) {
       return NextResponse.json(
         { error: "Describe what you want changed (keep it specific)." },
