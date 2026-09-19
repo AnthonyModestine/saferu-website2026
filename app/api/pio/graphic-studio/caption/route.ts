@@ -6,12 +6,22 @@ import {
   generateSafetySocialCaption,
   isCaptionAdjustMode,
 } from "@/lib/graphic-studio/social-caption"
+import {
+  debitAiTokens,
+  outOfTokensResponse,
+  rejectIfOutOfTokens,
+} from "@/lib/pio-token-gate"
+import { TOKEN_ESTIMATES } from "@/lib/openai-usage"
 
 export const maxDuration = 60
 
 export async function POST(request: Request) {
   const auth = await requireGraphicStudioAccess(request, "pio-graphic-caption", 40, 80)
   if (auth instanceof NextResponse) return auth
+  const { session } = auth
+
+  const outOfTokens = await rejectIfOutOfTokens(session.email)
+  if (outOfTokens) return outOfTokens
 
   try {
     const body = await request.json()
@@ -42,6 +52,12 @@ export async function POST(request: Request) {
           status: 503,
         })
       }
+      const debit = await debitAiTokens(
+        session.email,
+        result.tokensUsed,
+        TOKEN_ESTIMATES.graphicStudioCaption
+      )
+      if (!debit.ok) return outOfTokensResponse()
       return NextResponse.json({ caption: result.data, mode })
     }
 
@@ -56,6 +72,12 @@ export async function POST(request: Request) {
         status: 503,
       })
     }
+    const debit = await debitAiTokens(
+      session.email,
+      result.tokensUsed,
+      TOKEN_ESTIMATES.graphicStudioCaption
+    )
+    if (!debit.ok) return outOfTokensResponse()
     return NextResponse.json({ caption: result.data })
   } catch (err) {
     console.error("[api/pio/graphic-studio/caption]", err)

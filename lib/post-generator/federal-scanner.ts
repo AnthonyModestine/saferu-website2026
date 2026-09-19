@@ -128,7 +128,7 @@ async function scanAirQuality(location: ServiceAreaLocation): Promise<ExternalOp
     priority: aqi >= 150 ? "recommended_today" : "plan_ahead",
     signals: ["air_quality", "public_health", "respiratory_health"],
     sourceName: "Open-Meteo air quality (US AQI model)",
-    sourceUrl: "https://www.airnow.gov/",
+    sourceUrl: `https://www.airnow.gov/?lat=${location.latitude}&lon=${location.longitude}`,
     eventStart: data?.current?.time?.slice(0, 10),
     verifiedFacts: [
       `Modeled US AQI near ${label} is ${aqi} (${level}).`,

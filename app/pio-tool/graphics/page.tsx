@@ -16,9 +16,8 @@ export default function GraphicStudioPage() {
         </Button>
         <h1 className="text-3xl font-bold text-[#0f1c3f]">Graphic Studio</h1>
         <p className="mt-2 max-w-2xl text-[#64748B]">
-          Create professional 16:9 safety graphics for your agency. OpenAI researches the topic,
-          drafts the message, and generates the artwork — your original logo is composited
-          bottom-right without alteration.
+          Create professional 16:9 safety graphics for your agency. Describe the topic, approve the
+          message, and generate artwork with your agency logo and a ready social caption.
         </p>
       </div>
 
@@ -49,8 +48,7 @@ export default function GraphicStudioPage() {
               <Link href="/pio-tool/settings" className="font-semibold text-[#2563EB] hover:underline">
                 Agency Settings
               </Link>
-              . It is used as a layout reference during generation, then composited bottom-right as
-              your exact original file — never redrawn by AI.
+              . OpenAI places your exact logo on the graphic — scaled larger, not redrawn.
             </p>
           </div>
         </div>

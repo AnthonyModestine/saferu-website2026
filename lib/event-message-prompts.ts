@@ -13,6 +13,9 @@ export type EventCampaignKey =
   | "optional_final"
   | "thank_you"
 
+/** How aggressively to promote — light service events stay short; awareness events run fuller campaigns. */
+export type CampaignIntensity = "light" | "standard" | "awareness"
+
 export type EventSharedFacts = {
   organizationName: string
   organizationType: string
@@ -64,6 +67,14 @@ export type CampaignSlot = {
   promptBody: string
 }
 
+type PlanCandidate = {
+  key: EventCampaignKey
+  timingLabel: string
+  recommendedPostDate: string
+  recommendedPostTime: string
+  timeUntilEvent: string
+}
+
 export const EVENT_STAGE_PURPOSES: Record<EventCampaignKey, string> = {
   initial_announcement: "Build awareness early and give the community enough information to plan.",
   event_highlight: "Create a fresh reason to attend by spotlighting one or two supported benefits.",
@@ -73,6 +84,291 @@ export const EVENT_STAGE_PURPOSES: Record<EventCampaignKey, string> = {
   event_day: "Reach people who can still attend with a concise, time-accurate same-day message.",
   optional_final: "Give eligible nearby audiences one final low-pressure opportunity to attend.",
   thank_you: "Close the campaign, recognize supported contributions, and sustain the relationship.",
+}
+
+const LIGHT_EVENT_PATTERN =
+  /drug\s*take[\s-]*back|medication\s*(take[\s-]*back|disposal|drop[\s-]*off)|prescription\s*(take[\s-]*back|drop|disposal)|dea\s*take|rx\s*take[\s-]*back|medicine\s*drop|shred\s*day|document\s*shred|paper\s*shred|blood\s*drive|flu\s*clinic|vaccine\s*clinic|vaccination\s*clinic|needle\s*exchange|syringe\s*exchange|electronics?\s*recycl|e[\s-]*waste|hazardous\s*waste|household\s*hazardous|\bhhw\b|gun\s*buy[\s-]*back|ammo\s*disposal|ammunition\s*disposal|secure\s*drop|drive[\s-]*through\s*drop/
+
+const AWARENESS_EVENT_PATTERN =
+  /community\s*event|national\s*night\s*out|\bnno\b|open\s*house|festival|fundraiser|block\s*party|awareness\s*(month|week|day)|safety\s*fair|touch[\s-]*a[\s-]*truck|family\s*night|movie\s*in\s*the\s*park|parade|carnival/
+
+/**
+ * Decide campaign size from event type + wording.
+ * Light = transactional service (drug take-back) → few posts.
+ * Awareness = community promotion → fuller schedule.
+ */
+export function resolveCampaignIntensity(
+  facts: Pick<EventSharedFacts, "eventType" | "eventName" | "eventDescription" | "eventCategory">
+): CampaignIntensity {
+  const type = (facts.eventType || "").trim().toLowerCase()
+  const blob = `${facts.eventType} ${facts.eventName} ${facts.eventDescription} ${facts.eventCategory}`.toLowerCase()
+
+  if (
+    type === "drug take-back" ||
+    type === "service / drop-off" ||
+    LIGHT_EVENT_PATTERN.test(blob)
+  ) {
+    return "light"
+  }
+
+  if (
+    type === "community event" ||
+    type === "open house" ||
+    type === "fundraiser" ||
+    AWARENESS_EVENT_PATTERN.test(blob)
+  ) {
+    return "awareness"
+  }
+
+  return "standard"
+}
+
+export function campaignIntensityCopy(intensity: CampaignIntensity): string {
+  if (intensity === "light") {
+    return "Service-style event — SaferU will draft about 3–4 posts (announce, remind, event day, thank-you)."
+  }
+  if (intensity === "awareness") {
+    return "Awareness event — SaferU will draft a fuller posting schedule to keep the community informed."
+  }
+  return "SaferU will draft a balanced posting schedule for this event."
+}
+
+/** Major holidays that can flavor event campaign messaging. */
+export type EventHolidayId =
+  | "halloween"
+  | "christmas"
+  | "new_years"
+  | "easter"
+  | "july_fourth"
+
+export type EventHolidayContext = {
+  id: EventHolidayId
+  label: string
+  holidayDate: string
+  daysFromEvent: number
+  /** Suggested festive emojis the writer may use (not invent beyond this set). */
+  emojiFocus: string[]
+  toneNote: string
+}
+
+const EVENT_HOLIDAY_WINDOW_DAYS = 10
+
+/** Western (Gregorian) Easter Sunday for a given year — Anonymous Gregorian computus. */
+export function westernEasterYmd(year: number): string {
+  const a = year % 19
+  const b = Math.floor(year / 100)
+  const c = year % 100
+  const d = Math.floor(b / 4)
+  const e = b % 4
+  const f = Math.floor((b + 8) / 25)
+  const g = Math.floor((b - f + 1) / 3)
+  const h = (19 * a + b - d - g + 15) % 30
+  const i = Math.floor(c / 4)
+  const k = c % 4
+  const l = (32 + 2 * e + 2 * i - h - k) % 7
+  const m = Math.floor((a + 11 * h + 22 * l) / 451)
+  const month = Math.floor((h + l - 7 * m + 114) / 31)
+  const day = ((h + l - 7 * m + 114) % 31) + 1
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+}
+
+type HolidayDef = {
+  id: EventHolidayId
+  label: string
+  emojiFocus: string[]
+  toneNote: string
+  /** Return holiday YYYY-MM-DD for the year of the event (and adjacent year when needed). */
+  datesForEventYear: (eventYear: number) => string[]
+  namePattern: RegExp
+}
+
+const EVENT_HOLIDAYS: HolidayDef[] = [
+  {
+    id: "halloween",
+    label: "Halloween",
+    emojiFocus: ["🎃", "👻", "🍬", "🦇", "🌙"],
+    toneNote:
+      "Warm, playful Halloween energy without scaring anyone. Light spooky charm is fine; stay family-friendly and PIO-appropriate.",
+    datesForEventYear: (y) => [`${y}-10-31`],
+    namePattern: /\bhalloween\b|\btrick[\s-]*or[\s-]*treat\b|\bspooky\b/i,
+  },
+  {
+    id: "christmas",
+    label: "Christmas",
+    emojiFocus: ["🎄", "🎁", "❄️", "⭐", "🎅"],
+    toneNote:
+      "Warm, festive Christmas goodwill. Keep it welcoming and community-focused — not commercial or overly religious unless the event itself is.",
+    datesForEventYear: (y) => [`${y}-12-25`],
+    namePattern: /\bchristmas\b|\bx[\s-]*mas\b|\bholiday\s+(party|open\s*house|festival)\b/i,
+  },
+  {
+    id: "new_years",
+    label: "New Year's",
+    emojiFocus: ["🎉", "✨", "🥂", "🕛", "🥳"],
+    toneNote:
+      "Celebratory New Year energy — fresh start, community cheer. Keep it light and welcoming.",
+    // Cover Dec 31 and Jan 1 across year boundaries.
+    datesForEventYear: (y) => [`${y}-12-31`, `${y}-01-01`, `${y + 1}-01-01`, `${y - 1}-12-31`],
+    namePattern: /\bnew\s*year'?s?\b|\bnye\b|\bfirst\s+night\b/i,
+  },
+  {
+    id: "easter",
+    label: "Easter",
+    emojiFocus: ["🐰", "🥚", "🌷", "🐣", "🌸"],
+    toneNote:
+      "Bright, spring Easter cheer. Family-friendly and gentle — avoid heavy religious framing unless the event itself is faith-based.",
+    datesForEventYear: (y) => [westernEasterYmd(y), westernEasterYmd(y - 1), westernEasterYmd(y + 1)],
+    namePattern: /\beaster\b|\begg\s+hunt\b/i,
+  },
+  {
+    id: "july_fourth",
+    label: "Fourth of July",
+    emojiFocus: ["🇺🇸", "🎆", "✨", "🎇", "⭐"],
+    toneNote:
+      "Patriotic Independence Day energy — proud, community-minded, and festive without political commentary.",
+    datesForEventYear: (y) => [`${y}-07-04`],
+    namePattern: /\b4th\s+of\s+july\b|\bfourth\s+of\s+july\b|\bindependence\s+day\b|\bjuly\s*4(?:th)?\b/i,
+  },
+]
+
+function daysBetweenYmd(fromYmd: string, toYmd: string): number {
+  const a = new Date(`${fromYmd}T12:00:00`).getTime()
+  const b = new Date(`${toYmd}T12:00:00`).getTime()
+  return Math.round((b - a) / 86_400_000)
+}
+
+/**
+ * Detect when an event falls near a major holiday (or names one),
+ * so messaging can lean festive with holiday-focused emojis.
+ */
+export function resolveEventHolidayContext(
+  facts: Pick<EventSharedFacts, "eventDate" | "eventName" | "eventDescription" | "eventType">
+): EventHolidayContext | null {
+  const eventDate = (facts.eventDate || "").trim()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) return null
+
+  const year = Number(eventDate.slice(0, 4))
+  const blob = `${facts.eventName} ${facts.eventDescription} ${facts.eventType}`
+
+  type Candidate = EventHolidayContext & { score: number }
+  const candidates: Candidate[] = []
+
+  for (const holiday of EVENT_HOLIDAYS) {
+    const uniqueDates = [...new Set(holiday.datesForEventYear(year))]
+    let bestDays: number | null = null
+    let bestDate = uniqueDates[0]!
+    for (const holidayDate of uniqueDates) {
+      const days = daysBetweenYmd(eventDate, holidayDate)
+      if (bestDays == null || Math.abs(days) < Math.abs(bestDays)) {
+        bestDays = days
+        bestDate = holidayDate
+      }
+    }
+    if (bestDays == null) continue
+
+    const named = holiday.namePattern.test(blob)
+    const inWindow = Math.abs(bestDays) <= EVENT_HOLIDAY_WINDOW_DAYS
+    if (!named && !inWindow) continue
+
+    // Prefer closer dates; named matches still qualify even slightly outside window.
+    if (!inWindow && named && Math.abs(bestDays) > 45) continue
+
+    candidates.push({
+      id: holiday.id,
+      label: holiday.label,
+      holidayDate: bestDate,
+      daysFromEvent: bestDays,
+      emojiFocus: holiday.emojiFocus,
+      toneNote: holiday.toneNote,
+      score: named ? Math.abs(bestDays) - 100 : Math.abs(bestDays),
+    })
+  }
+
+  if (!candidates.length) return null
+  candidates.sort((a, b) => a.score - b.score)
+  const { score: _score, ...best } = candidates[0]!
+  return best
+}
+
+export function eventHolidayWritingBrief(holiday: EventHolidayContext | null): string {
+  if (!holiday) {
+    return `NEARBY HOLIDAY: none
+- Do not force holiday themes or seasonal emoji strings.
+- Use emojis sparingly and only when appropriate.`
+  }
+
+  const when =
+    holiday.daysFromEvent === 0
+      ? `the event is on ${holiday.label} (${holiday.holidayDate})`
+      : holiday.daysFromEvent > 0
+        ? `the event is ${holiday.daysFromEvent} day(s) before ${holiday.label} (${holiday.holidayDate})`
+        : `the event is ${Math.abs(holiday.daysFromEvent)} day(s) after ${holiday.label} (${holiday.holidayDate})`
+
+  return `NEARBY HOLIDAY: ${holiday.label}
+- Context: ${when}.
+- Make SOME (not all) campaign posts lightly festive and seasonally warm — especially announcement, highlight, event-day, and thank-you when they fit.
+- ${holiday.toneNote}
+- Prefer holiday-focused emojis from this set when using emojis: ${holiday.emojiFocus.join(" ")}.
+- Use 1–3 of those emojis across festive posts; do not spam emoji strings.
+- Still lead with accurate event facts (name, date, time, place, CTA). Festive tone supports the invite — it does not replace logistics.
+- Do not invent holiday activities, fireworks, candy giveaways, or themed programming unless those facts were provided.
+- Keep public-safety / government voice: warm and approachable, never unserious or meme-heavy.`
+}
+
+export function eventHolidayCopy(holiday: EventHolidayContext | null): string | null {
+  if (!holiday) return null
+  return `${holiday.label} is nearby — SaferU will make some posts festive with ${holiday.label}-focused emojis.`
+}
+
+const KEY_ORDER: EventCampaignKey[] = [
+  "initial_announcement",
+  "event_highlight",
+  "one_week_reminder",
+  "what_to_expect",
+  "day_before",
+  "event_day",
+  "optional_final",
+  "thank_you",
+]
+
+/** Cap or expand which adaptive slots stay in the plan. */
+export function applyCampaignIntensity(
+  candidates: PlanCandidate[],
+  intensity: CampaignIntensity
+): PlanCandidate[] {
+  if (candidates.length === 0) return candidates
+
+  if (intensity === "awareness") {
+    return candidates
+  }
+
+  if (intensity === "standard") {
+    return candidates.filter((slot) => slot.key !== "optional_final")
+  }
+
+  // Light: at most 4 posts — announce + one reminder + event day + thank-you when available.
+  const byKey = new Map(candidates.map((slot) => [slot.key, slot]))
+  const pickOrder: EventCampaignKey[] = [
+    "initial_announcement",
+    "day_before",
+    "event_day",
+    "thank_you",
+    "one_week_reminder",
+    "what_to_expect",
+    "event_highlight",
+  ]
+  const picked: PlanCandidate[] = []
+  for (const key of pickOrder) {
+    if (picked.length >= 4) break
+    const slot = byKey.get(key)
+    if (slot) picked.push(slot)
+  }
+
+  return picked.sort((a, b) => {
+    const byDate = a.recommendedPostDate.localeCompare(b.recommendedPostDate)
+    if (byDate !== 0) return byDate
+    return KEY_ORDER.indexOf(a.key) - KEY_ORDER.indexOf(b.key)
+  })
 }
 
 const SHARED_RULES = `You are an experienced event marketing manager who helps public safety agencies, local governments, nonprofits, schools, and community organizations promote events.
@@ -120,7 +416,7 @@ Follow these rules:
 - Do not place every event highlight into every message.
 - Use the exact event date, time, and location when they are important.
 - Include a clear next step or invitation that fits the agencyRole.
-- Use emojis sparingly and only when appropriate.
+- Use emojis sparingly and only when appropriate. When a nearby holiday is supplied, prefer that holiday's emoji set for some posts.
 - Do not add hashtags unless specifically requested.
 - Do not mention that the message was generated by AI.
 
@@ -408,7 +704,10 @@ export function buildEventCampaignPlan(
   const onlyKeys = opts?.onlyKeys
   const daysLeft = daysBetween(todayYmd, eventDate)
 
-  const candidates = buildAdaptiveCandidates(facts, todayYmd, daysLeft)
+  const candidates = applyCampaignIntensity(
+    buildAdaptiveCandidates(facts, todayYmd, daysLeft),
+    resolveCampaignIntensity(facts)
+  )
 
   for (const c of candidates) {
     if (onlyKeys && onlyKeys.length > 0 && !onlyKeys.includes(c.key)) continue
@@ -434,14 +733,6 @@ export function buildEventCampaignPlan(
   }
 
   return slots
-}
-
-type PlanCandidate = {
-  key: EventCampaignKey
-  timingLabel: string
-  recommendedPostDate: string
-  recommendedPostTime: string
-  timeUntilEvent: string
 }
 
 function daysLabel(n: number): string {
@@ -687,20 +978,10 @@ function buildAdaptiveCandidates(
   })
 
   // Sort by date then time-ish key order
-  const keyOrder: EventCampaignKey[] = [
-    "initial_announcement",
-    "event_highlight",
-    "one_week_reminder",
-    "what_to_expect",
-    "day_before",
-    "event_day",
-    "optional_final",
-    "thank_you",
-  ]
   out.sort((a, b) => {
     const d = a.recommendedPostDate.localeCompare(b.recommendedPostDate)
     if (d !== 0) return d
-    return keyOrder.indexOf(a.key) - keyOrder.indexOf(b.key)
+    return KEY_ORDER.indexOf(a.key) - KEY_ORDER.indexOf(b.key)
   })
 
   return out
@@ -753,11 +1034,15 @@ export function buildBatchUserPrompt(
 - Write each message as a Facebook community post.
 - A short paragraph or two is fine. Keep it readable on mobile.`
 
+  const holiday = resolveEventHolidayContext(facts)
+
   return `Generate a SaferU event campaign using ONLY this shared event information:
 
 ${JSON.stringify(shared, null, 2)}
 
 ${roleWritingBrief(facts.agencyRole, facts.organizationName, facts.hostOrganization)}
+
+${eventHolidayWritingBrief(holiday)}
 
 ${channelRules}
 

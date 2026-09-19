@@ -7,12 +7,22 @@ import {
   isSafetyGraphicStyle,
   isSafetyTipCategory,
 } from "@/lib/pio-graphic-studio-types"
+import {
+  debitAiTokens,
+  outOfTokensResponse,
+  rejectIfOutOfTokens,
+} from "@/lib/pio-token-gate"
+import { TOKEN_ESTIMATES } from "@/lib/openai-usage"
 
 export const maxDuration = 120
 
 export async function POST(request: Request) {
   const auth = await requireGraphicStudioAccess(request, "pio-graphic-prepare", 30, 60)
   if (auth instanceof NextResponse) return auth
+  const { session } = auth
+
+  const outOfTokens = await rejectIfOutOfTokens(session.email)
+  if (outOfTokens) return outOfTokens
 
   try {
     const body = await request.json()
@@ -46,6 +56,13 @@ export async function POST(request: Request) {
     if (!result.ok) {
       return NextResponse.json(graphicStudioErrorPayload(result.reason, result.detail), { status: 503 })
     }
+
+    const debit = await debitAiTokens(
+      session.email,
+      result.tokensUsed,
+      TOKEN_ESTIMATES.graphicStudioPrepare
+    )
+    if (!debit.ok) return outOfTokensResponse()
 
     return NextResponse.json({
       headline: result.data.headline,

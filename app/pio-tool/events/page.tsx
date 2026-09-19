@@ -32,6 +32,12 @@ import {
   type PioEventPost,
 } from "@/lib/pio-events-store"
 import {
+  campaignIntensityCopy,
+  eventHolidayCopy,
+  resolveCampaignIntensity,
+  resolveEventHolidayContext,
+} from "@/lib/event-message-prompts"
+import {
   getEventTemplateById,
   saveEventTemplate,
 } from "@/lib/pio-event-templates-store"
@@ -40,13 +46,10 @@ import {
   saveCustomEventHighlight,
 } from "@/lib/pio-custom-highlights-store"
 
-const STEPS = [
-  { id: 1, label: "Event Details" },
-  { id: 2, label: "Review & Generate" },
-] as const
-
 const EVENT_TYPES = [
   "Community event",
+  "Drug take-back",
+  "Service / drop-off",
   "Open house",
   "Education / training",
   "School program",
@@ -224,7 +227,6 @@ function CreateEventWizard() {
   const templateId = searchParams.get("template")
   const { settings } = useAgency()
   const { isSubscribed } = useSubscription()
-  const [step, setStep] = useState(1)
   const [form, setForm] = useState<DraftForm>(() => initialCreateForm(Boolean(templateId)))
   const [highlightInput, setHighlightInput] = useState("")
   const [customHighlights, setCustomHighlights] = useState<string[]>([])
@@ -370,18 +372,6 @@ function CreateEventWizard() {
     return null
   }
 
-  function goNext() {
-    setError(null)
-    if (step === 1) {
-      const err = validateStep1()
-      if (err) {
-        setError(err)
-        return
-      }
-    }
-    setStep((s) => Math.min(2, s + 1))
-  }
-
   function saveDraft() {
     const now = new Date().toISOString()
     const event: PioEvent = {
@@ -414,7 +404,6 @@ function CreateEventWizard() {
     setError(null)
     const err = validateStep1()
     if (err) {
-      setStep(1)
       setError(err)
       return
     }
@@ -497,7 +486,7 @@ function CreateEventWizard() {
       }
       savePioEvent(event)
       persistRecurringTemplateIfNeeded()
-      router.push(`/pio-tool/events/${event.id}`)
+      router.push(`/pio-tool/events/${event.id}/generate`)
     } catch {
       setError("Something went wrong. Please try again.")
     } finally {
@@ -559,43 +548,6 @@ function CreateEventWizard() {
         </div>
       </div>
 
-      {/* Stepper */}
-      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-[#e2e8f5] bg-white px-4 py-3 shadow-sm">
-        {STEPS.map((s, i) => {
-          const active = step === s.id
-          const done = step > s.id
-          return (
-            <div key={s.id} className="flex items-center gap-2">
-              {i > 0 && <div className="mx-1 hidden h-px w-6 bg-[#e2e8f5] sm:block" />}
-              <button
-                type="button"
-                onClick={() => setStep(s.id)}
-                className="flex items-center gap-2 rounded-full px-1 py-1 text-left"
-              >
-                <span
-                  className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
-                    active
-                      ? "bg-[#10B981] text-white"
-                      : done
-                        ? "bg-[#D1FAE5] text-[#047857]"
-                        : "bg-[#F3F4F6] text-[#6b7280]"
-                  }`}
-                >
-                  {s.id}
-                </span>
-                <span
-                  className={`text-sm font-semibold ${
-                    active ? "text-[#10B981]" : done ? "text-[#047857]" : "text-[#6b7280]"
-                  }`}
-                >
-                  {s.label}
-                </span>
-              </button>
-            </div>
-          )
-        })}
-      </div>
-
       {error && (
         <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
           {error}
@@ -603,12 +555,12 @@ function CreateEventWizard() {
       )}
 
       <div className="rounded-2xl border border-[#e2e8f5] bg-white p-6 shadow-sm">
-        {step === 1 && (
           <div className="space-y-5">
             <div>
               <h2 className="text-lg font-bold text-[#0f1c3f]">Event Details</h2>
               <p className="mt-1 text-sm text-[#7a8ab0]">
-                Provide the basic information about your event.
+                Add the basics, then generate. SaferU drafts Facebook posts for each posting day —
+                open a date to edit, adjust, or swap to X.
               </p>
             </div>
 
@@ -673,6 +625,16 @@ function CreateEventWizard() {
                   </option>
                 ))}
               </select>
+              <p className="text-xs text-[#7a8ab0]">
+                {campaignIntensityCopy(
+                  resolveCampaignIntensity({
+                    eventType: form.eventType,
+                    eventName: form.title,
+                    eventDescription: form.description,
+                    eventCategory: "",
+                  })
+                )}
+              </p>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-3">
@@ -685,6 +647,19 @@ function CreateEventWizard() {
                   onChange={(e) => update("eventDate", e.target.value)}
                   className="h-11"
                 />
+                {(() => {
+                  const holidayNote = eventHolidayCopy(
+                    resolveEventHolidayContext({
+                      eventDate: form.eventDate,
+                      eventName: form.title,
+                      eventDescription: form.description,
+                      eventType: form.eventType,
+                    })
+                  )
+                  return holidayNote ? (
+                    <p className="text-xs text-[#7a8ab0]">{holidayNote}</p>
+                  ) : null
+                })()}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="startTime">Start Time</Label>
@@ -958,104 +933,26 @@ function CreateEventWizard() {
               )}
             </div>
           </div>
-        )}
 
-        {step === 2 && (
-          <div className="space-y-4">
-            <div>
-              <h2 className="text-lg font-bold text-[#0f1c3f]">Review & Generate</h2>
-              <p className="mt-1 text-sm text-[#7a8ab0]">
-                Confirm the details, then generate posting dates and messages.
-              </p>
-            </div>
-            <dl className="grid gap-3 rounded-xl bg-[#F8FAFC] p-4 text-sm sm:grid-cols-2">
-              <div>
-                <dt className="text-[#7a8ab0]">Event</dt>
-                <dd className="font-semibold text-[#0f1c3f]">{form.title || "—"}</dd>
-              </div>
-              <div>
-                <dt className="text-[#7a8ab0]">Our role</dt>
-                <dd className="font-semibold text-[#0f1c3f]">
-                  {HOSTING_ROLES.find((r) => r.value === form.hostingRole)?.label || "Hosting"}
-                  {form.hostOrganization.trim() ? ` · Host: ${form.hostOrganization}` : ""}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-[#7a8ab0]">When</dt>
-                <dd className="font-semibold text-[#0f1c3f]">
-                  {form.eventDate || "—"}
-                  {form.startTime ? ` · ${form.startTime}` : ""}
-                  {form.endTime ? `–${form.endTime}` : ""}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-[#7a8ab0]">Where</dt>
-                <dd className="font-semibold text-[#0f1c3f]">{form.location || "—"}</dd>
-              </div>
-              <div>
-                <dt className="text-[#7a8ab0]">Type</dt>
-                <dd className="font-semibold text-[#0f1c3f]">
-                  {form.eventType}
-                </dd>
-              </div>
-              <div className="sm:col-span-2">
-                <dt className="text-[#7a8ab0]">Highlights</dt>
-                <dd className="mt-1 flex flex-wrap gap-1.5">
-                  {form.highlights.length === 0 ? (
-                    <span className="text-[#0f1c3f]">—</span>
-                  ) : (
-                    form.highlights.map((h) => (
-                      <span
-                        key={h}
-                        className="rounded-full bg-[#DBEAFE] px-2.5 py-0.5 text-xs font-semibold text-[#1D4ED8]"
-                      >
-                        {h}
-                      </span>
-                    ))
-                  )}
-                </dd>
-              </div>
-            </dl>
-            <Button
-              type="button"
-              onClick={generateContent}
-              disabled={generating || !isSubscribed}
-              className="bg-[#2563EB] text-white hover:bg-[#1d4ed8]"
-            >
-              {generating ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Generating content…
-                </>
-              ) : (
-                <>Generate Content →</>
-              )}
-            </Button>
-          </div>
-        )}
-
-        <div className="mt-8 flex items-center justify-between border-t border-[#eef2f7] pt-5">
+        <div className="mt-8 flex items-center justify-end gap-2 border-t border-[#eef2f7] pt-5">
+          <Button type="button" variant="outline" onClick={saveDraft}>
+            Save Draft
+          </Button>
           <Button
             type="button"
-            variant="outline"
-            disabled={step === 1}
-            onClick={() => setStep((s) => Math.max(1, s - 1))}
+            onClick={generateContent}
+            disabled={generating || !isSubscribed}
+            className="bg-[#2563EB] text-white hover:bg-[#1d4ed8]"
           >
-            Back
+            {generating ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Generating…
+              </>
+            ) : (
+              <>Generate Content →</>
+            )}
           </Button>
-          {step < 2 ? (
-            <Button
-              type="button"
-              onClick={goNext}
-              className="bg-[#2563EB] text-white hover:bg-[#1d4ed8]"
-            >
-              Next →
-            </Button>
-          ) : (
-            <Button type="button" variant="outline" onClick={saveDraft}>
-              Save Draft
-            </Button>
-          )}
         </div>
       </div>
     </div>

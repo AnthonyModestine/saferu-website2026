@@ -18,6 +18,7 @@ import {
   resolveAgencyDisplayName,
 } from "@/lib/post-generator/caption-voice"
 import { holidayValidationBrief } from "@/lib/post-generator/holiday-validation"
+import { customizePioFacebookPost } from "@/lib/post-generator/customize-pio-facebook-post"
 
 function pioSocialVoiceRules(agency: string, place: string, agencyTypeLabel?: string): string {
   const display = resolveAgencyDisplayName(agency)
@@ -72,6 +73,7 @@ export async function customizeCuratedMessage(
     agencyType?: string
     verifiedFacts?: WriterFact[]
     voiceProfile?: string
+    holidayEmojiFocus?: string[]
   }
 ): Promise<AiResult<string>> {
   const trimmed = originalMessage.trim()
@@ -92,6 +94,7 @@ export async function customizeCuratedMessage(
     serviceArea: place,
     voiceProfile: opts?.voiceProfile,
     verifiedFacts,
+    holidayEmojiFocus: opts?.holidayEmojiFocus,
   })
   if (!result.ok) return result
   if (result.data.status !== "ready" || !result.data.postText.trim()) {

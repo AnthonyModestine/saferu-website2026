@@ -1,6 +1,7 @@
 import type OpenAI from "openai"
 import type { ZodType } from "zod"
 import type { AiResult } from "./ai-result"
+import { tokensFromOpenAIUsage } from "./openai-usage"
 
 export async function runPioStructuredCall<T>(
   openai: OpenAI,
@@ -22,6 +23,7 @@ export async function runPioStructuredCall<T>(
       max_tokens: maxTokens,
       temperature,
     })
+    const tokensUsed = tokensFromOpenAIUsage(completion.usage)
     const choice = completion.choices[0]
     const raw = choice?.message?.content
     if (!raw) return { ok: false, reason: "empty_response" }
@@ -38,7 +40,7 @@ export async function runPioStructuredCall<T>(
     if (!parsed.success) {
       return { ok: false, reason: "invalid_json", detail: parsed.error.message }
     }
-    return { ok: true, data: parsed.data }
+    return { ok: true, data: parsed.data, tokensUsed }
   } catch (error) {
     return {
       ok: false,

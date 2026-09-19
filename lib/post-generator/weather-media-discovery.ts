@@ -2,7 +2,7 @@ import "server-only"
 
 import type { AiResult } from "@/lib/ai-result"
 import { parseModelJson } from "@/lib/parse-model-json"
-import { formatServiceAreaLabel, resolveServiceAreaLocations } from "./geo-utils"
+import { formatServiceAreaLabel, resolveDiscoveryCityLabel, resolveServiceAreaLocations } from "./geo-utils"
 import { buildSourceCatalogPrompt, getDiscoverySearchHints } from "./source-catalog"
 import { weatherGateBrief } from "./weather-gates"
 import type { ExternalOpportunityInput } from "./types"
@@ -100,7 +100,10 @@ export async function discoverLocalWeatherMediaTopics(opts: {
     county: opts.county,
     state: opts.state,
   })
-  const primaryCity = opts.city || locations[0]?.city
+  const primaryCity =
+    resolveDiscoveryCityLabel({ city: opts.city, state: opts.state, locations }) ||
+    opts.city ||
+    locations[0]?.city
 
   const searchHints = [
     ...WEATHER_MEDIA_SEARCH_HINTS.map((hint) =>

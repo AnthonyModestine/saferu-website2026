@@ -55,6 +55,17 @@ const TRUSTED_HOST_SUFFIXES = [
   "amberalert.gov",
   "spc.noaa.gov",
   "nhc.noaa.gov",
+  "phila.gov",
+  "phillypolice.com",
+  "511pa.com",
+  "penndot.pa.gov",
+  "septa.org",
+  "fox29.com",
+  "6abc.com",
+  "nbcphiladelphia.com",
+  "inquirer.com",
+  "phillyvoice.com",
+  "cbsnews.com",
 ]
 
 /** Useful for weather discovery/analysis, but not an issuing authority. */

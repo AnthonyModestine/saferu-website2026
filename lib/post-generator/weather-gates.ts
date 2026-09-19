@@ -13,6 +13,7 @@ export type WeatherCandidateLike = {
   priority?: string
   confidenceLevel?: string
   sourceName?: string
+  suggestedMessage?: string
 }
 
 const SERIOUS_WEATHER =
@@ -30,6 +31,7 @@ function weatherBlob(input: WeatherCandidateLike): string {
     input.sourceLabel,
     ...(input.signals || []),
     ...(input.verifiedFacts || []),
+    input.suggestedMessage,
   ]
     .filter(Boolean)
     .join(" ")
@@ -46,6 +48,9 @@ export function looksLikeWeatherTopic(input: WeatherCandidateLike): boolean {
   )
 }
 
+const ROUTINE_WEATHER =
+  /\b(nice (?:day|weather)|pleasant|beautiful day|great weather|mostly sunny|partly cloudy|clear skies|mild|comfortable|seasonal temps|fair weather|light shower|chance of rain|high of \d|low of \d|enjoy the sunshine|perfect weather)\b/i
+
 export function isSeriousWeatherRecommendation(input: WeatherCandidateLike): boolean {
   // Official NWS alert products are serious by definition — do not require
   // the event title to restate "warning/watch/advisory" when sourceLabel already says so.
@@ -57,6 +62,7 @@ export function isSeriousWeatherRecommendation(input: WeatherCandidateLike): boo
     return true
   }
   const text = weatherBlob(input)
+  if (ROUTINE_WEATHER.test(text) && !SERIOUS_WEATHER.test(text)) return false
   if (SERIOUS_WEATHER.test(text)) return true
   if (input.priority === "urgent" && RESIDENT_ACTION_NEED.test(text)) return true
   if (RESIDENT_ACTION_NEED.test(text) && /\b(nws|national weather service|weather\.gov)\b/i.test(text)) {
@@ -73,8 +79,10 @@ export function shouldRejectOrdinaryWeather(input: WeatherCandidateLike): boolea
 
 export function weatherGateBrief(): string {
   return `WEATHER RULES:
-- Do not recommend ordinary seasonal weather merely because a forecast exists.
-- Recommend weather when residents may need to alter travel, prepare property, limit outdoor activity, protect vulnerable people/pets, prepare for outages, avoid flooding, adjust event plans, or understand warning timing.
+- Never recommend a weather post for a routine or pleasant forecast. Do not post "nice weather," seasonal highs/lows, partly cloudy skies, or ordinary rain chances.
+- Only recommend weather when there is a verified hazard or official NWS watch, warning, advisory, or statement — or conditions that clearly affect travel, outdoor safety, outages, flooding, extreme heat/cold, air quality, or event plans.
+- Residents should need to change behavior: alter travel, prepare property, limit outdoor activity, protect vulnerable people/pets, prepare for outages, avoid flooding, shelter, or cancel/postpone plans.
 - Official watches/warnings/advisories/statements should come from NWS or another official weather authority.
+- If tomorrow's weather is normal and unremarkable, exclude it from recommendations and list it under Items Reviewed but Not Recommended.
 - Tropical Tidbits may provide situational awareness but must never be treated as an alert-issuing authority.`
 }

@@ -12,7 +12,6 @@ import {
   Megaphone,
   MapPin,
   Clock,
-  AlertTriangle,
   Send,
   ChevronRight,
   Sparkles,
@@ -173,10 +172,10 @@ function endOfWeekIso(): string {
   return localIsoDate(d)
 }
 
-function addDaysIso(days: number): string {
+function endOfMonthIso(): string {
   const d = new Date()
   d.setHours(12, 0, 0, 0)
-  d.setDate(d.getDate() + days)
+  d.setMonth(d.getMonth() + 1, 0)
   return localIsoDate(d)
 }
 
@@ -189,7 +188,7 @@ export default function PIODashboardPage() {
   const [packLoading, setPackLoading] = useState<string | null>(null)
   const [checkoutLoading, setCheckoutLoading] = useState(false)
   const [upcomingEvents, setUpcomingEvents] = useState<PioEvent[]>([])
-  const [postTab, setPostTab] = useState<"today" | "week" | "upcoming">("today")
+  const [postTab, setPostTab] = useState<"today" | "week" | "month">("today")
   // localStorage / Date are client-only — keep SSR + first paint identical
   const [hasMounted, setHasMounted] = useState(false)
   const [greeting, setGreeting] = useState("Welcome!")
@@ -227,17 +226,13 @@ export default function PIODashboardPage() {
   const scheduledPosts = useMemo(() => {
     if (!hasMounted) return []
     const today = todayIso()
-    const weekEnd = endOfWeekIso()
     if (postTab === "today") {
       return getScheduledEventPosts({ from: today, to: today })
     }
     if (postTab === "week") {
-      return getScheduledEventPosts({ from: today, to: weekEnd }).slice(0, 4)
+      return getScheduledEventPosts({ from: today, to: endOfWeekIso() }).slice(0, 6)
     }
-    // Upcoming = next posts after this week (max 6)
-    const afterWeek = new Date(weekEnd + "T12:00:00")
-    afterWeek.setDate(afterWeek.getDate() + 1)
-    return getScheduledEventPosts({ from: localIsoDate(afterWeek) }).slice(0, 6)
+    return getScheduledEventPosts({ from: today, to: endOfMonthIso() }).slice(0, 8)
   }, [postTab, upcomingEvents, hasMounted])
 
   const isOutOfGenerations = isSubscribed && genStatus !== null && genStatus.remaining === 0
@@ -279,9 +274,9 @@ export default function PIODashboardPage() {
   }
 
   const packs = [
-    { id: "generations-5", label: "5 generations", price: "$10" },
-    { id: "generations-12", label: "12 generations", price: "$20", popular: true },
-    { id: "generations-35", label: "35 generations", price: "$50" },
+    { id: "generations-5", label: "25,000 tokens", price: "$10" },
+    { id: "generations-12", label: "50,000 tokens", price: "$20", popular: true },
+    { id: "generations-35", label: "125,000 tokens", price: "$50" },
   ]
 
   const createHref = (href: string) => {
@@ -347,6 +342,11 @@ export default function PIODashboardPage() {
   }, [member, hasMounted, upcomingEvents, ideaPreview])
 
   const briefingSummary = useMemo(() => {
+    if (!PRESS_CENTER_FEATURES.postGeneratorVisible) {
+      return member
+        ? "What do you need to share with your community today?"
+        : "Preview your agency communications workspace."
+    }
     if (!member) {
       return "A sample agency day — events and posts that stay in sync."
     }
@@ -359,7 +359,7 @@ export default function PIODashboardPage() {
       parts.push(
         `${briefingStats.eventsSoon} ${briefingStats.eventsSoon === 1 ? "event" : "events"} coming up`
       )
-    if (PRESS_CENTER_FEATURES.postGeneratorVisible && briefingStats.ideas > 0)
+    if (briefingStats.ideas > 0)
       parts.push(
         `${briefingStats.ideas} ${briefingStats.ideas === 1 ? "recommendation" : "recommendations"} for your area`
       )
@@ -386,8 +386,8 @@ export default function PIODashboardPage() {
   return (
     <div className="mx-auto max-w-[1120px] space-y-5 pb-8">
       {!loading && !isSubscribed && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#cfc3ff] bg-gradient-to-r from-[#f3eeff] to-[#eaf2ff] px-4 py-3">
-          <p className="text-sm font-medium text-[#3d2d7a]">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#c7d7f5] bg-[#F0F5FF] px-4 py-3">
+          <p className="text-sm font-medium text-[#0f1c3f]">
             This is a live preview of Press Center — including Upcoming Events and Posts to Share.
             Subscribe to unlock creating and publishing for your department.
           </p>
@@ -395,7 +395,7 @@ export default function PIODashboardPage() {
             size="sm"
             disabled={checkoutLoading}
             onClick={handleSubscribe}
-            className="bg-[#7c5cfc] text-white hover:bg-[#6a4df0]"
+            className="bg-[#2563EB] text-white hover:bg-[#1d4ed8]"
           >
             {checkoutLoading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -426,7 +426,11 @@ export default function PIODashboardPage() {
             <div>
               {dateLabel && (
                 <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#93C5FD]">
-                  {member ? `${dateLabel} · DAILY BRIEFING` : `${dateLabel} · LIVE PREVIEW`}
+                  {member
+                    ? PRESS_CENTER_FEATURES.postGeneratorVisible
+                      ? `${dateLabel} · DAILY BRIEFING`
+                      : `${dateLabel} · PRESS CENTER`
+                    : `${dateLabel} · LIVE PREVIEW`}
                 </p>
               )}
               <h1 className="mt-1.5 text-2xl font-bold tracking-tight sm:text-[1.7rem]">
@@ -460,31 +464,31 @@ export default function PIODashboardPage() {
             </div>
           </div>
 
-          {/* Briefing stats */}
-          <div className="mt-4 grid gap-2.5 sm:grid-cols-2">
-            <a href="#posts-to-share" className="group flex items-baseline gap-2.5 rounded-xl border border-white/10 bg-white/[0.07] px-4 py-3 transition-colors hover:bg-white/[0.12]">
-              <span className="text-2xl font-bold">{briefingStats.postsToday}</span>
-              <span className="text-sm font-semibold text-[#BFDBFE]">
-                {briefingStats.postsToday === 1 ? "post ready to share today" : "posts ready to share today"}
-              </span>
-            </a>
-            <a href="#upcoming-events" className="group flex items-baseline gap-2.5 rounded-xl border border-white/10 bg-white/[0.07] px-4 py-3 transition-colors hover:bg-white/[0.12]">
-              <span className="text-2xl font-bold">{briefingStats.eventsSoon}</span>
-              <span className="text-sm font-semibold text-[#BFDBFE]">
-                {briefingStats.eventsSoon === 1 ? "event in the next 2 weeks" : "events in the next 2 weeks"}
-              </span>
-            </a>
-            {PRESS_CENTER_FEATURES.postGeneratorVisible && (
+          {/* Briefing stats — hide while Post Generator is off */}
+          {PRESS_CENTER_FEATURES.postGeneratorVisible ? (
+            <div className="mt-4 grid gap-2.5 sm:grid-cols-2">
+              <a href="#posts-to-share" className="group flex items-baseline gap-2.5 rounded-xl border border-white/10 bg-white/[0.07] px-4 py-3 transition-colors hover:bg-white/[0.12]">
+                <span className="text-2xl font-bold">{briefingStats.postsToday}</span>
+                <span className="text-sm font-semibold text-[#BFDBFE]">
+                  {briefingStats.postsToday === 1 ? "post ready to share today" : "posts ready to share today"}
+                </span>
+              </a>
+              <a href="#upcoming-events" className="group flex items-baseline gap-2.5 rounded-xl border border-white/10 bg-white/[0.07] px-4 py-3 transition-colors hover:bg-white/[0.12]">
+                <span className="text-2xl font-bold">{briefingStats.eventsSoon}</span>
+                <span className="text-sm font-semibold text-[#BFDBFE]">
+                  {briefingStats.eventsSoon === 1 ? "event in the next 2 weeks" : "events in the next 2 weeks"}
+                </span>
+              </a>
               <div className="flex items-baseline gap-2.5 rounded-xl border border-[#F2B233]/40 bg-[#F2B233]/10 px-4 py-3 sm:col-span-2">
                 <span className="text-2xl font-bold text-[#F2B233]">{briefingStats.ideas}</span>
                 <span className="text-sm font-semibold text-[#ffe3a8]">
                   {briefingStats.ideas === 1 ? "AI recommendation for your area" : "AI recommendations for your area"}
                 </span>
               </div>
-            )}
-          </div>
+            </div>
+          ) : null}
 
-          {/* Graphic Studio / optional recommendations CTA */}
+          {/* Quick create — inside the opening briefing card */}
           <div className="mt-4 border-t border-white/10 pt-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-2">
@@ -504,46 +508,90 @@ export default function PIODashboardPage() {
                   </>
                 ) : (
                   <>
-                    <ImageIcon className="h-4 w-4 shrink-0 text-[#F2B233]" />
+                    <FileText className="h-4 w-4 shrink-0 text-[#F2B233]" />
                     <p className="text-sm font-bold uppercase tracking-[0.14em] text-[#93C5FD]">
-                      Graphic Studio
+                      Quick start
                     </p>
                     <span className="truncate text-sm text-[#8fa5c7]">
-                      · Safety graphics and event flyers
+                      · Press release, video request, events, or a safety graphic
                     </span>
                   </>
                 )}
               </div>
-              {member ? (
-                <Button asChild size="sm" className="bg-white text-[#0f1c3f] hover:bg-[#E0E7FF]">
-                  <Link
-                    href={createHref(
-                      PRESS_CENTER_FEATURES.postGeneratorVisible
-                        ? "/pio-tool/ideas"
-                        : GRAPHIC_STUDIO_PATH
-                    )}
-                  >
-                    {PRESS_CENTER_FEATURES.postGeneratorVisible
-                      ? briefingStats.ideas > 0
+              {PRESS_CENTER_FEATURES.postGeneratorVisible ? (
+                member ? (
+                  <Button asChild size="sm" className="bg-white text-[#0f1c3f] hover:bg-[#E0E7FF]">
+                    <Link href={createHref("/pio-tool/ideas")}>
+                      {briefingStats.ideas > 0
                         ? `See ${briefingStats.ideas} ${briefingStats.ideas === 1 ? "recommendation" : "recommendations"}`
-                        : "Open generator"
-                      : "Create a graphic"}
-                    <ChevronRight className="ml-1 h-4 w-4" />
-                  </Link>
-                </Button>
-              ) : (
-                <Button asChild size="sm" className="bg-white text-[#0f1c3f] hover:bg-[#E0E7FF]">
-                  <Link href={pressCenterSignInUrl()}>Sign in to view</Link>
-                </Button>
-              )}
+                        : "Open generator"}
+                      <ChevronRight className="ml-1 h-4 w-4" />
+                    </Link>
+                  </Button>
+                ) : (
+                  <Button asChild size="sm" className="bg-white text-[#0f1c3f] hover:bg-[#E0E7FF]">
+                    <Link href={pressCenterSignInUrl()}>Sign in to view</Link>
+                  </Button>
+                )
+              ) : null}
             </div>
+
+            {member ? (
+              <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                {PRESS_CENTER_FEATURES.graphicStudioVisible && (
+                  <QuickCreateTile
+                    href={createHref(`${GRAPHIC_STUDIO_PATH}/safety-tip`)}
+                    title="Safety Graphic"
+                    icon={ImageIcon}
+                    iconBg="bg-[#F59E0B]"
+                    variant="hero"
+                  />
+                )}
+                <QuickCreateTile
+                  href={createHref("/pio-tool/new")}
+                  title="Press Release"
+                  icon={FileText}
+                  iconBg="bg-[#3B82F6]"
+                  variant="hero"
+                />
+                <QuickCreateTile
+                  href={createHref("/pio-tool/community-post")}
+                  title="Video Request"
+                  icon={Video}
+                  iconBg="bg-[#7C5CFC]"
+                  variant="hero"
+                />
+                <QuickCreateTile
+                  href={createHref("/pio-tool/events?new=1")}
+                  title="Community Event"
+                  icon={CalendarDays}
+                  iconBg="bg-[#10B981]"
+                  variant="hero"
+                />
+                {PRESS_CENTER_FEATURES.postGeneratorVisible && (
+                  <QuickCreateTile
+                    href={createHref("/pio-tool/ideas")}
+                    title="AI Post Generator"
+                    icon={Sparkles}
+                    iconBg="bg-[#F59E0B]"
+                    variant="hero"
+                  />
+                )}
+              </div>
+            ) : !PRESS_CENTER_FEATURES.postGeneratorVisible ? (
+              <div className="mt-3">
+                <Button asChild size="sm" className="bg-white text-[#0f1c3f] hover:bg-[#E0E7FF]">
+                  <Link href={pressCenterSignInUrl()}>Sign in to create</Link>
+                </Button>
+              </div>
+            ) : null}
           </div>
         </div>
       </section>
 
       {isOutOfGenerations && (
         <div className="rounded-2xl border border-[#f2d48a] bg-[#fff8e8] p-4">
-          <p className="mb-3 font-semibold text-[#0f1c3f]">You&apos;ve used all your generations this month</p>
+          <p className="mb-3 font-semibold text-[#0f1c3f]">You&apos;ve used all your AI tokens this month</p>
           <div className="divide-y overflow-hidden rounded-xl border border-[#f2d48a] bg-white">
             {packs.map((pack) => (
               <button
@@ -554,60 +602,19 @@ export default function PIODashboardPage() {
                 className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-[#f8f5ff] disabled:opacity-60"
               >
                 <span className="text-sm font-medium">{pack.label}</span>
-                <span className="text-sm font-semibold text-[#7c5cfc]">{pack.price}</span>
+                <span className="text-sm font-semibold text-[#2563EB]">{pack.price}</span>
               </button>
             ))}
           </div>
         </div>
       )}
 
-      {/* Quick create is available after sign-in */}
-      {member && <section className="space-y-2">
-        <h2 className="text-xs font-bold uppercase tracking-wider text-[#667795]">Quick create</h2>
-        <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
-          <QuickCreateTile
-            href={createHref("/pio-tool/new")}
-            title="Press Release"
-            icon={FileText}
-            iconBg="bg-[#3B82F6]"
-          />
-          <QuickCreateTile
-            href={createHref("/pio-tool/community-post")}
-            title="Video Request"
-            icon={Video}
-            iconBg="bg-[#7C5CFC]"
-          />
-          <QuickCreateTile
-            href={createHref("/pio-tool/events?new=1")}
-            title="Community Event"
-            icon={CalendarDays}
-            iconBg="bg-[#10B981]"
-          />
-          {PRESS_CENTER_FEATURES.graphicStudioVisible && (
-            <QuickCreateTile
-              href={createHref(GRAPHIC_STUDIO_PATH)}
-              title="Graphic Studio"
-              icon={ImageIcon}
-              iconBg="bg-[#F59E0B]"
-            />
-          )}
-          {PRESS_CENTER_FEATURES.postGeneratorVisible && (
-            <QuickCreateTile
-              href={createHref("/pio-tool/ideas")}
-              title="AI Post Generator"
-              icon={Sparkles}
-              iconBg="bg-[#F59E0B]"
-            />
-          )}
-        </div>
-      </section>}
-
-      {/* Upcoming Events + Posts to Share — always visible */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div id="upcoming-events" className="scroll-mt-24">
+      {/* Upcoming Events (left) + Posts to Share (right) */}
+      <div className="flex w-full flex-col gap-4 md:flex-row md:items-stretch">
+        <div id="upcoming-events" className="min-w-0 flex-1 scroll-mt-24">
           <UpcomingEventsPanel events={upcomingEvents} forceDemo={!member} />
         </div>
-        <div id="posts-to-share" className="scroll-mt-24">
+        <div id="posts-to-share" className="min-w-0 flex-1 scroll-mt-24">
           <PostsToSharePanel
             tab={postTab}
             onTabChange={setPostTab}
@@ -620,29 +627,77 @@ export default function PIODashboardPage() {
   )
 }
 
+function PanelHeader({
+  icon: Icon,
+  title,
+  subtitle,
+  action,
+}: {
+  icon: React.ComponentType<{ className?: string }>
+  title: string
+  subtitle: string
+  action?: React.ReactNode
+}) {
+  return (
+    <div className="mb-4 flex items-start justify-between gap-3">
+      <div className="flex min-w-0 items-start gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EFF6FF] text-[#2563EB]">
+          <Icon className="h-5 w-5" />
+        </div>
+        <div className="min-w-0">
+          <h2 className="text-lg font-bold text-[#0f1c3f]">{title}</h2>
+          <p className="mt-0.5 text-sm text-[#7a8ab0]">{subtitle}</p>
+        </div>
+      </div>
+      {action}
+    </div>
+  )
+}
+
 function QuickCreateTile({
   href,
   title,
   icon: Icon,
   iconBg,
+  variant = "default",
 }: {
   href: string
   title: string
   icon: React.ComponentType<{ className?: string }>
   iconBg: string
+  variant?: "default" | "hero"
 }) {
+  const isHero = variant === "hero"
   return (
     <Link
       href={href}
-      className="group flex items-center gap-3 rounded-xl border border-[#e2e8f5] bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+      className={
+        isHero
+          ? "group flex items-center gap-3 rounded-xl border border-white/15 bg-white/10 p-3 transition hover:bg-white/15"
+          : "group flex items-center gap-3 rounded-xl border border-[#e2e8f5] bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+      }
     >
       <div
-        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${iconBg} text-white shadow-md`}
+        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${iconBg} text-white`}
       >
-        <Icon className="h-5 w-5" />
+        <Icon className="h-[18px] w-[18px]" />
       </div>
-      <span className="flex-1 text-sm font-bold text-[#0f1c3f]">{title}</span>
-      <ChevronRight className="h-4 w-4 text-[#9aa8c3] transition group-hover:translate-x-0.5" />
+      <span
+        className={
+          isHero
+            ? "flex-1 text-sm font-semibold text-white"
+            : "flex-1 text-sm font-semibold text-[#0f1c3f]"
+        }
+      >
+        {title}
+      </span>
+      <ChevronRight
+        className={
+          isHero
+            ? "h-4 w-4 text-[#93A4C7] transition group-hover:translate-x-0.5"
+            : "h-4 w-4 text-[#9aa8c3] transition group-hover:translate-x-0.5"
+        }
+      />
     </Link>
   )
 }
@@ -692,31 +747,35 @@ function UpcomingEventsPanel({
         .sort((a, b) => a.daysAway - b.daysAway)
 
   return (
-    <section className="rounded-2xl border border-[#e2e8f5] bg-white p-5 shadow-sm">
-      <div className="mb-4 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <CalendarDays className="h-5 w-5 text-[#3B82F6]" />
-          <h2 className="text-lg font-bold text-[#0f1c3f]">Upcoming Events</h2>
-        </div>
-        <Link href="/pio-tool/events" className="text-sm font-semibold text-[#3B82F6] hover:underline">
-          View all events →
-        </Link>
-      </div>
+    <section className="flex h-full flex-col rounded-2xl border border-[#e2e8f5] bg-white p-5 shadow-sm">
+      <PanelHeader
+        icon={CalendarDays}
+        title="Upcoming Events"
+        subtitle="Next community events on your calendar"
+        action={
+          <Link
+            href="/pio-tool/events"
+            className="shrink-0 text-sm font-semibold text-[#2563EB] hover:underline"
+          >
+            View all →
+          </Link>
+        }
+      />
 
-      <ul className="space-y-3">
+      <ul className="flex flex-1 flex-col gap-2.5">
         {rows.map((row) => (
           <li key={row.id}>
             <Link
               href={row.href}
-              className="flex items-center gap-3 rounded-xl border border-[#e8eef8] bg-white p-3 transition hover:border-[#86efac] hover:bg-[#f8fffb]"
+              className="flex items-center gap-3 rounded-xl border border-[#e8eef8] bg-[#F8FAFC] p-3 transition hover:border-[#bfdbfe] hover:bg-[#EFF6FF]"
             >
-              <div className="flex h-[58px] w-12 shrink-0 flex-col items-center justify-center rounded-xl bg-[#F3F4F6] text-[#0f1c3f]">
-                <span className="text-[10px] font-bold tracking-wide text-[#6b7280]">{row.month}</span>
+              <div className="flex h-14 w-12 shrink-0 flex-col items-center justify-center rounded-xl bg-white text-[#0f1c3f] ring-1 ring-[#e2e8f5]">
+                <span className="text-[10px] font-bold tracking-wide text-[#64748b]">{row.month}</span>
                 <span className="text-xl font-bold leading-none">{row.day}</span>
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate font-semibold text-[#0f1c3f]">{row.title}</p>
-                <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#6b7c9c]">
+                <p className="truncate text-sm font-semibold text-[#0f1c3f]">{row.title}</p>
+                <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#64748b]">
                   <span className="inline-flex items-center gap-1">
                     <MapPin className="h-3 w-3" />
                     {row.location}
@@ -727,11 +786,9 @@ function UpcomingEventsPanel({
                   </span>
                 </p>
               </div>
-              <div className="shrink-0 text-right">
-                <span className="block rounded-full bg-[#D1FAE5] px-2.5 py-1 text-[11px] font-bold text-[#047857]">
-                  {row.daysAwayLabel}
-                </span>
-              </div>
+              <span className="shrink-0 rounded-full bg-[#EFF6FF] px-2.5 py-1 text-[11px] font-bold text-[#1D4ED8]">
+                {row.daysAwayLabel}
+              </span>
             </Link>
           </li>
         ))}
@@ -746,55 +803,38 @@ function PostsToSharePanel({
   posts,
   forceDemo = false,
 }: {
-  tab: "today" | "week" | "upcoming"
-  onTabChange: (t: "today" | "week" | "upcoming") => void
+  tab: "today" | "week" | "month"
+  onTabChange: (t: "today" | "week" | "month") => void
   posts: ReturnType<typeof getScheduledEventPosts>
   forceDemo?: boolean
 }) {
   const tabs: Array<{ id: typeof tab; label: string }> = [
     { id: "today", label: "Today" },
     { id: "week", label: "This Week" },
-    { id: "upcoming", label: "Upcoming" },
+    { id: "month", label: "This Month" },
   ]
 
-  const toneIcon = {
-    green: { wrap: "bg-[#D1FAE5] text-[#059669]", Icon: Megaphone },
-    orange: { wrap: "bg-[#FFEDD5] text-[#EA580C]", Icon: AlertTriangle },
-    blue: { wrap: "bg-[#DBEAFE] text-[#2563EB]", Icon: Send },
-  }
-
-  // Guest / empty: always show 3 demo posts (police + fire mix)
   const demoPosts = DEMO_POSTS.slice(0, 3)
   const showDemo = forceDemo || posts.length === 0
 
   return (
-    <section className="rounded-2xl border border-[#e2e8f5] bg-white p-5 shadow-sm">
-      <div className="mb-1 flex items-start justify-between gap-2">
-        <div>
-          <div className="flex items-center gap-2">
-            <Send className="h-5 w-5 text-[#7C5CFC]" />
-            <h2 className="text-lg font-bold text-[#0f1c3f]">Posts to Share</h2>
-          </div>
-          <p className="mt-1 text-sm text-[#7a8ab0]">Ready to review and share</p>
-        </div>
-        <Link
-          href="/pio-tool/posts"
-          className="shrink-0 text-sm font-semibold text-[#3B82F6] hover:underline"
-        >
-          View full schedule →
-        </Link>
-      </div>
+    <section className="flex h-full flex-col rounded-2xl border border-[#e2e8f5] bg-white p-5 shadow-sm">
+      <PanelHeader
+        icon={Send}
+        title="Posts to Share"
+        subtitle="What to post today, this week, and this month"
+      />
 
-      <div className="mb-4 mt-4 flex gap-1 rounded-full bg-[#F3F4F6] p-1">
+      <div className="mb-4 flex gap-1 rounded-xl bg-[#F1F5F9] p-1">
         {tabs.map((t) => (
           <button
             key={t.id}
             type="button"
             onClick={() => onTabChange(t.id)}
-            className={`flex-1 rounded-full px-3 py-2 text-xs font-bold transition ${
+            className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold transition ${
               tab === t.id
-                ? "bg-[#7C5CFC] text-white shadow-sm"
-                : "text-[#6b7c9c] hover:text-[#0f1c3f]"
+                ? "bg-[#0B1B3A] text-white shadow-sm"
+                : "text-[#64748b] hover:text-[#0f1c3f]"
             }`}
           >
             {t.label}
@@ -803,87 +843,58 @@ function PostsToSharePanel({
       </div>
 
       {showDemo ? (
-        <ul className="space-y-3">
-          {demoPosts.map((post) => {
-            const tone = toneIcon[post.tone]
-            const Icon = tone.Icon
-            return (
-              <li
-                key={post.id}
-                className="rounded-xl border border-[#e8eef8] bg-white p-3"
-              >
-                <div className="flex items-start gap-3">
-                  <div
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${tone.wrap}`}
-                  >
-                    <Icon className="h-4 w-4" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[11px] font-bold uppercase tracking-wide text-[#9aa8c3]">
-                      {post.time}
-                    </p>
-                    <p className="mt-0.5 line-clamp-2 text-sm text-[#405172]">{post.preview}</p>
-                    <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
-                          post.tone === "orange"
-                            ? "bg-[#FFEDD5] text-[#C2410C]"
-                            : post.tone === "blue"
-                              ? "bg-[#DBEAFE] text-[#1D4ED8]"
-                              : "bg-[#D1FAE5] text-[#047857]"
-                        }`}
-                      >
-                        {post.tag}
-                      </span>
-                      <Link
-                        href="/pio-tool/events"
-                        className="ml-auto inline-flex items-center rounded-lg border border-[#d4ccff] bg-[#f8f5ff] px-3 py-1.5 text-xs font-semibold text-[#6b4dff] transition hover:bg-[#efeaff]"
-                      >
-                        View Message
-                      </Link>
-                    </div>
+        <ul className="flex flex-1 flex-col gap-2.5">
+          {demoPosts.map((post) => (
+            <li key={post.id}>
+              <div className="flex items-start gap-3 rounded-xl border border-[#e8eef8] bg-[#F8FAFC] p-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-[#2563EB] ring-1 ring-[#e2e8f5]">
+                  <Megaphone className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-[#64748b]">
+                    {post.time}
+                  </p>
+                  <p className="mt-0.5 line-clamp-2 text-sm text-[#405172]">{post.preview}</p>
+                  <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                    <span className="rounded-full bg-[#EFF6FF] px-2.5 py-1 text-[11px] font-bold text-[#1D4ED8]">
+                      {post.tag}
+                    </span>
+                    <Link
+                      href="/pio-tool/events"
+                      className="ml-auto inline-flex items-center rounded-lg border border-[#bfdbfe] bg-white px-3 py-1.5 text-xs font-semibold text-[#2563EB] transition hover:bg-[#EFF6FF]"
+                    >
+                      View Message
+                    </Link>
                   </div>
                 </div>
-              </li>
-            )
-          })}
+              </div>
+            </li>
+          ))}
         </ul>
       ) : (
-        <ul className="space-y-3">
-          {posts.map((post, i) => {
-            const toneKey = /alert|weather|urgent/i.test(post.tag || post.message)
-              ? "orange"
-              : i % 2 === 0
-                ? "green"
-                : "blue"
-            const tone = toneIcon[toneKey]
-            const Icon = tone.Icon
+        <ul className="flex flex-1 flex-col gap-2.5">
+          {posts.map((post) => {
             const href = post.key
               ? `/pio-tool/events/${post.eventId}/generate?key=${post.key}`
               : `/pio-tool/events/${post.eventId}`
             return (
-              <li
-                key={post.id}
-                className="rounded-xl border border-[#e8eef8] bg-white p-3"
-              >
-                <div className="flex items-start gap-3">
-                  <div
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${tone.wrap}`}
-                  >
-                    <Icon className="h-4 w-4" />
+              <li key={post.id}>
+                <div className="flex items-start gap-3 rounded-xl border border-[#e8eef8] bg-[#F8FAFC] p-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-[#2563EB] ring-1 ring-[#e2e8f5]">
+                    <Send className="h-4 w-4" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-[11px] font-bold uppercase tracking-wide text-[#9aa8c3]">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-[#64748b]">
                       {post.postDate} · {post.timingLabel}
                     </p>
                     <p className="mt-0.5 line-clamp-2 text-sm text-[#405172]">{post.message}</p>
                     <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                      <span className="rounded-full bg-[#D1FAE5] px-2.5 py-1 text-[11px] font-bold text-[#047857]">
+                      <span className="rounded-full bg-[#EFF6FF] px-2.5 py-1 text-[11px] font-bold text-[#1D4ED8]">
                         {post.tag || post.eventTitle}
                       </span>
                       <Link
                         href={href}
-                        className="ml-auto inline-flex items-center rounded-lg border border-[#d4ccff] bg-[#f8f5ff] px-3 py-1.5 text-xs font-semibold text-[#6b4dff] transition hover:bg-[#efeaff]"
+                        className="ml-auto inline-flex items-center rounded-lg border border-[#bfdbfe] bg-white px-3 py-1.5 text-xs font-semibold text-[#2563EB] transition hover:bg-[#EFF6FF]"
                       >
                         View Message
                       </Link>

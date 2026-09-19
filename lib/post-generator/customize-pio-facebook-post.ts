@@ -13,6 +13,16 @@ const MODE_MAP: Record<
     instruction:
       "Reduce the post to approximately 55 to 70 percent of its original length. Remove repetition, background, and lower-priority wording before removing operational facts or public instructions.",
   },
+  longer: {
+    mode: "EXPAND",
+    instruction:
+      "Expand the post modestly with clearer logistics and a warmer community invitation. Do not invent facts, activities, costs, registration details, or outcomes that are not already present.",
+  },
+  more_excited: {
+    mode: "CHANGE_TONE",
+    instruction:
+      "Make the tone more enthusiastic and inviting while staying professional for a public-safety or local-government account. Do not add hype, fear, jokes, or unsupported claims.",
+  },
   conversational: {
     mode: "MAKE_MORE_ENGAGING",
     instruction:
@@ -47,6 +57,13 @@ const MODE_MAP: Record<
     mode: "CHANGE_TONE",
     instruction: "Remove all emojis and keep plain professional text.",
   },
+}
+
+function addEmojisInstruction(holidayEmojiFocus?: string[]): string {
+  if (holidayEmojiFocus?.length) {
+    return `Add one or two relevant emojis sparingly. Prefer holiday-focused emojis from this set when they fit: ${holidayEmojiFocus.join(" ")}. Do not add decorative emoji strings.`
+  }
+  return MODE_MAP.add_emojis.instruction
 }
 
 export const CUSTOMIZE_PIO_POST_SYSTEM_PROMPT = `${PIO_FACEBOOK_VOICE_CONTRACT}
@@ -123,6 +140,7 @@ export async function customizePioFacebookPost(opts: {
   serviceArea: string
   voiceProfile?: string
   verifiedFacts: WriterFact[]
+  holidayEmojiFocus?: string[]
 }): Promise<AiResult<PioCustomizeResult>> {
   const trimmed = opts.originalMessage.trim()
   if (!trimmed) return { ok: false, reason: "empty_input" }
@@ -131,13 +149,17 @@ export async function customizePioFacebookPost(opts: {
   if (!apiKey) return { ok: false, reason: "missing_api_key" }
 
   const mapped = MODE_MAP[opts.mode]
+  const instruction =
+    opts.mode === "add_emojis"
+      ? addEmojisInstruction(opts.holidayEmojiFocus)
+      : mapped.instruction
   const prompt = `Edit this agency Facebook post.
 
 MODE
 ${mapped.mode}
 
 MODE INSTRUCTION
-${mapped.instruction}
+${instruction}
 
 AGENCY
 ${JSON.stringify(

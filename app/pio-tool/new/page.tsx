@@ -120,6 +120,7 @@ export default function NewPressReleasePage() {
   const [copied, setCopied] = useState(false)
   const [showGenLimitModal, setShowGenLimitModal] = useState(false)
   const [generateError, setGenerateError] = useState<string | null>(null)
+  const [regenerationDirection, setRegenerationDirection] = useState("")
   const [incidentType, setIncidentType] = useState("")
   const [entryType, setEntryType] = useState("none")
   const [arrestsMade, setArrestsMade] = useState(false)
@@ -302,6 +303,14 @@ export default function NewPressReleasePage() {
       return
     }
 
+    const direction = regenerationDirection.trim()
+    if (generated && direction.length < 4) {
+      setGenerateError("Describe what to change, then click Regenerate.")
+      setActiveTab("preview")
+      setGenerating(false)
+      return
+    }
+
     try {
       const res = await fetch("/api/pio/generate-all", {
         method: "POST",
@@ -344,6 +353,18 @@ export default function NewPressReleasePage() {
               ? agencySettings.agencyTypeOther.trim() || undefined
               : undefined,
           outputs: selectedOutputs,
+          ...(generated && direction
+            ? {
+                revisionDirection: direction,
+                previousDrafts: {
+                  pressRelease: generatedRelease || undefined,
+                  facebook: generatedFacebook || undefined,
+                  twitter: generatedTwitter || undefined,
+                  talkingPoints: generatedTalkingPoints || undefined,
+                  communityRequest: generatedCommunityRequest || undefined,
+                },
+              }
+            : {}),
         }),
       })
       const data = await res.json()
@@ -374,6 +395,7 @@ export default function NewPressReleasePage() {
         setPressReleaseSessionId(data.sessionIds?.pressReleaseSessionId ?? null)
         setVideoRequestSessionId(data.sessionIds?.videoRequestSessionId ?? null)
         setShowFeedback(true)
+        setRegenerationDirection("")
         const historyContent =
           data.pressRelease ||
           data.facebook ||
@@ -406,7 +428,7 @@ export default function NewPressReleasePage() {
         return
       }
       // Out of generations — show purchase modal, keep form intact
-      if (res.status === 403 && data?.error?.includes("generations")) {
+      if (res.status === 403 && data?.error?.toLowerCase().includes("token")) {
         setGenerating(false)
         setShowGenLimitModal(true)
         return
@@ -558,6 +580,7 @@ export default function NewPressReleasePage() {
     setWhatToLookFor("")
     setSelectedOutputs({ ...DEFAULT_MULTI_OUTPUT_SELECTION })
     setIncludesVideoRequest(false)
+    setRegenerationDirection("")
     setPreviewTab("press-release")
     setActiveTab("header")
   }
@@ -617,8 +640,10 @@ export default function NewPressReleasePage() {
       {generating ? (
         <>
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          Generating…
+          {generated ? "Regenerating…" : "Generating…"}
         </>
+      ) : generated ? (
+        <>Regenerate →</>
       ) : (
         <>Generate →</>
       )}
@@ -1164,6 +1189,36 @@ export default function NewPressReleasePage() {
                 title="Review"
                 description="Only the messages you selected. Edit, copy, or export when ready."
               />
+              <div className="space-y-3 rounded-xl border border-[#e2e8f5] bg-white p-4">
+                <Label htmlFor="regeneration-direction">What should we change?</Label>
+                <Textarea
+                  id="regeneration-direction"
+                  rows={3}
+                  value={regenerationDirection}
+                  onChange={(e) => setRegenerationDirection(e.target.value)}
+                  placeholder="Example: Shorten the lead. Keep suspect descriptors. Softer tone on Facebook."
+                  maxLength={1000}
+                />
+                <p className="text-xs text-[#64748B]">
+                  Add direction, then click Regenerate. We revise from your current drafts — not a
+                  cold redo.
+                </p>
+                <Button
+                  type="button"
+                  onClick={handleGenerate}
+                  disabled={generating || regenerationDirection.trim().length < 4}
+                  className="bg-[#2563EB] text-white hover:bg-[#1d4ed8]"
+                >
+                  {generating ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Regenerating…
+                    </>
+                  ) : (
+                    <>Regenerate →</>
+                  )}
+                </Button>
+              </div>
               <div
                 className={`rounded-xl border p-4 ${
                   qualityStatus === "needs_human_review"

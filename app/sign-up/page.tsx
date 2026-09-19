@@ -151,12 +151,10 @@ function SignUpForm() {
             />
           </Link>
           <CardTitle className="mt-4 text-left text-xl font-bold leading-snug text-[#1a365d] sm:text-2xl">
-            Join SaferU and get instant access to ready-to-share social media content designed
-            specifically for public safety professionals.
+            Join SaferU — free safety content for your agency.
           </CardTitle>
           <CardDescription className="text-left text-base leading-relaxed text-muted-foreground pt-3">
-            Save time, stay consistent, and keep your community informed with professionally
-            designed graphics, captions, and weekly content updates.
+            Ready-to-share graphics and captions for public safety teams.
           </CardDescription>
           <ul className="mt-5 space-y-2.5 text-left">
             {FREE_MEMBER_BENEFITS.map((benefit) => (

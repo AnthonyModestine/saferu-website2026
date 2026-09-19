@@ -3,6 +3,12 @@ import { graphicStudioErrorPayload } from "@/lib/ai-result"
 import { requireGraphicStudioAccess } from "@/lib/graphic-studio/api-auth"
 import { reviseSafetyGraphic } from "@/lib/graphic-studio/revise-image"
 import { resolveMemberAgencyLogo } from "@/lib/graphic-studio-store"
+import {
+  debitAiTokens,
+  outOfTokensResponse,
+  rejectIfOutOfTokens,
+} from "@/lib/pio-token-gate"
+import { TOKEN_ESTIMATES } from "@/lib/openai-usage"
 
 export const maxDuration = 300
 
@@ -10,6 +16,9 @@ export async function POST(request: Request) {
   const auth = await requireGraphicStudioAccess(request, "pio-graphic-revise", 15, 30)
   if (auth instanceof NextResponse) return auth
   const { session } = auth
+
+  const outOfTokens = await rejectIfOutOfTokens(session.email)
+  if (outOfTokens) return outOfTokens
 
   try {
     const body = await request.json()
@@ -56,6 +65,13 @@ export async function POST(request: Request) {
         status: 503,
       })
     }
+
+    const debit = await debitAiTokens(
+      session.email,
+      result.tokensUsed,
+      TOKEN_ESTIMATES.graphicStudioRevise
+    )
+    if (!debit.ok) return outOfTokensResponse()
 
     return NextResponse.json({
       imageDataUrl: result.data.imageDataUrl,

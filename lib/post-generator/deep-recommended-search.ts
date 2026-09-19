@@ -13,7 +13,7 @@ import {
   buildSourceCatalogPrompt,
   getDiscoverySearchHints,
 } from "./source-catalog"
-import { formatServiceAreaLabel, resolveServiceAreaLocations } from "./geo-utils"
+import { formatServiceAreaLabel, resolveDiscoveryCityLabel, resolveServiceAreaLocations } from "./geo-utils"
 import type { ExternalOpportunityInput } from "./types"
 
 type ModelTopic = {
@@ -83,7 +83,10 @@ async function runDeepSearchPass(opts: {
     county: opts.county,
     state: opts.state,
   })
-  const primaryCity = opts.city || locations[0]?.city
+  const primaryCity =
+    resolveDiscoveryCityLabel({ city: opts.city, state: opts.state, locations }) ||
+    opts.city ||
+    locations[0]?.city
   const countyFocus = opts.county?.trim()
   const isSheriff = opts.agencyType === "sheriff"
   const profile = getAgencyProfile(opts.agencyType)

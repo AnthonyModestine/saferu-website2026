@@ -13,9 +13,9 @@ import { Button } from "@/components/ui/button"
 import { startHostedCheckoutSession } from "@/app/actions/stripe"
 
 const PACKS = [
-  { id: "generations-5",  label: "5 generations",  price: "$10" },
-  { id: "generations-12", label: "12 generations", price: "$20", popular: true },
-  { id: "generations-35", label: "35 generations", price: "$50" },
+  { id: "generations-5", label: "25,000 tokens", price: "$10" },
+  { id: "generations-12", label: "50,000 tokens", price: "$20", popular: true },
+  { id: "generations-35", label: "125,000 tokens", price: "$50" },
 ]
 
 interface Props {
@@ -42,10 +42,11 @@ export function GenerationLimitModal({ open, onOpenChange }: Props) {
         <DialogHeader>
           <div className="flex items-center gap-2 mb-1">
             <Zap className="h-5 w-5 text-[#f2b233]" />
-            <DialogTitle className="text-[#1a365d]">Out of Generations</DialogTitle>
+            <DialogTitle className="text-[#1a365d]">Out of AI Tokens</DialogTitle>
           </div>
           <DialogDescription>
-            You&apos;ve used all 30 generations included this month. Your form is saved — purchase a pack and generate right away.
+            You&apos;ve used all 100,000 AI tokens included this month. Your form is saved — purchase a
+            pack and generate right away.
           </DialogDescription>
         </DialogHeader>
 
@@ -80,17 +81,8 @@ export function GenerationLimitModal({ open, onOpenChange }: Props) {
           ))}
         </div>
 
-        <p className="text-xs text-muted-foreground text-center mt-1">
-          Packs are one-time purchases and carry over month to month.
-        </p>
-
-        <Button
-          variant="ghost"
-          className="w-full text-muted-foreground"
-          onClick={() => onOpenChange(false)}
-          disabled={loading !== null}
-        >
-          Cancel — I&apos;ll wait until next month
+        <Button variant="ghost" className="mt-2 w-full" onClick={() => onOpenChange(false)}>
+          Not now
         </Button>
       </DialogContent>
     </Dialog>

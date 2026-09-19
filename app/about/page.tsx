@@ -6,7 +6,7 @@ import {
   FileText,
   Video,
   CalendarDays,
-  Sparkles,
+  ImageIcon,
   Images,
   Bell,
   CheckCircle,
@@ -29,10 +29,11 @@ const AGENCY_TYPES = [
 ]
 
 const PRESS_CENTER_POINTS = [
-  "Draft press releases with social posts, talking points, and Spanish versions",
-  "Request doorbell and dash camera footage with privacy-safe locations",
-  "Plan event campaigns with messages before, during, and after each event",
-  "Get sourced post recommendations for your service area",
+  "Draft incident and general press releases with social posts and talking points",
+  "Create public video and witness requests for investigations",
+  "Plan community event campaigns with timed messages before, during, and after",
+  "Build safety graphics in Graphic Studio with your agency logo locked in place",
+  "Optional Spanish versions of generated messages when you need them",
 ]
 
 const CONTENT_POINTS = [
@@ -150,10 +151,10 @@ export default function AboutPage() {
                 <div className="flex flex-1 flex-col p-7">
                   <div className="flex items-center gap-3">
                     {[
-                      { icon: FileText, tone: "bg-[#2563EB]" },
-                      { icon: Video, tone: "bg-[#E07C3E]" },
-                      { icon: CalendarDays, tone: "bg-[#4A9D6B]" },
-                      { icon: Sparkles, tone: "bg-[#7C5CFC]" },
+                      { icon: FileText, tone: "bg-[#3B82F6]" },
+                      { icon: Video, tone: "bg-[#7C5CFC]" },
+                      { icon: CalendarDays, tone: "bg-[#10B981]" },
+                      { icon: ImageIcon, tone: "bg-[#F59E0B]" },
                     ].map((item, i) => (
                       <span
                         key={i}
@@ -164,8 +165,9 @@ export default function AboutPage() {
                     ))}
                   </div>
                   <p className="mt-5 text-base leading-relaxed text-[#5c6b85]">
-                    A focused workspace that turns incidents, events, and community updates into
-                    professional communications quickly and confidently.
+                    A paid agency workspace for drafting professional communications — press
+                    releases, video requests, community event campaigns, and branded safety
+                    graphics — so departments can review and publish with confidence.
                   </p>
                   <ul className="mt-5 space-y-2.5">
                     {PRESS_CENTER_POINTS.map((point) => (

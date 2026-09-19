@@ -27,7 +27,7 @@ import {
 import { eventExclusionBrief } from "./event-exclusion"
 import { jurisdictionRulesBrief } from "./jurisdiction"
 import { currentnessBrief, sourceStandardsBrief } from "./source-standards"
-import { formatServiceAreaLabel, resolveServiceAreaLocations } from "./geo-utils"
+import { formatServiceAreaLabel, resolveDiscoveryCityLabel, resolveServiceAreaLocations } from "./geo-utils"
 
 function safeUrl(value: unknown): string | undefined {
   const raw = String(value || "").trim()
@@ -76,7 +76,10 @@ export async function discoverLocalCurrentEventsWithAI(opts: {
     county: opts.county,
     state: opts.state,
   })
-  const primaryCity = opts.city || locations[0]?.city
+  const primaryCity =
+    resolveDiscoveryCityLabel({ city: opts.city, state: opts.state, locations }) ||
+    opts.city ||
+    locations[0]?.city
 
   const countyFocus = opts.county?.trim()
   const isSheriff = opts.agencyType === "sheriff"
@@ -113,7 +116,7 @@ Return ONLY valid JSON:
 
 Rules:
 - Find only real, verifiable PUBLIC SAFETY / CIVIC UPDATES relevant to residents in the configured service area — not community festivals or entertainment events.
-- Prefer: weather impacts, road/traffic disruptions, utility outages, boil-water notices, school delays/closures, air quality, wildfire/smoke, health advisories, official missing-person campaigns, emergency management notices, new state or local laws affecting residents, and FBI/FTC/CISA public advisories when relevant to the community.
+- Prefer: weather impacts, road/traffic disruptions, utility outages, boil-water notices, school delays/closures, air quality, wildfire/smoke, health advisories, official missing-person campaigns, emergency management notices, new state or local laws affecting residents, police press releases seeking suspects or sharing surveillance video, fire department incidents with official statements, community watch meetings led by police, and FBI/FTC/CISA public advisories when relevant to the community.
 - Do NOT recommend community events, festivals, open houses, fairs, concerts, or "save the date" activities unless the cited source clearly shows THIS agency type (${opts.agencyType || "public safety"}) is hosting or officially participating.
 - Prefer opportunities this agency type would realistically communicate (${opts.agencyType || "public safety"}).
 - Geographic scope: ${
@@ -124,7 +127,7 @@ Rules:
 - Prefer official municipal, county, police, fire, emergency management, school, transit, road, utility, health department, or established local-news sources citing officials.
 - Updates must be happening today or within the next 3 days (occasionally up to 7 days for major disruptions residents can still act on).
 - Every item MUST include a working source URL that directly supports its facts.
-- Do not include rumors, crime incidents involving private victims, opinion pieces, generic seasonal advice, or evergreen safety tips.
+- Do not include rumors, private victim details, opinion pieces, generic seasonal advice, or evergreen safety tips. Official police releases seeking public help identifying a suspect ARE allowed when the source is the department or established local news quoting the department.
 - Do not duplicate excluded titles.
 - Use only facts explicitly supported by the cited source.
 - If reliable results are unavailable, return fewer items rather than inventing anything.

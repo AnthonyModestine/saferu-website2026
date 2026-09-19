@@ -1,4 +1,5 @@
 import type { PostOpportunity } from "@/lib/post-generator/types"
+import { trafficPostTypeLabel, isActualRoadClosure } from "@/lib/post-generator/traffic-post-label"
 
 /**
  * Client-side generator for a 16:9 public-safety alert graphic.
@@ -29,20 +30,21 @@ export type WeatherAlertGraphicOptions = {
  */
 const STANDARD_ACCENT = "#F2B233"
 
-type AlertGraphicKind = "weather" | "public_works"
+type AlertGraphicKind = "weather" | "public_works" | "community"
 
 function alertHaystack(opp: Pick<PostOpportunity, "category" | "title">): string {
   return `${opp.category} ${opp.title}`.toLowerCase()
 }
 
-const PUBLIC_WORKS_CATEGORY_RE = /road_closure|boil_water|water_main|utility|public_works|sewer|hydrant/
+const PUBLIC_WORKS_CATEGORY_RE =
+  /road_closure|traffic_advisory|boil_water|water_main|utility|public_works|sewer|hydrant/
 const PUBLIC_WORKS_TEXT_RE =
-  /road closure|road closed|lane closure|detour|boil water|water main|water service|water outage|hydrant|sewer|gas leak|power outage|utility|construction/
+  /road closure|road closed|lane closure|detour|speed limit|traffic advisory|boil water|water main|water service|water outage|hydrant|sewer|gas leak|power outage|utility|construction/
 
-/** Which opportunities receive a standardized generated graphic (and what kind). */
+/** Classifies the PIO public-information template headline style. */
 export function alertGraphicKind(
   opp: Pick<PostOpportunity, "sourceLabel" | "category" | "title">
-): AlertGraphicKind | null {
+): AlertGraphicKind {
   // Keep in sync with engine `isOfficialAlertTemplateTopic` weather labels.
   if (opp.sourceLabel === "Weather Alert" || opp.sourceLabel === "Weather Analysis") {
     return "weather"
@@ -51,25 +53,33 @@ export function alertGraphicKind(
   if (PUBLIC_WORKS_CATEGORY_RE.test(opp.category) || PUBLIC_WORKS_TEXT_RE.test(haystack)) {
     return "public_works"
   }
-  return null
+  return "community"
 }
 
 export function isWeatherAlertOpportunity(
   opp: Pick<PostOpportunity, "sourceLabel" | "category" | "title">
 ): boolean {
-  return alertGraphicKind(opp) !== null
+  const kind = alertGraphicKind(opp)
+  return kind === "weather" || kind === "public_works"
 }
 
-/** Live community cards without a real graphic get the branded alert template. */
+/** Live community cards without a source graphic get the branded PIO template. */
 export function needsAlertTemplateGraphic(opp: PostOpportunity): boolean {
   if (opp.opportunitySource === "saferu_curated") return false
+
   const existing = opp.graphicUrl || opp.graphicThumbnailUrl || opp.curated?.graphicUrl
   if (existing?.startsWith("data:")) return false
-  if (existing && !/placeholder-\d+\.jpg/i.test(existing)) return false
-  return (
-    opp.opportunitySource === "external" ||
-    opp.opportunitySource === "external_with_saferu_match"
-  )
+
+  if (
+    existing &&
+    !/placeholder-\d+\.jpg/i.test(existing) &&
+    opp.graphicSourceName &&
+    opp.graphicSourceName !== "SaferU"
+  ) {
+    return false
+  }
+
+  return true
 }
 
 /**
@@ -80,48 +90,69 @@ export function weatherAlertHeadline(
   opp: Pick<PostOpportunity, "sourceLabel" | "category" | "title">
 ): string {
   const haystack = alertHaystack(opp)
+  const kind = alertGraphicKind(opp)
+
+  if (kind === "community") {
+    if (/scam|fraud|phish|ic3|impersonation/.test(haystack)) return "Scam Alert"
+    if (/missing person|amber|endangered/.test(haystack)) return "Missing Person"
+    if (/wildfire|structure fire|fire department|smoke/.test(haystack)) return "Fire Alert"
+    if (/police|suspect|crime|shooting|robbery|theft/.test(haystack)) return "Police Alert"
+    if (/school|student|district/.test(haystack)) return "School Notice"
+    if (/health|air quality|outbreak/.test(haystack)) return "Health Notice"
+    if (/law|ordinance|legislation|statute/.test(haystack)) return "Community Notice"
+    if (opp.sourceLabel === "National Safety Alert" || opp.sourceLabel === "Federal Advisory") {
+      return "Public Safety Alert"
+    }
+    if (
+      /community_event|celebration|festival|gathering|night out|meeting|community day/.test(haystack)
+    ) {
+      return "Community Event"
+    }
+    return "Community Update"
+  }
 
   // ----- Weather -----
-  if (/tornado warning/.test(haystack)) return "TORNADO WARNING"
-  if (/tornado watch/.test(haystack)) return "TORNADO WATCH"
+  if (/tornado warning/.test(haystack)) return "Tornado Warning"
+  if (/tornado watch/.test(haystack)) return "Tornado Watch"
   if (/severe thunderstorm warning|thunderstorm warning/.test(haystack)) {
-    return "THUNDERSTORM WARNING"
+    return "Thunderstorm Warning"
   }
   if (/severe thunderstorm watch|thunderstorm watch/.test(haystack)) {
-    return "THUNDERSTORM WATCH"
+    return "Thunderstorm Watch"
   }
-  if (/severe thunderstorm|thunderstorm/.test(haystack)) return "THUNDERSTORM ALERT"
-  if (/winter storm warning/.test(haystack)) return "WINTER STORM WARNING"
+  if (/severe thunderstorm|thunderstorm/.test(haystack)) return "Thunderstorm Alert"
+  if (/winter storm warning/.test(haystack)) return "Winter Storm Warning"
   if (/winter weather advisory|winter storm watch|ice storm|blizzard/.test(haystack)) {
-    return "WINTER WEATHER ALERT"
+    return "Winter Weather Alert"
   }
-  if (/flash flood warning|flood warning/.test(haystack)) return "FLOOD WARNING"
-  if (/flood watch|flood advisory/.test(haystack)) return "FLOOD WATCH"
+  if (/flash flood warning|flood warning/.test(haystack)) return "Flood Warning"
+  if (/flood watch|flood advisory/.test(haystack)) return "Flood Watch"
 
   // ----- Public works -----
-  if (/boil water/.test(haystack)) return "BOIL WATER ADVISORY"
-  if (/water main/.test(haystack)) return "WATER MAIN BREAK"
-  if (/hydrant/.test(haystack)) return "HYDRANT FLUSHING"
-  if (/water service|water outage|water shut/.test(haystack)) return "WATER SERVICE ALERT"
-  if (/gas leak/.test(haystack)) return "GAS LEAK"
-  if (/power outage|utility/.test(haystack)) return "UTILITY NOTICE"
-  if (/road closure|road closed|lane closure|detour|closure|closed/.test(haystack)) {
-    return "ROAD CLOSURE"
-  }
-  if (/traffic/.test(haystack)) return "TRAFFIC ADVISORY"
-  if (/scam|fraud|phish|ic3|impersonation/.test(haystack)) return "SCAM ALERT"
-  if (/law|ordinance|legislation|statute/.test(haystack)) return "COMMUNITY NOTICE"
+  const trafficLabel = trafficPostTypeLabel(haystack)
+  if (trafficLabel) return trafficLabel
+
+  if (/boil water/.test(haystack)) return "Boil Water Advisory"
+  if (/water main/.test(haystack)) return "Water Main Break"
+  if (/hydrant/.test(haystack)) return "Hydrant Flushing"
+  if (/water service|water outage|water shut/.test(haystack)) return "Water Service Alert"
+  if (/gas leak/.test(haystack)) return "Gas Leak"
+  if (/power outage|utility/.test(haystack)) return "Utility Notice"
+  if (isActualRoadClosure(haystack)) return "Road Closure"
+  if (/traffic/.test(haystack)) return "Traffic Advisory"
+  if (/scam|fraud|phish|ic3|impersonation/.test(haystack)) return "Scam Alert"
+  if (/law|ordinance|legislation|statute/.test(haystack)) return "Community Notice"
   if (opp.sourceLabel === "National Safety Alert" || opp.sourceLabel === "Federal Advisory") {
-    return "PUBLIC SAFETY ALERT"
+    return "Public Safety Alert"
   }
 
   // ----- Fallbacks -----
-  if (alertGraphicKind(opp) === "public_works") return "PUBLIC WORKS NOTICE"
-  if (/heat|hot/.test(haystack)) return "HEAT ALERT"
-  if (/winter|snow|ice|freez/.test(haystack)) return "WINTER WEATHER ALERT"
-  if (/flood/.test(haystack)) return "FLOOD ALERT"
-  if (/tornado/.test(haystack)) return "TORNADO ALERT"
-  return "WEATHER ALERT"
+  if (kind === "public_works") return "Public Works Notice"
+  if (/heat|hot/.test(haystack)) return "Heat Alert"
+  if (/winter|snow|ice|freez/.test(haystack)) return "Winter Weather Alert"
+  if (/flood/.test(haystack)) return "Flood Alert"
+  if (/tornado/.test(haystack)) return "Tornado Alert"
+  return "Weather Alert"
 }
 
 function hexToRgba(hex: string, alpha: number): string {
@@ -234,44 +265,31 @@ export async function createWeatherAlertImage(
   if (!ctx) return ""
 
   const accent = opts.accent ?? STANDARD_ACCENT
-  const headline = (opts.headline ?? "WEATHER ALERT").toUpperCase()
+  const headline = opts.headline ?? "Public Information"
 
   drawBackground(ctx, W, H, accent)
 
   const padding = Math.round(W * 0.05)
   const dividerX = Math.round(W * 0.68)
 
-  // ----- Left: headline + subtitle -----
+  // ----- Left: alert type headline only -----
   const leftMaxWidth = dividerX - padding - Math.round(W * 0.04)
 
-  // Fixed headline sizing for a consistent template across every alert.
-  // Text wraps rather than resizing, so letter sizing is identical everywhere.
   const headlineSize = Math.round(H * 0.135)
-  const headlineLetterSpacing = `${Math.max(1, Math.round(headlineSize * 0.01))}px`
+  const headlineLetterSpacing = `${Math.max(1, Math.round(headlineSize * 0.008))}px`
   ctx.font = `800 ${headlineSize}px ${FONT_STACK}`
   setLetterSpacing(ctx, headlineLetterSpacing)
   const headlineLines = wrapLines(ctx, headline, leftMaxWidth)
 
   const headlineLineHeight = headlineSize * 1.04
-  const name = (opts.agencyName ?? "").trim()
-  const nameSize = Math.round(H * 0.042)
-  ctx.font = `600 ${nameSize}px ${FONT_STACK}`
-  setLetterSpacing(ctx, "0px")
-  const nameLines = name ? wrapLines(ctx, name, leftMaxWidth).slice(0, 2) : []
-  const nameLineHeight = nameSize * 1.28
-  const nameGap = nameLines.length ? Math.round(H * 0.035) : 0
-
-  const blockHeight =
-    headlineLines.length * headlineLineHeight +
-    nameGap +
-    nameLines.length * nameLineHeight
+  const blockHeight = headlineLines.length * headlineLineHeight
   let cursorY = (H - blockHeight) / 2 + headlineSize
 
   ctx.textAlign = "left"
   ctx.textBaseline = "alphabetic"
   ctx.fillStyle = "#FFFFFF"
   ctx.font = `800 ${headlineSize}px ${FONT_STACK}`
-  setLetterSpacing(ctx, `${Math.max(1, Math.round(headlineSize * 0.01))}px`)
+  setLetterSpacing(ctx, headlineLetterSpacing)
   ctx.shadowColor = "rgba(0,0,0,0.45)"
   ctx.shadowBlur = Math.round(H * 0.02)
   ctx.shadowOffsetY = Math.round(H * 0.004)
@@ -283,29 +301,26 @@ export async function createWeatherAlertImage(
   ctx.shadowBlur = 0
   ctx.shadowOffsetY = 0
 
-  if (nameLines.length) {
-    cursorY += nameGap - headlineLineHeight + headlineSize * 0.12
-    ctx.font = `600 ${nameSize}px ${FONT_STACK}`
-    setLetterSpacing(ctx, "1px")
-    ctx.fillStyle = accent
-    nameLines.forEach((line) => {
-      ctx.fillText(line, padding, cursorY)
-      cursorY += nameLineHeight
-    })
-  }
-
   // ----- Divider -----
   ctx.fillStyle = "rgba(255,255,255,0.22)"
   ctx.fillRect(dividerX, padding, Math.max(2, Math.round(W * 0.0015)), H - padding * 2)
 
-  // ----- Right: agency logo -----
+  // ----- Right: agency logo with agency name below -----
   const rightPad = Math.round(W * 0.03)
   const rightLeft = dividerX + rightPad
   const rightRight = W - rightPad
   const rightWidth = rightRight - rightLeft
   const rightCenterX = (rightLeft + rightRight) / 2
+  const name = (opts.agencyName ?? "").trim()
+  const nameSize = Math.round(H * 0.034)
 
-  const logoMax = Math.min(rightWidth, Math.round(H * 0.5))
+  ctx.font = `600 ${nameSize}px ${FONT_STACK}`
+  setLetterSpacing(ctx, "0px")
+  const nameLines = name ? wrapLines(ctx, name, rightWidth).slice(0, 2) : []
+  const nameLineHeight = nameSize * 1.25
+  const logoGap = nameLines.length ? Math.round(H * 0.035) : 0
+
+  const logoMax = Math.min(rightWidth, Math.round(H * 0.42))
 
   let logo: HTMLImageElement | null = null
   if (opts.logoUrl) {
@@ -327,7 +342,9 @@ export async function createWeatherAlertImage(
     logoDrawH = logoMax * 0.8
   }
 
-  const logoY = (H - logoDrawH) / 2
+  const nameBlockHeight = nameLines.length * nameLineHeight
+  const groupHeight = logoDrawH + logoGap + nameBlockHeight
+  const logoY = (H - groupHeight) / 2
 
   if (logo) {
     ctx.drawImage(logo, rightCenterX - logoDrawW / 2, logoY, logoDrawW, logoDrawH)
@@ -355,6 +372,19 @@ export async function createWeatherAlertImage(
     ctx.font = `800 ${Math.round(r * 0.7)}px ${FONT_STACK}`
     setLetterSpacing(ctx, "0px")
     ctx.fillText(initials || "PIO", cx, cy)
+  }
+
+  if (nameLines.length) {
+    let textY = logoY + logoDrawH + logoGap + nameSize
+    ctx.textAlign = "center"
+    ctx.textBaseline = "alphabetic"
+    ctx.font = `600 ${nameSize}px ${FONT_STACK}`
+    setLetterSpacing(ctx, "0px")
+    ctx.fillStyle = accent
+    nameLines.forEach((line) => {
+      ctx.fillText(line, rightCenterX, textY)
+      textY += nameLineHeight
+    })
   }
 
   setLetterSpacing(ctx, "0px")

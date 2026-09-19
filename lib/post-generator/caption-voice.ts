@@ -4,6 +4,14 @@
  */
 
 import { buildWeatherAlertPost, type WeatherMessageContext } from "./weather-alert-message"
+import {
+  buildFederalRelayPost,
+  isFederalRelayOpportunity,
+} from "./federal-relay-message"
+import {
+  buildWildfireIncidentPost,
+  isWildfireIncidentOpportunity,
+} from "./wildfire-incident-message"
 
 export const CAPTION_BANNED_PHRASES = [
   "please be advised",
@@ -181,9 +189,26 @@ export function buildOpportunityFallbackMessage(
     })
   }
 
-  const facts = opportunity.verifiedFacts ?? []
-  const actions = opportunity.publicCallToAction ?? []
-  const body = [opportunity.summary, ...facts, ...actions].filter(Boolean).join(" ")
+  if (isFederalRelayOpportunity(opportunity)) {
+    return buildFederalRelayPost(opportunity, agencyName, {
+      city: serviceArea?.city,
+      state: serviceArea?.state,
+    })
+  }
+
+  if (isWildfireIncidentOpportunity(opportunity)) {
+    return buildWildfireIncidentPost(opportunity, agencyName, serviceArea)
+  }
+
+  const facts = dedupeRelayFacts(
+    opportunity.verifiedFacts ?? [],
+    opportunity.title,
+    opportunity.summary
+  )
+  const actions = (opportunity.publicCallToAction ?? []).filter(
+    (line) => !factRepeatsTitle(line, opportunity.title)
+  )
+  const body = [...facts, ...actions].filter(Boolean).join(" ")
   const message = body || `${opportunity.title}.`
   return withPioAgencyAttribution(message, agencyName, {
     title: opportunity.title,
@@ -191,6 +216,40 @@ export function buildOpportunityFallbackMessage(
     issuingAuthority: opportunity.issuingAuthority,
     sourceLabel: opportunity.sourceLabel,
   })
+}
+
+function normalizeForCompare(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()
+}
+
+function factRepeatsTitle(fact: string, title: string): boolean {
+  const factNorm = normalizeForCompare(fact)
+  const titleNorm = normalizeForCompare(title)
+  if (!factNorm || !titleNorm) return false
+  return factNorm.includes(titleNorm) || titleNorm.includes(factNorm)
+}
+
+function dedupeRelayFacts(facts: string[], title: string, summary?: string): string[] {
+  const summaryNorm = normalizeForCompare(summary || "")
+  const seen = new Set<string>()
+  const unique: string[] = []
+
+  for (const fact of facts) {
+    const trimmed = fact.trim()
+    if (!trimmed) continue
+    if (factRepeatsTitle(trimmed, title)) continue
+    if (summaryNorm && normalizeForCompare(trimmed) === summaryNorm) continue
+    if (/^fbi ic3 published/i.test(trimmed)) continue
+    if (/issued a new public alert/i.test(trimmed)) continue
+    if (/^nifc (lists|reports)/i.test(trimmed)) continue
+    if (/containment was reported at/i.test(trimmed)) continue
+    const key = normalizeForCompare(trimmed)
+    if (seen.has(key)) continue
+    seen.add(key)
+    unique.push(trimmed)
+  }
+
+  return unique.slice(0, 3)
 }
 
 /** Agency naming rules shared by writer / customize / final-gate prompts. */

@@ -69,6 +69,44 @@ function normalizePlaceQuery(value: string): string {
   return value.replace(/\bcounty\b/gi, "").replace(/\s+/g, " ").trim()
 }
 
+/** Philly neighborhoods geocode and search under Philadelphia, not as standalone cities. */
+const PHILADELPHIA_NEIGHBORHOOD_PATTERN =
+  /^(center city|old city|society hill|rittenhouse|university city|manayunk|fishtown|south philly|north philly|west philly|northeast philly|kensington|passyunk|queen village|fairmount|spring garden|northern liberties|cedar park|powelton|brewerytown)(\s|$)/i
+
+/**
+ * Map neighborhood / compound city labels to the parent municipality used for
+ * geocoding, NWS, and AI web-search hints (e.g. "Center City Philadelphia" → Philadelphia).
+ */
+export function normalizeCityForDiscovery(city: string, state?: string): string {
+  const trimmed = city.trim()
+  if (!trimmed) return trimmed
+
+  const lower = trimmed.toLowerCase()
+  const stateCode = (state || "").trim().toUpperCase().slice(0, 2)
+
+  if (/\bphiladelphia\b/i.test(lower)) return "Philadelphia"
+
+  if (
+    (stateCode === "PA" || /\bpennsylvania\b/i.test(state || "")) &&
+    (PHILADELPHIA_NEIGHBORHOOD_PATTERN.test(lower) || lower.includes("center city"))
+  ) {
+    return "Philadelphia"
+  }
+
+  return trimmed
+}
+
+/** City label for discovery prompts — prefers normalized parent city over neighborhood names. */
+export function resolveDiscoveryCityLabel(opts: {
+  city?: string
+  state: string
+  locations?: ServiceAreaLocation[]
+}): string | undefined {
+  const raw = opts.city?.trim() || opts.locations?.[0]?.city?.trim()
+  if (!raw) return undefined
+  return normalizeCityForDiscovery(raw, opts.state)
+}
+
 const US_STATE_NAMES: Record<string, string> = {
   al: "alabama",
   ak: "alaska",
@@ -183,11 +221,13 @@ export async function resolveServiceAreaLocations(opts: {
     const city = opts.city?.trim()
     const county = opts.county?.trim()
     const countyCore = county ? normalizePlaceQuery(county) : ""
-    if (city) {
-      queries.push(city)
+    const discoveryCity = city ? normalizeCityForDiscovery(city, state) : ""
+    const cityQueries = [...new Set([discoveryCity, city].filter(Boolean))]
+    for (const cityQuery of cityQueries) {
+      queries.push(cityQuery)
       if (countyCore) {
-        queries.push(`${city} ${countyCore} County`)
-        queries.push(`${city} ${countyCore}`)
+        queries.push(`${cityQuery} ${countyCore} County`)
+        queries.push(`${cityQuery} ${countyCore}`)
       }
     }
     if (countyCore) {

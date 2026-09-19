@@ -2,19 +2,23 @@ import { NextResponse } from "next/server"
 import { getMemberSession } from "@/lib/member-session"
 import { getIsPaidByEmail } from "@/lib/member-access"
 import { isOnActiveTrial } from "@/lib/pio-trial"
-import { checkRateLimit } from "@/lib/rate-limit"
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
 import { aiErrorPayload } from "@/lib/ai-result"
 import {
   customizeCuratedMessage,
   generateMessageFromOpportunity,
 } from "@/lib/post-generator-ai"
 import { isLocalPreviewServer } from "@/lib/local-preview-server"
+import { formatDepartmentLabel } from "@/lib/department-types"
 import type { CustomizeMessageMode } from "@/lib/post-generator/types"
+import { resolveEventHolidayContext } from "@/lib/event-message-prompts"
 
 export const maxDuration = 30
 
 const CUSTOMIZE_MODES: CustomizeMessageMode[] = [
   "shorten",
+  "longer",
+  "more_excited",
   "conversational",
   "formal",
   "facebook",
@@ -40,7 +44,18 @@ export async function POST(request: Request) {
   }
 
   if (!checkRateLimit(`pio-customize:${session.email}`, 60, 60 * 60 * 1000)) {
-    return NextResponse.json({ error: "Too many requests." }, { status: 429 })
+    return NextResponse.json(
+      { error: "Too many requests. Please slow down.", code: "rate_limited" },
+      { status: 429 }
+    )
+  }
+
+  const ip = getClientIp(request)
+  if (!checkRateLimit(`pio-customize-ip:${ip}`, 120, 60 * 60 * 1000)) {
+    return NextResponse.json(
+      { error: "Too many requests.", code: "rate_limited" },
+      { status: 429 }
+    )
   }
 
   try {
@@ -81,14 +96,34 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid customize mode." }, { status: 400 })
     }
 
+    const message = String(body.message || "").trim()
+    if (!message) {
+      return NextResponse.json({ error: "Add a message before customizing." }, { status: 400 })
+    }
+
     const verifiedFactsRaw = Array.isArray(body.verifiedFacts) ? body.verifiedFacts.map(String) : []
-    const verifiedFacts = verifiedFactsRaw.map((text, index) => ({
-      id: `fact-${index + 1}`,
-      text,
-    }))
+    const verifiedFacts = verifiedFactsRaw
+      .map((text) => text.trim())
+      .filter(Boolean)
+      .map((text, index) => ({
+        id: `fact-${index + 1}`,
+        text,
+      }))
+
+    const agencyType = formatDepartmentLabel(
+      String(body.agencyType || body.departmentType || ""),
+      String(body.agencyTypeOther || body.departmentOther || "")
+    )
+
+    const holiday = resolveEventHolidayContext({
+      eventDate: String(body.eventDate || ""),
+      eventName: String(body.eventName || body.title || ""),
+      eventDescription: String(body.eventDescription || ""),
+      eventType: String(body.eventType || ""),
+    })
 
     const result = await customizeCuratedMessage(
-      String(body.message || ""),
+      message,
       mode,
       String(body.agencyName || ""),
       {
@@ -96,8 +131,9 @@ export async function POST(request: Request) {
         state: String(body.state || ""),
       },
       {
-        agencyType: String(body.agencyType || body.departmentType || ""),
+        agencyType,
         verifiedFacts,
+        holidayEmojiFocus: holiday?.emojiFocus,
       }
     )
     if (!result.ok) {

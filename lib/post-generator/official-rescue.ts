@@ -37,7 +37,12 @@ export function isPromotableDiscoveryCandidate(input: ExternalOpportunityInput):
     return true
   }
   if (hasTrustedDiscoverySource(input)) return true
-  if (input.confidenceLevel === "high" && facts >= 2) return true
+  if (label === "Current Local Opportunity" && facts >= 1) return true
+  if ((input.category || "").toLowerCase().includes("road") && facts >= 1) return true
+  if ((input.signals ?? []).includes("local_news") && facts >= 1) return true
+  if ((input.signals ?? []).includes("police_alert") && facts >= 1) return true
+  if ((input.signals ?? []).includes("crime_prevention") && facts >= 1) return true
+  if (input.confidenceLevel === "high" && facts >= 1) return true
   return false
 }
 

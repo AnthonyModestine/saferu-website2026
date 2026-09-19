@@ -272,6 +272,8 @@ export type RankedExternalOpportunity = ExternalOpportunityInput & {
 
 export type CustomizeMessageMode =
   | "shorten"
+  | "longer"
+  | "more_excited"
   | "conversational"
   | "formal"
   | "facebook"

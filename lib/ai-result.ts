@@ -6,7 +6,7 @@ export type AiFailureReason =
   | "empty_input"
 
 export type AiResult<T> =
-  | { ok: true; data: T }
+  | { ok: true; data: T; tokensUsed?: number }
   | { ok: false; reason: AiFailureReason; detail?: string }
 
 export function aiErrorMessage(reason: AiFailureReason): string {

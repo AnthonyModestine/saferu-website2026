@@ -170,11 +170,15 @@ export function markOpportunityPosted(opts: {
 
 export const BRIEFING_CACHE_EVENT = "saferu-briefing-cache-updated"
 
-export function cacheOpportunityResult(opportunities: PostOpportunity[], generatedAt: string): void {
+export function cacheOpportunityResult(
+  opportunities: PostOpportunity[],
+  generatedAt: string,
+  options?: { notify?: boolean }
+): void {
   const h = loadOpportunityHistory()
   h.lastResult = { generatedAt, opportunities }
   saveOpportunityHistory(h)
-  if (typeof window !== "undefined") {
+  if (typeof window !== "undefined" && options?.notify !== false) {
     window.dispatchEvent(new CustomEvent(BRIEFING_CACHE_EVENT))
   }
 }

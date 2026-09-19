@@ -9,6 +9,7 @@ import { describe, it } from "node:test"
 import {
   alertGraphicKind,
   isWeatherAlertOpportunity,
+  needsAlertTemplateGraphic,
   weatherAlertHeadline,
 } from "./pio-weather-graphic"
 
@@ -45,6 +46,17 @@ describe("alertGraphicKind", () => {
       "public_works"
     )
   })
+
+  it("marks community events for the PIO template", () => {
+    assert.equal(
+      alertGraphicKind({
+        sourceLabel: "Current Local Opportunity",
+        category: "community_event",
+        title: 'Unity in the Community "A Sheriff\'s Community Celebration"',
+      }),
+      "community"
+    )
+  })
 })
 
 describe("weatherAlertHeadline", () => {
@@ -55,7 +67,7 @@ describe("weatherAlertHeadline", () => {
         category: "severe_storms",
         title: "Tornado Watch",
       }),
-      "TORNADO WATCH"
+      "Tornado Watch"
     )
     assert.equal(
       weatherAlertHeadline({
@@ -63,7 +75,7 @@ describe("weatherAlertHeadline", () => {
         category: "severe_storms",
         title: "Severe Thunderstorm Warning",
       }),
-      "THUNDERSTORM WARNING"
+      "Thunderstorm Warning"
     )
     assert.equal(
       weatherAlertHeadline({
@@ -71,7 +83,39 @@ describe("weatherAlertHeadline", () => {
         category: "severe_storms",
         title: "Severe Thunderstorm",
       }),
-      "THUNDERSTORM ALERT"
+      "Thunderstorm Alert"
+    )
+    assert.equal(
+      weatherAlertHeadline({
+        sourceLabel: "Federal Advisory",
+        category: "crime",
+        title: "IRS impersonation scam",
+      }),
+      "Scam Alert"
+    )
+    assert.equal(
+      weatherAlertHeadline({
+        sourceLabel: "Local Update",
+        category: "road_closure",
+        title: "Main Street closed overnight",
+      }),
+      "Road Closure"
+    )
+    assert.equal(
+      weatherAlertHeadline({
+        sourceLabel: "Local Update",
+        category: "traffic_advisory",
+        title: "Main Street Speed Limit Reduction",
+      }),
+      "Traffic Advisory"
+    )
+    assert.equal(
+      weatherAlertHeadline({
+        sourceLabel: "Current Local Opportunity",
+        category: "community_event",
+        title: 'Unity in the Community "A Sheriff\'s Community Celebration"',
+      }),
+      "Community Event"
     )
   })
 })
@@ -89,10 +133,30 @@ describe("isWeatherAlertOpportunity", () => {
     assert.equal(
       isWeatherAlertOpportunity({
         sourceLabel: "Community News",
-        category: "crime",
+        category: "community_event",
         title: "Neighborhood watch meeting",
       }),
       false
+    )
+  })
+})
+
+describe("needsAlertTemplateGraphic", () => {
+  it("applies the PIO template to live community events without a source graphic", () => {
+    assert.equal(
+      needsAlertTemplateGraphic({
+        id: "tomorrow-1",
+        title: "Unity in the Community",
+        category: "community_event",
+        sourceLabel: "Current Local Opportunity",
+        opportunitySource: "external",
+        whyItMatters: "",
+        recommendedAction: "",
+        recommendedPostTiming: "",
+        priority: "plan_ahead",
+        status: "new",
+      }),
+      true
     )
   })
 })

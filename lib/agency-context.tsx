@@ -8,6 +8,7 @@ import {
   isAgencyLocationReady,
 } from "@/lib/agency-location"
 import { prefetchPostOpportunities } from "@/lib/post-generator/prefetch-briefing"
+import { PRESS_CENTER_FEATURES } from "@/lib/press-center-features"
 
 const STORAGE_KEY = "pio_agency_settings"
 
@@ -224,6 +225,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
   const locationReady = isAgencyLocationReady(settings)
 
   useEffect(() => {
+    if (!PRESS_CENTER_FEATURES.postGeneratorVisible) return
     if (!settingsHydrated || !memberPaid || !locationReady) return
     void prefetchPostOpportunities({ settings, isPaid: memberPaid })
   }, [

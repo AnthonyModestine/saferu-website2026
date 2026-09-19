@@ -1,6 +1,6 @@
 /**
- * Tracks AI generation usage per member.
- * Monthly quota resets automatically. Purchased packs carry over.
+ * Tracks AI token usage per member (Press Center allowance).
+ * Monthly quota resets automatically. Purchased token packs carry over.
  *
  * Uses Neon Postgres when POSTGRES_URL / DATABASE_URL is set (production),
  * otherwise falls back to data/pio-generations.json (local dev).
@@ -12,15 +12,39 @@ import { ensureSchema, getSql, isDatabaseConfigured } from "@/lib/db"
 
 const DATA_DIR = path.join(process.cwd(), "data")
 const FILE_PATH = path.join(DATA_DIR, "pio-generations.json")
-const MONTHLY_QUOTA = 30
+
+/** Included AI tokens per subscription month (matches pricing). */
+export const MONTHLY_TOKEN_QUOTA = 100_000
+
+export const OUT_OF_TOKENS_MESSAGE =
+  "You have used all your AI tokens for this month. Purchase a token pack to continue."
 
 interface MemberRecord {
-  [monthKey: string]: number // "YYYY-MM" → used count
   packs: number
+  /** Set after one-time conversion from generation-count units to tokens. */
+  migratedToTokens?: boolean
+  [monthKey: string]: number | boolean | undefined
 }
 
 interface GenerationsStore {
   [email: string]: MemberRecord
+}
+
+/** ~3,333 tokens per legacy “generation” (100,000 / 30). */
+const LEGACY_TOKENS_PER_GENERATION = Math.round(MONTHLY_TOKEN_QUOTA / 30)
+
+function migrateLegacyGenerationUnits(record: MemberRecord): MemberRecord {
+  if (record.migratedToTokens) return record
+  const month = currentMonthKey()
+  const used = typeof record[month] === "number" ? (record[month] as number) : 0
+  const packs = typeof record.packs === "number" ? record.packs : 0
+  // Legacy generation-scale values are small; token-scale values are large.
+  if (used <= 200 && packs <= 500) {
+    if (used > 0) record[month] = used * LEGACY_TOKENS_PER_GENERATION
+    if (packs > 0) record.packs = packs * LEGACY_TOKENS_PER_GENERATION
+  }
+  record.migratedToTokens = true
+  return record
 }
 
 function currentMonthKey(): string {
@@ -57,13 +81,21 @@ async function dbReadRecord(email: string): Promise<MemberRecord> {
   const data = rows[0].data
   if (typeof data === "string") {
     try {
-      return { packs: 0, ...JSON.parse(data) }
+      const parsed = JSON.parse(data) as MemberRecord
+      return {
+        ...parsed,
+        packs: typeof parsed.packs === "number" ? parsed.packs : 0,
+      }
     } catch {
       return { packs: 0 }
     }
   }
   if (data && typeof data === "object") {
-    return { packs: 0, ...(data as MemberRecord) }
+    const parsed = data as MemberRecord
+    return {
+      ...parsed,
+      packs: typeof parsed.packs === "number" ? parsed.packs : 0,
+    }
   }
   return { packs: 0 }
 }
@@ -80,11 +112,24 @@ async function dbWriteRecord(email: string, record: MemberRecord): Promise<void>
 
 async function readRecord(email: string): Promise<MemberRecord> {
   const key = email.trim().toLowerCase()
+  let record: MemberRecord
   if (isDatabaseConfigured()) {
-    return dbReadRecord(key)
+    record = await dbReadRecord(key)
+  } else {
+    const store = await readFileStore()
+    record = ensureRecord(store, key)
   }
-  const store = await readFileStore()
-  return ensureRecord(store, key)
+  if (!record.migratedToTokens) {
+    const before = JSON.stringify(record)
+    migrateLegacyGenerationUnits(record)
+    if (JSON.stringify(record) !== before) {
+      await writeRecord(email, record)
+    } else {
+      record.migratedToTokens = true
+      await writeRecord(email, record)
+    }
+  }
+  return record
 }
 
 async function writeRecord(email: string, record: MemberRecord): Promise<void> {
@@ -98,61 +143,87 @@ async function writeRecord(email: string, record: MemberRecord): Promise<void> {
   await writeFileStore(store)
 }
 
-/** Returns { used, quota, packs, remaining } for the current month. */
-export async function getGenerationStatus(email: string): Promise<{
+export type TokenStatus = {
   used: number
   quota: number
   packs: number
   remaining: number
-}> {
+}
+
+/** Returns { used, quota, packs, remaining } for the current month (all in tokens). */
+export async function getTokenStatus(email: string): Promise<TokenStatus> {
   const record = await readRecord(email)
   const month = currentMonthKey()
   const used = typeof record[month] === "number" ? record[month] : 0
   const packs = record.packs
-  const remaining = Math.max(0, MONTHLY_QUOTA - used) + packs
-  return { used, quota: MONTHLY_QUOTA, packs, remaining }
+  const remaining = Math.max(0, MONTHLY_TOKEN_QUOTA - used) + packs
+  return { used, quota: MONTHLY_TOKEN_QUOTA, packs, remaining }
 }
+
+/** @deprecated Prefer getTokenStatus — same shape, token units. */
+export const getGenerationStatus = getTokenStatus
 
 /**
- * Attempts to consume one generation.
- * Returns true if allowed and decremented, false if no generations left.
+ * Debit tokens from monthly allowance first, then purchased packs.
+ * Returns true if the full amount was consumed.
  */
-export async function consumeGeneration(email: string): Promise<boolean> {
+export async function consumeTokens(email: string, amount: number): Promise<boolean> {
+  const tokens = Math.max(0, Math.floor(amount))
+  if (tokens <= 0) return true
+
   const record = await readRecord(email)
   const month = currentMonthKey()
   const used = typeof record[month] === "number" ? record[month] : 0
-  const monthlyRemaining = MONTHLY_QUOTA - used
-  const packs = record.packs
+  let monthlyRemaining = Math.max(0, MONTHLY_TOKEN_QUOTA - used)
+  let packs = record.packs
+  let left = tokens
+
+  if (monthlyRemaining + packs < left) {
+    return false
+  }
 
   if (monthlyRemaining > 0) {
-    record[month] = used + 1
-    await writeRecord(email, record)
-    return true
+    const fromMonthly = Math.min(monthlyRemaining, left)
+    record[month] = used + fromMonthly
+    left -= fromMonthly
+    monthlyRemaining -= fromMonthly
   }
 
-  if (packs > 0) {
-    record.packs = packs - 1
-    await writeRecord(email, record)
-    return true
+  if (left > 0) {
+    record.packs = packs - left
   }
 
-  return false
+  await writeRecord(email, record)
+  return true
 }
 
-/** Add purchased generation pack credits to a member's account. */
-export async function addGenerationPack(email: string, count: number): Promise<void> {
+/** @deprecated Prefer consumeTokens(email, amount). */
+export async function consumeGeneration(email: string, amount = 1): Promise<boolean> {
+  return consumeTokens(email, amount)
+}
+
+/** Add purchased token pack credits to a member's account. */
+export async function addTokenPack(email: string, count: number): Promise<void> {
+  const tokens = Math.max(0, Math.floor(count))
+  if (tokens <= 0) return
   const record = await readRecord(email)
-  record.packs = (record.packs || 0) + count
+  record.packs = (record.packs || 0) + tokens
   await writeRecord(email, record)
 }
 
+/** @deprecated Prefer addTokenPack. */
+export const addGenerationPack = addTokenPack
+
 /** Batch lookup for admin member list. */
-export async function getGenerationStatuses(
+export async function getTokenStatuses(
   emails: string[]
-): Promise<Map<string, Awaited<ReturnType<typeof getGenerationStatus>>>> {
+): Promise<Map<string, TokenStatus>> {
   const unique = [...new Set(emails.map((e) => e.trim().toLowerCase()).filter(Boolean))]
   const entries = await Promise.all(
-    unique.map(async (email) => [email, await getGenerationStatus(email)] as const)
+    unique.map(async (email) => [email, await getTokenStatus(email)] as const)
   )
   return new Map(entries)
 }
+
+/** @deprecated Prefer getTokenStatuses. */
+export const getGenerationStatuses = getTokenStatuses

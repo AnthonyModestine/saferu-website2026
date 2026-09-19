@@ -6,7 +6,6 @@ import {
   PenLine,
   Images,
   ShieldCheck,
-  Star,
   Flame,
   Quote,
   Sparkles,
@@ -17,10 +16,8 @@ import {
   CalendarDays,
   Facebook,
   BadgeCheck,
-  Lock,
   Copy,
   Download,
-  Bell,
   ArrowRight,
 } from "lucide-react"
 
@@ -151,9 +148,33 @@ const PRESS_CENTER_TOOLS = [
   },
   {
     label: "Graphic Studio",
-    detail: "Create safety-tip and event graphics with logos locked in place.",
+    detail: "Create community safety graphics with your agency logo locked in place.",
     icon: Sparkles,
     tone: "bg-[#7C5CFC]",
+  },
+]
+
+const GRAPHIC_STUDIO_STEPS = [
+  {
+    num: "01",
+    label: "Share the topic",
+    detail:
+      "Tell us what you want your community to know — fire safety, scams, traffic, or anything in between.",
+    bar: "bg-[#2563EB]",
+  },
+  {
+    num: "02",
+    label: "Approve the message",
+    detail:
+      "Review the headline and on-graphic copy, then generate a polished safety graphic in one click.",
+    bar: "bg-[#E07C3E]",
+  },
+  {
+    num: "03",
+    label: "Download and publish",
+    detail:
+      "Get your finished graphic with your agency logo already in place — ready to post in minutes.",
+    bar: "bg-[#4A9D6B]",
   },
 ]
 
@@ -418,62 +439,100 @@ const BRIEFING_CARDS = [
   },
 ]
 
-/** Section 6 — Graphic Studio (dark color block). */
+/** Section 6 — Graphic Studio: outcome showcase (same dark system as Press Center). */
 export function GraphicStudioSection() {
   return (
-    <section className="relative overflow-hidden bg-[#0F1C3F] py-20 sm:py-28">
+    <section className="relative overflow-hidden bg-[#0B1B3A] py-20 sm:py-28">
       <div className="pointer-events-none absolute inset-0" aria-hidden="true">
-        <div className="absolute -top-40 left-1/2 h-[420px] w-[720px] -translate-x-1/2 rounded-full bg-[#F2B233]/15 blur-[140px]" />
-        <div className="absolute -left-32 bottom-0 h-[320px] w-[320px] rounded-full bg-[#2563EB]/15 blur-[120px]" />
+        <div className="absolute -right-40 -top-32 h-[420px] w-[420px] rounded-full bg-[#F2B233]/15 blur-[130px]" />
+        <div className="absolute -left-32 bottom-0 h-[360px] w-[360px] rounded-full bg-[#2563EB]/20 blur-[130px]" />
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff05_1px,transparent_1px),linear-gradient(to_bottom,#ffffff05_1px,transparent_1px)] bg-[size:3.5rem_3.5rem]" />
       </div>
 
-      <div className="relative mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-3xl text-center">
-          <p className="inline-flex items-center gap-2 rounded-full bg-[#F2B233] px-4 py-1.5 text-sm font-bold text-[#0F1C3F] shadow-[0_6px_20px_rgba(242,178,51,0.35)]">
-            <Sparkles className="h-4 w-4" />
-            Graphic Studio
-          </p>
-          <h2 className="mt-5 text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">
-            Make It Look Official
-          </h2>
-          <p className="mt-6 text-lg leading-relaxed text-[#b8c7e0] sm:text-xl">
-            Build safety-tip graphics and community event flyers with your department logo locked
-            in place — so every post looks ready to share.
-          </p>
+      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="grid items-center gap-14 lg:grid-cols-[0.95fr_1.15fr] lg:gap-12">
+          <div>
+            <p className="text-sm font-bold uppercase tracking-widest text-[#8fa3c2]">
+              Graphic Studio
+            </p>
+            <h2 className="mt-3 text-balance text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">
+              Look like you have a full-time PIO
+            </h2>
+            <p className="mt-6 text-lg leading-relaxed text-[#b8c7e0]">
+              From a safety idea to a post-ready graphic — with your logo on it and a caption ready
+              to share. No designer. No blank canvas. Just say what matters and publish.
+            </p>
+
+            <Button
+              asChild
+              size="lg"
+              className="mt-10 rounded-xl bg-[#F2B233] px-9 py-7 text-lg font-bold text-[#1A365D] shadow-[0_8px_30px_rgba(242,178,51,0.3)] transition-transform hover:-translate-y-0.5 hover:bg-[#ffc44d]"
+            >
+              <Link href="/pio-tool/graphics/safety-tip">Create your first safety graphic</Link>
+            </Button>
+          </div>
+
+          <div className="relative mx-auto w-full max-w-xl pb-16 sm:pb-12" aria-hidden="true">
+            <div className="absolute -inset-8 rounded-[2.5rem] bg-gradient-to-br from-[#F2B233]/20 via-[#2563EB]/15 to-[#7C5CFC]/20 blur-3xl" />
+
+            <div className="relative overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/25">
+              <div className="relative aspect-video w-full bg-[#0d1526]">
+                <Image
+                  src="/images/hero-pd-safety-graphic.png"
+                  alt="Example police department safety graphic ready for social media"
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 1024px) 90vw, 560px"
+                />
+              </div>
+            </div>
+
+            <div className="absolute -bottom-2 -left-2 z-10 w-[min(100%,280px)] -rotate-2 rounded-2xl bg-white p-3.5 shadow-2xl ring-1 ring-white/25 sm:-left-6 sm:w-[260px]">
+              <div className="flex items-center gap-2">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#1877F2]">
+                  <Facebook className="h-4 w-4 fill-white text-white" />
+                </span>
+                <div>
+                  <p className="text-[10px] font-bold text-[#0F1C3F]">Facebook Caption</p>
+                  <p className="text-[8px] font-semibold text-[#5c6b85]">
+                    Written in your agency voice
+                  </p>
+                </div>
+              </div>
+              <p className="mt-2 text-[10px] leading-relaxed text-[#42536e]">
+                Reminder for tonight: lock doors and windows every time you leave — and before bed.
+                A few seconds now can help keep your home safe…
+              </p>
+              <span className="mt-2 inline-flex items-center gap-1 rounded-md bg-[#2563EB]/10 px-2 py-1 text-[9px] font-bold text-[#2563EB]">
+                <Copy className="h-2.5 w-2.5" />
+                Copy caption
+              </span>
+            </div>
+
+            <div className="absolute -right-2 -top-5 z-10 rotate-2 rounded-xl bg-white px-3 py-2 shadow-xl ring-1 ring-white/25 sm:-right-4">
+              <span className="flex items-center gap-1.5 text-[10px] font-bold text-[#4A9D6B]">
+                <BadgeCheck className="h-3.5 w-3.5" />
+                Ready to share
+              </span>
+            </div>
+          </div>
         </div>
 
-        <div className="mt-14 grid gap-6 md:grid-cols-2">
-          <div className="rounded-2xl bg-white p-6 shadow-xl">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-[#B45309]">
-              Safety Graphic
-            </p>
-            <h3 className="mt-2 text-xl font-bold text-[#0F1C3F]">Prevention reminders</h3>
-            <p className="mt-2 text-sm leading-relaxed text-[#5c6b85]">
-              One clear safety takeaway, researched before design. Your agency logo bottom-right —
-              no SaferU mark on the public graphic.
-            </p>
-          </div>
-          <div className="rounded-2xl bg-white p-6 shadow-xl">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-[#047857]">
-              Community Event
-            </p>
-            <h3 className="mt-2 text-xl font-bold text-[#0F1C3F]">Flyers without the design stress</h3>
-            <p className="mt-2 text-sm leading-relaxed text-[#5c6b85]">
-              Add the event name, time, and place. Optional background photo. Your logo only —
-              no SaferU branding on event graphics.
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-14 text-center">
-          <Button
-            asChild
-            size="lg"
-            className="rounded-xl bg-[#F2B233] px-9 py-7 text-lg font-bold text-[#0F1C3F] shadow-[0_8px_30px_rgba(242,178,51,0.35)] transition-transform hover:-translate-y-0.5 hover:bg-[#ffc44d]"
-          >
-            <Link href="/pio-tool/graphics">Open Graphic Studio</Link>
-          </Button>
+        {/* Step cards — same white-box pattern as Core Outcomes */}
+        <div className="mt-16 grid gap-6 md:grid-cols-3">
+          {GRAPHIC_STUDIO_STEPS.map((step) => (
+            <div
+              key={step.num}
+              className="relative overflow-hidden rounded-2xl border border-[#E2E8F5] bg-white p-6 shadow-sm sm:p-8"
+            >
+              <span className={`absolute inset-x-0 top-0 h-1 ${step.bar}`} />
+              <p className="text-[11px] font-bold uppercase tracking-widest text-[#B45309]">
+                {step.num}
+              </p>
+              <h3 className="mt-2 text-xl font-bold text-[#0F1C3F]">{step.label}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-[#5c6b85]">{step.detail}</p>
+            </div>
+          ))}
         </div>
       </div>
     </section>
@@ -537,7 +596,7 @@ export function ContentLibrarySection() {
                 variant="outline"
                 className="rounded-xl border-[#1470AF]/30 px-8 py-6 text-base font-bold text-[#1470AF]"
               >
-                <Link href="/sign-up?returnUrl=%2Fwhats-new">Create Free Account</Link>
+                <Link href="/sign-up">Create Free Account</Link>
               </Button>
             </div>
           </div>
@@ -611,26 +670,22 @@ export function ContentLibrarySection() {
             <div className="absolute bottom-0 left-[18%] z-30 w-[64%] overflow-hidden rounded-2xl border border-[#F2B233]/40 bg-[#0B1B3A] shadow-2xl">
               <div className="flex items-center justify-between border-b border-white/10 px-5 py-3">
                 <p className="flex items-center gap-2 text-sm font-bold text-white">
-                  <Star className="h-4 w-4 fill-[#F2B233] text-[#F2B233]" />
-                  What&rsquo;s New
+                  <Sparkles className="h-4 w-4 text-[#F2B233]" />
+                  Graphic Studio
                 </p>
-                <span className="flex items-center gap-1 rounded-full bg-[#F2B233] px-2.5 py-1 text-[9px] font-black uppercase tracking-wide text-[#1A365D]">
-                  <Lock className="h-3 w-3" /> Members
+                <span className="rounded-full bg-[#F2B233] px-2.5 py-1 text-[9px] font-black uppercase tracking-wide text-[#1A365D]">
+                  New
                 </span>
               </div>
               <div className="p-5">
-                <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-[#F2B233]">
-                  <Bell className="h-3.5 w-3.5" /> New curated content every week
-                </p>
-                <p className="mt-2 text-lg font-bold leading-snug text-white">
-                  Timely graphics and captions based on current events.
+                <p className="text-lg font-bold leading-snug text-white">
+                  Turn a safety topic into a ready-to-post graphic.
                 </p>
                 <p className="mt-2 text-xs leading-relaxed text-[#b8c7e0]">
-                  Seasonal safety, emerging scams, major weather, awareness campaigns, and topics
-                  communities are talking about now.
+                  Your agency logo and a social caption included.
                 </p>
                 <span className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-[#F2B233]">
-                  Free membership unlocks access <ArrowRight className="h-3.5 w-3.5" />
+                  Try Graphic Studio <ArrowRight className="h-3.5 w-3.5" />
                 </span>
               </div>
             </div>

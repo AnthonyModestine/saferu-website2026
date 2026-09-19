@@ -55,11 +55,12 @@ function isOnActiveTrial(m: MemberRow): boolean {
   return m.trialEndAt > Math.floor(Date.now() / 1000)
 }
 
-function formatGenerations(m: MemberRow): string {
-  const g = m.generations
+function formatTokens(m: MemberRow): string {
+  const g = m.tokens ?? m.generations
   if (!g) return "—"
-  const packNote = g.packs > 0 ? `, +${g.packs} pack` : ""
-  return `${g.remaining} left (${g.used}/${g.quota} used${packNote})`
+  const fmt = (n: number) => n.toLocaleString()
+  const packNote = g.packs > 0 ? `, +${fmt(g.packs)} pack` : ""
+  return `${fmt(g.remaining)} left (${fmt(g.used)}/${fmt(g.quota)} used${packNote})`
 }
 
 function paymentStatusLabel(status: MemberPaymentStatus): string {
@@ -99,14 +100,14 @@ function PaymentBadge({ status }: { status: MemberPaymentStatus }) {
 }
 
 function buildCSV(members: MemberRow[]): string {
-  const headers = ["Email", "Name", "Customer ID", "Payment status", "Access", "Generations remaining", "Subscription status", "Joined"]
+  const headers = ["Email", "Name", "Customer ID", "Payment status", "Access", "AI tokens remaining", "Subscription status", "Joined"]
   const rows = members.map((m) => [
     m.email ?? "",
     m.name ?? "",
     m.id,
     paymentStatusLabel(m.paymentStatus),
     m.access,
-    m.generations ? String(m.generations.remaining) : "",
+    (m.tokens ?? m.generations) ? String((m.tokens ?? m.generations)!.remaining) : "",
     m.subscriptionStatus ?? "",
     formatDate(m.createdAt),
   ])
@@ -232,7 +233,7 @@ export function MembersListClient({ initialMembers, total, error }: Props) {
     if (result.success) {
       router.refresh()
     } else {
-      setPackError(result.error ?? "Failed to add generations")
+      setPackError(result.error ?? "Failed to add tokens")
     }
     setPackGranting(null)
   }
@@ -303,7 +304,8 @@ export function MembersListClient({ initialMembers, total, error }: Props) {
       subscriptionStatus: "active",
       trialEndAt: null,
       disabled: false,
-      generations: { used: 18, quota: 30, packs: 0, remaining: 12 },
+      tokens: { used: 42_000, quota: 100_000, packs: 0, remaining: 58_000 },
+      generations: { used: 42_000, quota: 100_000, packs: 0, remaining: 58_000 },
     },
     {
       id: "example_2",
@@ -316,7 +318,8 @@ export function MembersListClient({ initialMembers, total, error }: Props) {
       subscriptionStatus: "canceled",
       trialEndAt: Math.floor(Date.now() / 1000) + 5 * 24 * 3600, // 5 days from now
       disabled: false,
-      generations: { used: 4, quota: 30, packs: 5, remaining: 31 },
+      tokens: { used: 12_000, quota: 100_000, packs: 25_000, remaining: 113_000 },
+      generations: { used: 12_000, quota: 100_000, packs: 25_000, remaining: 113_000 },
     },
   ]
 
@@ -629,7 +632,7 @@ export function MembersListClient({ initialMembers, total, error }: Props) {
                 <th className="pb-3 pr-4 font-medium">Name</th>
                 <th className="pb-3 pr-4 font-medium">Payment</th>
                 <th className="pb-3 pr-4 font-medium">Access</th>
-                <th className="pb-3 pr-4 font-medium">Generations</th>
+                <th className="pb-3 pr-4 font-medium">AI tokens</th>
                 <th className="pb-3 pr-4 font-medium">Joined</th>
                 <th className="pb-3 pr-4 font-medium">Status</th>
                 <th className="pb-3 pr-4 font-medium text-right">Actions</th>
@@ -658,7 +661,7 @@ export function MembersListClient({ initialMembers, total, error }: Props) {
                     <PaymentBadge status={m.paymentStatus} />
                   </td>
                   <td className="py-3 pr-4 text-gray-700">{m.access}</td>
-                  <td className="py-3 pr-4 text-gray-600 text-xs sm:text-sm">{formatGenerations(m)}</td>
+                  <td className="py-3 pr-4 text-gray-600 text-xs sm:text-sm">{formatTokens(m)}</td>
                   <td className="py-3 pr-4 text-gray-500">{formatDate(m.createdAt)}</td>
                   <td className="py-3 pr-4 text-gray-600">
                     <div className="flex flex-wrap items-center gap-1.5">
@@ -710,25 +713,25 @@ export function MembersListClient({ initialMembers, total, error }: Props) {
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
-                              onClick={() => handleGrantPack(m, 5)}
-                              disabled={packGranting === `${m.id}-5`}
+                              onClick={() => handleGrantPack(m, 25_000)}
+                              disabled={packGranting === `${m.id}-25000`}
                             >
                               <Sparkles className="mr-2 h-4 w-4" />
-                              {packGranting === `${m.id}-5` ? "Adding…" : "Add 5 generations"}
+                              {packGranting === `${m.id}-25000` ? "Adding…" : "Add 25,000 tokens"}
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              onClick={() => handleGrantPack(m, 12)}
-                              disabled={packGranting === `${m.id}-12`}
+                              onClick={() => handleGrantPack(m, 50_000)}
+                              disabled={packGranting === `${m.id}-50000`}
                             >
                               <Sparkles className="mr-2 h-4 w-4" />
-                              {packGranting === `${m.id}-12` ? "Adding…" : "Add 12 generations"}
+                              {packGranting === `${m.id}-50000` ? "Adding…" : "Add 50,000 tokens"}
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              onClick={() => handleGrantPack(m, 35)}
-                              disabled={packGranting === `${m.id}-35`}
+                              onClick={() => handleGrantPack(m, 125_000)}
+                              disabled={packGranting === `${m.id}-125000`}
                             >
                               <Sparkles className="mr-2 h-4 w-4" />
-                              {packGranting === `${m.id}-35` ? "Adding…" : "Add 35 generations"}
+                              {packGranting === `${m.id}-125000` ? "Adding…" : "Add 125,000 tokens"}
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                           </>

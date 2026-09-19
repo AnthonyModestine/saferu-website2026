@@ -153,7 +153,7 @@ function buildExternalFromInput(
     qualityGateStatus: input.qualityGateStatus,
     signals: input.signals,
     curated: useAlertTemplate ? undefined : curated,
-    curatedMessage: undefined,
+    curatedMessage: input.suggestedMessage?.trim() || undefined,
     recommendationScore: input.internalScores?.composite,
     graphicUrl: externalGraphic ?? libraryGraphic,
     graphicThumbnailUrl: externalThumbnail ?? externalGraphic ?? libraryGraphic,

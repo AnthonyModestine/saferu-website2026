@@ -4,8 +4,9 @@ import { getMemberSession } from "@/lib/member-session"
 import { getIsPaidByEmail } from "@/lib/member-access"
 import { isOnActiveTrial } from "@/lib/pio-trial"
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
-import { consumeGeneration, getGenerationStatus } from "@/lib/pio-generations"
+import { consumeTokens, getTokenStatus, OUT_OF_TOKENS_MESSAGE } from "@/lib/pio-generations"
 import { aiErrorPayload } from "@/lib/ai-result"
+import { TOKEN_ESTIMATES, tokensOrEstimate } from "@/lib/openai-usage"
 
 const MAX = 1000
 
@@ -56,15 +57,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Too many requests." }, { status: 429 })
   }
 
-  const status = await getGenerationStatus(session.email)
+  const status = await getTokenStatus(session.email)
   if (status.remaining === 0) {
-    return NextResponse.json(
-      {
-        error:
-          "You have used all your generations for this month. Purchase a generation pack to continue.",
-      },
-      { status: 403 }
-    )
+    return NextResponse.json({ error: OUT_OF_TOKENS_MESSAGE }, { status: 403 })
   }
 
   try {
@@ -222,18 +217,16 @@ export async function POST(request: Request) {
 
     if (!result.ok) {
       console.error("[generate-event-posts] AI failed:", result.reason, result.detail ?? "")
+      if (result.reason === "empty_input" && result.detail) {
+        return NextResponse.json({ error: result.detail, code: result.reason }, { status: 400 })
+      }
       return NextResponse.json(aiErrorPayload(result.reason, result.detail), { status: 503 })
     }
 
-    const consumed = await consumeGeneration(session.email)
+    const debit = tokensOrEstimate(result.tokensUsed, TOKEN_ESTIMATES.eventPosts)
+    const consumed = await consumeTokens(session.email, debit)
     if (!consumed) {
-      return NextResponse.json(
-        {
-          error:
-            "You have used all your generations for this month. Purchase a generation pack to continue.",
-        },
-        { status: 403 }
-      )
+      return NextResponse.json({ error: OUT_OF_TOKENS_MESSAGE }, { status: 403 })
     }
 
     return NextResponse.json({

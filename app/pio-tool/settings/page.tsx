@@ -430,12 +430,13 @@ export default function AgencySettingsPage() {
           </p>
           {isSubscribed && genUsage && (
             <div className="rounded-lg border border-border bg-muted/30 p-4 text-sm text-muted-foreground space-y-1">
-              <p className="font-medium text-foreground">AI generations this month</p>
+              <p className="font-medium text-foreground">AI tokens this month</p>
               <p>
-                {genUsage.used} of {genUsage.quota} included generations used
-                {genUsage.packs > 0 ? ` · ${genUsage.packs} extra from packs` : ""}
+                {genUsage.used.toLocaleString()} of {genUsage.quota.toLocaleString()} included tokens
+                used
+                {genUsage.packs > 0 ? ` · ${genUsage.packs.toLocaleString()} extra from packs` : ""}
               </p>
-              <p className="text-xs">Included generations reset at the start of each calendar month.</p>
+              <p className="text-xs">Included tokens reset at the start of each calendar month.</p>
             </div>
           )}
           <Button

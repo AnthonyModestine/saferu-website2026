@@ -7,7 +7,7 @@ import { getFreeMembers, getFreeMemberByEmail, deleteFreeMember, addFreeMember }
 import { purgeAllMemberData } from "@/lib/purge-member-data"
 import { setTrial, getTrialEnd } from "@/lib/pio-trial"
 import { getDisabledEmails, setMemberDisabled as setDisabledInStore } from "@/lib/disabled-members"
-import { addGenerationPack, getGenerationStatuses } from "@/lib/pio-generations"
+import { addTokenPack, getTokenStatuses } from "@/lib/pio-generations"
 import {
   accessLabel,
   derivePaymentStatus,
@@ -16,12 +16,15 @@ import {
 
 export type { MemberPaymentStatus } from "@/lib/member-payment-status"
 
-export interface MemberGenerationInfo {
+export interface MemberTokenInfo {
   used: number
   quota: number
   packs: number
   remaining: number
 }
+
+/** @deprecated Prefer MemberTokenInfo */
+export type MemberGenerationInfo = MemberTokenInfo
 
 export interface MemberRow {
   id: string
@@ -39,8 +42,10 @@ export interface MemberRow {
   trialEndAt: number | null
   /** True if account is disabled by admin */
   disabled: boolean
-  /** Press Center AI generations remaining this month (+ packs) */
-  generations: MemberGenerationInfo | null
+  /** Press Center AI tokens remaining this month (+ packs) */
+  tokens: MemberTokenInfo | null
+  /** @deprecated Prefer tokens */
+  generations: MemberTokenInfo | null
 }
 
 export interface MembersResult {
@@ -133,6 +138,7 @@ export async function getMembersList(): Promise<MembersResult> {
           subscriptionStatus,
           trialEndAt: null,
           disabled: disabledSet.has((c.email ?? "").toLowerCase()),
+          tokens: null,
           generations: null,
         })
       }
@@ -155,6 +161,7 @@ export async function getMembersList(): Promise<MembersResult> {
       subscriptionStatus: null,
       trialEndAt: null,
       disabled: disabledSet.has(m.email.toLowerCase()),
+      tokens: null,
       generations: null,
     })
   }
@@ -167,15 +174,18 @@ export async function getMembersList(): Promise<MembersResult> {
     m.trialEndAt = trialEnds[i]
   })
 
-  const generationStatuses = await getGenerationStatuses(
+  const tokenStatuses = await getTokenStatuses(
     members.map((m) => m.email ?? "").filter(Boolean)
   )
   members.forEach((m) => {
     if (!m.email) {
+      m.tokens = null
       m.generations = null
       return
     }
-    m.generations = generationStatuses.get(m.email.toLowerCase()) ?? null
+    const status = tokenStatuses.get(m.email.toLowerCase()) ?? null
+    m.tokens = status
+    m.generations = status
   })
 
   return { members, total: members.length }
@@ -322,7 +332,7 @@ export async function addMemberAdmin(params: {
   return { success: true }
 }
 
-/** Grant additional Press Center generation credits (admin only). */
+/** Grant additional Press Center AI token credits (admin only). */
 export async function grantGenerationPack(
   email: string,
   count: number
@@ -330,17 +340,19 @@ export async function grantGenerationPack(
   await ensureAdmin()
   const normalized = email?.trim()?.toLowerCase()
   if (!normalized) return { success: false, error: "Email is required" }
-  if (!Number.isFinite(count) || count < 1 || count > 100) {
-    return { success: false, error: "Count must be between 1 and 100" }
+  if (!Number.isFinite(count) || count < 1 || count > 500_000) {
+    return { success: false, error: "Token amount must be between 1 and 500,000" }
   }
   try {
-    await addGenerationPack(normalized, Math.floor(count))
+    await addTokenPack(normalized, Math.floor(count))
     return { success: true }
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Failed to add generations"
+    const message = e instanceof Error ? e.message : "Failed to add tokens"
     return { success: false, error: message }
   }
 }
+
+export const grantTokenPack = grantGenerationPack
 
 /** Grant Press Center trial for a member by email (admin only). Days = 7 or 30. */
 export async function grantPioTrial(email: string, days: number): Promise<{ success: boolean; error?: string }> {

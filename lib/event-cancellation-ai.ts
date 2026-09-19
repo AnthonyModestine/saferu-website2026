@@ -3,6 +3,7 @@
  */
 
 import type { AiResult } from "./ai-result"
+import { tokensFromOpenAIUsage } from "./openai-usage"
 import { z } from "zod"
 
 export type CancellationDraft = {
@@ -138,6 +139,7 @@ ${JSON.stringify(
 
     const text = completion.choices?.[0]?.message?.content?.trim()
     if (!text) return { ok: false, reason: "empty_response" }
+    const tokensUsed = tokensFromOpenAIUsage(completion.usage)
 
     const parsed = cancellationSchema.safeParse(JSON.parse(text))
     if (!parsed.success || !parsed.data.message.trim()) {
@@ -161,6 +163,7 @@ ${JSON.stringify(
 
     return {
       ok: true,
+      tokensUsed,
       data: {
         channel: input.channel,
         postTitle: String(

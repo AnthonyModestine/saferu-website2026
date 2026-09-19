@@ -1,7 +1,6 @@
 /** Shared copy and styles for free member sign-up flows */
 
 export const FREE_MEMBER_BENEFITS = [
-  'Weekly "What\'s New" content delivered to your inbox',
   "Ready-to-share graphics and captions in minutes",
   "Crime prevention, fire safety, weather, scam, and emergency preparedness content",
   "Built for police, fire, EMS, emergency management, and local government agencies",

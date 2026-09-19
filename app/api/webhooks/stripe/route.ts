@@ -1,18 +1,15 @@
 import { NextResponse } from "next/server"
 import { stripe } from "@/lib/stripe"
 import type Stripe from "stripe"
+import { addTokenPack } from "@/lib/pio-generations"
+import { productTokenAmount } from "@/lib/products"
 
 /**
  * Stripe webhook handler.
  * Verifies the signature using STRIPE_WEBHOOK_SECRET from environment variables.
- * Set this in Vercel → Settings → Environment Variables.
  *
- * To get your webhook secret:
- *   1. Go to stripe.com/dashboard → Developers → Webhooks
- *   2. Add endpoint: https://yourdomain.com/api/webhooks/stripe
- *   3. Select events: customer.subscription.created, customer.subscription.updated,
- *      customer.subscription.deleted, invoice.payment_succeeded, invoice.payment_failed
- *   4. Copy the "Signing secret" and add it as STRIPE_WEBHOOK_SECRET in Vercel
+ * Recommended events:
+ *   customer.subscription.*, invoice.payment_*, checkout.session.completed
  */
 export async function POST(request: Request) {
   if (!stripe) {
@@ -42,12 +39,35 @@ export async function POST(request: Request) {
 
   try {
     switch (event.type) {
+      case "checkout.session.completed": {
+        const session = event.data.object as Stripe.Checkout.Session
+        if (session.mode === "payment" && session.payment_status === "paid") {
+          const email = (
+            session.metadata?.memberEmail ||
+            session.customer_email ||
+            session.customer_details?.email ||
+            ""
+          )
+            .trim()
+            .toLowerCase()
+          const productId = session.metadata?.productId?.trim() || ""
+          const tokens = productTokenAmount(productId)
+          if (email && tokens > 0) {
+            await addTokenPack(email, tokens)
+            console.log(`Credited ${tokens} AI tokens to ${email} from ${productId}`)
+          } else {
+            console.warn(
+              `checkout.session.completed missing credit info: email=${email || "(none)"} productId=${productId || "(none)"}`
+            )
+          }
+        }
+        break
+      }
+
       case "customer.subscription.created":
       case "customer.subscription.updated": {
         const subscription = event.data.object as Stripe.Subscription
         console.log(`Subscription ${event.type}: ${subscription.id} status=${subscription.status}`)
-        // Stripe is the source of truth for paid status via getIsPaidByEmail.
-        // No local state change needed unless you want to cache it.
         break
       }
 
@@ -70,7 +90,6 @@ export async function POST(request: Request) {
       }
 
       default:
-        // Ignore unhandled event types
         break
     }
 

@@ -474,8 +474,7 @@ export default function ArticleEditorClient({
             <div className="mt-2 flex items-center gap-2">
               <Link2 className="h-3.5 w-3.5 text-gray-400" />
               <span className="text-xs text-gray-500 font-mono">
-                www.saferu.com
-                {getArticlePublicPath(categoryId, subcategoryId, articleId).slice(1)}
+                www.saferu.com{getArticlePublicPath(categoryId, subcategoryId, articleId)}
               </span>
               <Button
                 type="button"

@@ -3,6 +3,8 @@
  * Keep in sync with trusted-sources.ts.
  */
 
+import { normalizeCityForDiscovery } from "./geo-utils"
+
 export type SourceCatalogSection = {
   title: string
   urls: string[]
@@ -235,6 +237,42 @@ export function getStatePoliceUrl(state: string): string | undefined {
   return STATE_POLICE_URLS[normalizeStateCode(state)]
 }
 
+/** Hard-coded authoritative sources for major cities where slug patterns fail. */
+const CITY_SOURCE_OVERRIDES: Record<
+  string,
+  { city: string; state: string; urls: string[]; searchTerms?: string[] }
+> = {
+  philadelphia: {
+    city: "Philadelphia",
+    state: "PA",
+    urls: [
+      "https://www.phila.gov/news",
+      "https://www.phillypolice.com/news",
+      "https://www.phila.gov/departments/philadelphia-fire-department",
+      "https://www.penndot.pa.gov",
+      "https://www.511pa.com",
+      "https://www.septa.org",
+      "https://www.fox29.com",
+      "https://www.nbcphiladelphia.com",
+      "https://6abc.com",
+      "https://www.inquirer.com",
+    ],
+    searchTerms: [
+      "Philadelphia police seek suspect surveillance video",
+      "Philadelphia road closure PennDOT 511",
+      "Philadelphia fire department official statement",
+      "Philadelphia community watch OR town watch meeting",
+      "Philadelphia new ordinance OR city council law",
+    ],
+  },
+}
+
+function cityOverrideKey(city?: string, state?: string): string | null {
+  if (!city?.trim()) return null
+  const normalized = normalizeCityForDiscovery(city, state).toLowerCase()
+  return CITY_SOURCE_OVERRIDES[normalized] ? normalized : null
+}
+
 function slugLocal(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "")
 }
@@ -282,9 +320,22 @@ export function buildSourceCatalogPrompt(opts: {
     `  - ${getStatePoliceUrl(stateCode) || "Search state police / highway patrol for " + stateCode}`
   )
 
-  if (opts.city) {
-    lines.push(`Local patterns for ${opts.city}, ${stateCode} (discover actual URLs):`)
-    for (const url of expandLocalPatterns(opts.city, opts.county, stateCode).slice(0, 12)) {
+  const discoveryCity = opts.city
+    ? normalizeCityForDiscovery(opts.city, opts.state)
+    : opts.city
+  const overrideKey = cityOverrideKey(discoveryCity, opts.state)
+  const cityOverride = overrideKey ? CITY_SOURCE_OVERRIDES[overrideKey] : undefined
+
+  if (cityOverride) {
+    lines.push(`Verified local sources for ${cityOverride.city}, ${cityOverride.state}:`)
+    for (const url of cityOverride.urls) lines.push(`  - ${url}`)
+    if (cityOverride.searchTerms?.length) {
+      lines.push("High-value local search topics:")
+      for (const term of cityOverride.searchTerms) lines.push(`  - ${term}`)
+    }
+  } else if (discoveryCity) {
+    lines.push(`Local patterns for ${discoveryCity}, ${stateCode} (discover actual URLs):`)
+    for (const url of expandLocalPatterns(discoveryCity, opts.county, stateCode).slice(0, 12)) {
       lines.push(`  - ${url}`)
     }
     for (const section of LOCAL_SOURCE_PATTERNS) {
@@ -322,6 +373,10 @@ export const DISCOVERY_SOURCE_SEARCH_HINTS = [
   "Citizen app alerts {city}",
   "Watch Duty wildfire {state} OR {city}",
   "{city} {state} Fox OR ABC OR NBC OR CBS weather forecast",
+  "{city} {state} Fox OR ABC local news road closure OR boil water citing officials",
+  "{city} {state} NBC OR CBS traffic alert OR utility outage citing police OR DOT",
+  "site:fox*.com {city} {state} public safety OR road closure",
+  "site:abc*.com {city} {state} emergency OR traffic citing officials",
   "AccuWeather {city} {state} forecast",
   "site:tropicaltidbits.com tropical weather model analysis {state}",
 ] as const
@@ -346,12 +401,16 @@ export const DISCOVERY_SOURCE_CATEGORIES = [
 
 export function getDiscoverySearchHints(state: string, city?: string, county?: string): string[] {
   const stateCode = normalizeStateCode(state)
-  const cityLabel = city || stateCode
-  const countyLabel = county || city || stateCode
-  return DISCOVERY_SOURCE_SEARCH_HINTS.map((hint) =>
+  const discoveryCity = city ? normalizeCityForDiscovery(city, state) : city
+  const cityLabel = discoveryCity || stateCode
+  const countyLabel = county || discoveryCity || stateCode
+  const hints = DISCOVERY_SOURCE_SEARCH_HINTS.map((hint) =>
     hint
       .replace(/\{state\}/g, stateCode)
       .replace(/\{city\}/g, cityLabel)
       .replace(/\{county\}/g, countyLabel)
   )
+  const overrideKey = cityOverrideKey(discoveryCity, state)
+  const extra = overrideKey ? CITY_SOURCE_OVERRIDES[overrideKey]?.searchTerms ?? [] : []
+  return [...hints, ...extra]
 }

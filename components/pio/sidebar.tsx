@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import {
   LayoutDashboard,
-  Plus,
   FileText,
   Video,
   CalendarDays,
@@ -16,6 +15,7 @@ import {
   Settings,
   Sparkles,
   Lock,
+  Home,
 } from "lucide-react"
 import { useAgency } from "@/lib/agency-context"
 import { useMemberSession } from "@/lib/use-member-session"
@@ -54,7 +54,7 @@ const createItems = [
     ? [
         {
           title: "Graphic Studio",
-          description: "Safety tips and event flyers with logos locked in",
+          description: "Community safety graphics with your agency logo",
           href: GRAPHIC_STUDIO_PATH,
           icon: ImageIcon,
           accent: "text-[#F59E0B]",
@@ -170,28 +170,20 @@ export function PIOSidebar() {
         </div>
       </Link>
 
-      <div className="px-4 pb-3">
-        {member ? (
-          <Link
-            href="/pio-tool/events?new=1"
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#2563EB] px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-[#2563EB]/30 transition hover:bg-[#1d4ed8]"
-          >
-            <Plus className="h-4 w-4" />
-            Create New
-          </Link>
-        ) : (
-          <div
-            className="flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl bg-[#2563EB]/45 px-4 py-3 text-sm font-semibold text-white/80"
-            title="Sign in to unlock"
-            aria-disabled="true"
-          >
-            <Lock className="h-4 w-4" />
-            Create New
-          </div>
-        )}
-      </div>
-
       <nav className="flex-1 space-y-5 overflow-y-auto px-3 pb-4">
+        <Link
+          href="/"
+          className="flex items-start gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-white/10"
+        >
+          <Home className="mt-0.5 h-5 w-5 shrink-0 text-[#93A4C7]" />
+          <span className="min-w-0">
+            <span className="block text-sm font-semibold text-white">Home</span>
+            <span className="mt-0.5 block text-[11px] leading-snug text-[#94A3B8]">
+              Back to SaferU
+            </span>
+          </span>
+        </Link>
+
         <Link
           href={member ? "/pio-tool" : "/pio-tool?guest=1"}
           className={cn(

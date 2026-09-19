@@ -186,7 +186,7 @@ export default function CommunityPostPage() {
         track("pio_generate", { source: "community_post" })
         return
       }
-      if (res.status === 403 && data?.error?.includes("generations")) {
+      if (res.status === 403 && data?.error?.toLowerCase().includes("token")) {
         setGenerating(false)
         setShowGenLimitModal(true)
         return

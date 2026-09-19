@@ -38,11 +38,12 @@ import {
   mapsSearchUrl,
   savePioEvent,
   type PioEvent,
-  type PioEventPost,
 } from "@/lib/pio-events-store"
 
 const EVENT_TYPES = [
   "Community event",
+  "Drug take-back",
+  "Service / drop-off",
   "Open house",
   "Education / training",
   "School program",
@@ -192,14 +193,6 @@ function EventDetailInner() {
     }
     return buildEventCampaignPlan(facts, todayYmd())
   }, [event, settings.agencyName, settings.agencyType])
-
-  const postsByKey = useMemo(() => {
-    const map = new Map<string, PioEventPost>()
-    for (const p of event?.posts || []) {
-      if (p.key) map.set(p.key, p)
-    }
-    return map
-  }, [event])
 
   function updateEdit<K extends keyof EditForm>(key: K, value: EditForm[K]) {
     setEditForm((prev) => (prev ? { ...prev, [key]: value } : prev))
@@ -751,75 +744,94 @@ function EventDetailInner() {
 
             {!cancelled && (
             <section className="rounded-2xl border border-[#e2e8f5] bg-white p-5 shadow-sm">
-              <h2 className="mb-1 text-base font-bold text-[#0f1c3f]">
-                Recommended Communications
-              </h2>
-              <p className="mb-4 text-sm text-[#7a8ab0]">
-                Suggested messages based on your event date.
-              </p>
-              <ul className="divide-y divide-[#eef2f7]">
-                {slots.map((slot) => {
-                  const existing = postsByKey.get(slot.key)
-                  const dueToday = slot.recommendedPostDate === todayYmd()
-                  const past = slot.recommendedPostDate < todayYmd()
-                  const { month, day } = formatEventDateShort(slot.recommendedPostDate)
+              <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-bold text-[#0f1c3f]">Messages</h2>
+                  <p className="mt-1 text-sm text-[#7a8ab0]">
+                    Click a date to view that draft. Past dates are hidden.
+                  </p>
+                </div>
+                {event.posts.some(
+                  (p) => p.channel === "Facebook" && p.postDate >= todayYmd()
+                ) && (
+                  <Button asChild size="sm" className="bg-[#2563EB] hover:bg-[#1d4ed8]">
+                    <Link href={`/pio-tool/events/${event.id}/generate`}>Open messages</Link>
+                  </Button>
+                )}
+              </div>
+              {(() => {
+                const today = todayYmd()
+                const upcoming =
+                  event.posts.length > 0
+                    ? Array.from(
+                        event.posts
+                          .filter(
+                            (p) =>
+                              p.key !== "cancellation" &&
+                              p.postDate >= today
+                          )
+                          .reduce((map, post) => {
+                            if (!map.has(post.key) || post.channel === "Facebook") {
+                              map.set(post.key, post)
+                            }
+                            return map
+                          }, new Map<string, (typeof event.posts)[number]>())
+                          .values()
+                      ).sort((a, b) => a.postDate.localeCompare(b.postDate))
+                    : slots
+                        .filter((slot) => slot.recommendedPostDate >= today)
+                        .map((slot) => ({
+                          key: slot.key,
+                          postDate: slot.recommendedPostDate,
+                          timingLabel: slot.timingLabel,
+                          channel: "Facebook" as const,
+                          message: "",
+                        }))
+
+                if (upcoming.length === 0) {
                   return (
-                    <li
-                      key={slot.key}
-                      className="flex flex-wrap items-center gap-3 py-3 first:pt-0 last:pb-0"
-                    >
-                      <div className="flex h-[52px] w-11 shrink-0 flex-col items-center justify-center rounded-xl bg-[#F3F4F6] text-[#0f1c3f]">
-                        <span className="text-[10px] font-bold tracking-wide text-[#6b7280]">
-                          {month}
-                        </span>
-                        <span className="text-lg font-bold leading-none">{day}</span>
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-[#0f1c3f]">{slot.timingLabel}</p>
-                        <p className="text-xs text-[#7a8ab0]">
-                          {new Date(slot.recommendedPostDate + "T00:00:00").toLocaleDateString(
-                            "en-US",
-                            { weekday: "short", month: "short", day: "numeric", year: "numeric" }
-                          )}
-                        </p>
-                      </div>
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                          dueToday
-                            ? "bg-[#FEE2E2] text-[#B91C1C]"
-                            : past
-                              ? "bg-[#F3F4F6] text-[#6b7280]"
-                              : "bg-[#DBEAFE] text-[#1D4ED8]"
-                        }`}
-                      >
-                        {dueToday
-                          ? "Due Today"
-                          : past
-                            ? "Past"
-                            : daysUntil(slot.recommendedPostDate) === 1
-                              ? "1 day"
-                              : `${daysUntil(slot.recommendedPostDate)} days`}
-                      </span>
-                      {existing ? (
-                        <Button asChild size="sm" variant="outline">
-                          <Link href={`/pio-tool/events/${event.id}/generate?key=${slot.key}`}>
-                            View
-                          </Link>
-                        </Button>
-                      ) : (
-                        <Button asChild size="sm" className="bg-[#2563EB] hover:bg-[#1d4ed8]">
-                          <Link href={`/pio-tool/events/${event.id}/generate?key=${slot.key}`}>
-                            Generate Message
-                          </Link>
-                        </Button>
-                      )}
-                    </li>
+                    <p className="text-sm text-[#7a8ab0]">
+                      No upcoming messages. Past posting dates are hidden.
+                    </p>
                   )
-                })}
-              </ul>
-              <p className="mt-4 rounded-xl bg-[#EFF6FF] px-3 py-2.5 text-xs text-[#1e40af]">
-                These are recommendations only. You choose what to generate and when.
-              </p>
+                }
+
+                return (
+                  <ul className="space-y-3">
+                    {upcoming.map((item) => {
+                      const dueToday = item.postDate === today
+                      const { month, day } = formatEventDateShort(item.postDate)
+                      return (
+                        <li key={item.key}>
+                          <Link
+                            href={`/pio-tool/events/${event.id}/generate`}
+                            className="flex flex-wrap items-center gap-3 rounded-xl border border-[#e2e8f5] p-3 transition hover:border-[#93c5fd] hover:bg-[#F8FAFC]"
+                          >
+                            <div className="flex h-[52px] w-11 shrink-0 flex-col items-center justify-center rounded-xl bg-[#F3F4F6] text-[#0f1c3f]">
+                              <span className="text-[10px] font-bold tracking-wide text-[#6b7280]">
+                                {month}
+                              </span>
+                              <span className="text-lg font-bold leading-none">{day}</span>
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-semibold text-[#0f1c3f]">
+                                {item.timingLabel}
+                              </p>
+                              <p className="text-xs text-[#7a8ab0]">
+                                {dueToday
+                                  ? "Due today · Click to view"
+                                  : daysUntil(item.postDate) === 1
+                                    ? "1 day · Click to view"
+                                    : `${daysUntil(item.postDate)} days · Click to view`}
+                              </p>
+                            </div>
+                          </Link>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )
+              })()}
             </section>
             )}
           </div>

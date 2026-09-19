@@ -18,8 +18,20 @@ import { runPioStructuredCall } from "./pio-structured-call"
 
 export type { PressReleasePayload } from "./pio-normalized-facts"
 
+type PressReleaseRevision = {
+  direction: string
+  previousDrafts?: {
+    pressRelease?: string
+    facebook?: string
+    twitter?: string
+    talkingPoints?: string
+    communityRequest?: string | null
+  }
+}
+
 export async function generateStructuredPressReleaseDraft(
-  payload: PressReleasePayload
+  payload: PressReleasePayload,
+  revision?: PressReleaseRevision | null
 ): Promise<AiResult<PressReleaseDraft>> {
   const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) {
@@ -52,11 +64,19 @@ export async function generateStructuredPressReleaseDraft(
       wordCountMin: INCIDENT_MIN,
       wordCountMax: INCIDENT_MAX,
     })
+    const direction = revision?.direction?.trim()
+    const callPayload = direction
+      ? {
+          ...userPayload,
+          revisionDirection: direction.slice(0, 1000),
+          ...(revision?.previousDrafts ? { previousDrafts: revision.previousDrafts } : {}),
+        }
+      : userPayload
 
     return runPioStructuredCall(
       openai,
       PRESS_RELEASE_DRAFT_PROMPT,
-      userPayload,
+      callPayload,
       PRESS_RELEASE_DRAFT_RESPONSE_FORMAT,
       pressReleaseDraftSchema,
       4000,

@@ -30,14 +30,14 @@ const FREE_FEATURES = [
 ]
 
 const PRESS_CENTER_FEATURES: { label: string; ai?: boolean }[] = [
-  { label: "Up to three agency users" },
+  { label: "One agency user account" },
   { label: "100,000 AI tokens each month", ai: true },
   { label: "Press Release Generator", ai: true },
   { label: "Social media versions included with each press release" },
   { label: "Video Request Generator", ai: true },
   { label: "Community Event Campaigns" },
   { label: "Graphic Studio", ai: true },
-  { label: "Safety tip and event graphics with department logos", ai: true },
+  { label: "Safety graphics with department logos", ai: true },
   { label: "Agency profile and branding" },
   { label: "Saved drafts and communication history" },
   { label: "Ready-to-share captions" },
@@ -83,7 +83,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "Does Graphic Studio use AI tokens?",
-    a: "Creating and downloading graphics from locked templates does not use your monthly AI allowance. If SaferU later adds AI drafting helpers inside Graphic Studio, those optional AI actions may use tokens and will be labeled clearly.",
+    a: "Yes. Graphic Studio uses your monthly AI token allowance for research, message drafting, image generation, captions, and revisions.",
   },
   {
     q: "Does editing or copying a message use tokens?",
@@ -91,7 +91,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "What happens when we reach the monthly limit?",
-    a: "The agency can continue using the Content Library, viewing recommendations, editing drafts, saving work, copying messages, and downloading content. New AI generations will become available again when the monthly allowance resets or when additional usage is purchased.",
+    a: "The agency can continue using the Content Library, viewing recommendations, editing drafts, saving work, copying messages, and downloading content. New AI drafting becomes available again when the monthly token allowance resets or when additional tokens are purchased.",
   },
   {
     q: "Do unused tokens roll over?",
@@ -99,7 +99,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "Can more than one person use Press Center?",
-    a: "Yes. The standard Press Center subscription includes up to three agency users.",
+    a: "Press Center subscriptions currently include one agency user account. Multi-user agency packages are planned after launch.",
   },
   {
     q: "Do you offer volunteer agency pricing?",

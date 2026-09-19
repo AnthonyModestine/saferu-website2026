@@ -77,7 +77,34 @@ export function selectionHasAny(selection: MultiOutputSelection): boolean {
   return Object.values(selection).some(Boolean)
 }
 
+export type MultiOutputPreviousDrafts = {
+  pressRelease?: string
+  facebook?: string
+  twitter?: string
+  talkingPoints?: string
+  communityRequest?: string | null
+}
+
+/** Editorial direction for a regenerate — not a source of new facts. */
+export type MultiOutputRevision = {
+  direction: string
+  previousDrafts?: MultiOutputPreviousDrafts
+}
+
 export type AncillaryPayload = PressReleasePayload
+
+function withRevisionPayload<T extends object>(
+  payload: T,
+  revision?: MultiOutputRevision | null
+): T | (T & { revisionDirection: string; previousDrafts?: MultiOutputPreviousDrafts }) {
+  const direction = revision?.direction?.trim()
+  if (!direction) return payload
+  return {
+    ...payload,
+    revisionDirection: direction.slice(0, 1000),
+    ...(revision?.previousDrafts ? { previousDrafts: revision.previousDrafts } : {}),
+  }
+}
 
 export function payloadWantsVideoRequest(payload: AncillaryPayload): boolean {
   return Boolean(
@@ -252,7 +279,8 @@ export async function generateMultiOutput(
     twitter: true,
     talkingPoints: true,
     videoRequest: true,
-  }
+  },
+  revision?: MultiOutputRevision | null
 ): Promise<AiResult<MultiOutputResult>> {
   if (!selectionHasAny(selection)) {
     return { ok: false, reason: "invalid_json", detail: "Select at least one output to generate." }
@@ -280,11 +308,21 @@ export async function generateMultiOutput(
   const knownIds = new Set(normalized.publicationFacts.map((fact) => fact.id))
   const needsReleaseContext =
     selection.pressRelease || selection.facebook || selection.twitter || selection.talkingPoints
+  const activeRevision =
+    revision?.direction?.trim()
+      ? {
+          direction: revision.direction.trim().slice(0, 1000),
+          previousDrafts: revision.previousDrafts,
+        }
+      : null
+
+  let tokensUsed = 0
 
   let releaseDraft = emptyRelease()
   if (needsReleaseContext) {
-    const result = await generateStructuredPressReleaseDraft(normalizedPayload)
+    const result = await generateStructuredPressReleaseDraft(normalizedPayload, activeRevision)
     if (!result.ok) return result
+    tokensUsed += result.tokensUsed ?? 0
     releaseDraft = result.data
     const idError = knownFactError(releaseDraft.usedFactIds, knownIds, "Call 1")
     if (idError) return { ok: false, reason: "invalid_json", detail: idError }
@@ -300,21 +338,25 @@ export async function generateMultiOutput(
     const result = await runPioStructuredCall(
       openai,
       SUPPLEMENTARY_DRAFT_PROMPT,
-      {
-        normalized,
-        pressReleaseDraft: releaseDraft,
-        requested: {
-          facebook: selection.facebook,
-          x: selection.twitter,
-          talkingPoints: selection.talkingPoints,
+      withRevisionPayload(
+        {
+          normalized,
+          pressReleaseDraft: releaseDraft,
+          requested: {
+            facebook: selection.facebook,
+            x: selection.twitter,
+            talkingPoints: selection.talkingPoints,
+          },
         },
-      },
+        activeRevision
+      ),
       SUPPLEMENTARY_RESPONSE_FORMAT,
       supplementaryDraftSchema,
       2400,
       0.1
     )
     if (!result.ok) return result
+    tokensUsed += result.tokensUsed ?? 0
     supplementary = result.data
     const idError = knownFactError(supplementary.usedFactIds, knownIds, "Call 2")
     if (idError) return { ok: false, reason: "invalid_json", detail: idError }
@@ -328,12 +370,19 @@ export async function generateMultiOutput(
 
   let assistance: AssistanceDraft | null = null
   if (selection.videoRequest) {
-    const result = await generateStructuredCommunityRequest({
-      normalized,
-      requested: true,
-      instruction: "Draft a public-assistance, witness, or video request only from supported facts.",
-    })
+    const result = await generateStructuredCommunityRequest(
+      withRevisionPayload(
+        {
+          normalized,
+          requested: true,
+          instruction:
+            "Draft a public-assistance, witness, or video request only from supported facts.",
+        },
+        activeRevision
+      )
+    )
     if (!result.ok) return result
+    tokensUsed += result.tokensUsed ?? 0
     assistance = result.data
     const idError = knownFactError(assistance.usedFactIds, knownIds, "Call 3")
     if (idError) return { ok: false, reason: "invalid_json", detail: idError }
@@ -345,24 +394,28 @@ export async function generateMultiOutput(
   const gateResult = await runPioStructuredCall(
     openai,
     PIO_QUALITY_GATE_PROMPT,
-    {
-      normalized,
-      selectedOutputs: selection,
-      drafts: {
-        pressRelease: releaseDraft,
-        supplementary,
-        assistance,
-        assistanceRendered: assistance ? renderAssistanceRequest(assistance) : "",
+    withRevisionPayload(
+      {
+        normalized,
+        selectedOutputs: selection,
+        drafts: {
+          pressRelease: releaseDraft,
+          supplementary,
+          assistance,
+          assistanceRendered: assistance ? renderAssistanceRequest(assistance) : "",
+        },
+        instruction:
+          "Review all selected drafts. Keep unselected finalPackage fields empty. Correct safely or require human review.",
       },
-      instruction:
-        "Review all selected drafts. Keep unselected finalPackage fields empty. Correct safely or require human review.",
-    },
+      activeRevision
+    ),
     QUALITY_GATE_RESPONSE_FORMAT,
     qualityGateSchema,
     6000,
     0
   )
   if (!gateResult.ok) return gateResult
+  tokensUsed += gateResult.tokensUsed ?? 0
   const gate = gateResult.data
   const finalPackage =
     gate.status === "needs_human_review"
@@ -409,6 +462,7 @@ export async function generateMultiOutput(
 
   return {
     ok: true,
+    tokensUsed,
     data: {
       pressRelease: publicRelease,
       facebook: selection.facebook && !mustReview ? finalPackage.facebook : "",

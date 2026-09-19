@@ -8,92 +8,18 @@ import { parseServiceZips } from "@/lib/local-ideas-ai"
 import { isLocalPreviewServer } from "@/lib/local-preview-server"
 import { isDepartmentType } from "@/lib/department-types"
 import { resolveMemberDepartment } from "@/lib/member-profile"
+import { aiErrorPayload } from "@/lib/ai-result"
 import { generatePostOpportunities, flattenOpportunities } from "@/lib/post-generator/engine"
+import { opportunityFingerprint, topicKey } from "@/lib/post-generator/rank-opportunities"
+import { DEFAULT_DAILY_RECOMMENDATION_LIMIT } from "@/lib/post-generator/types"
+import { runTomorrowBriefing } from "@/lib/post-generator/tomorrow-briefing"
 import {
-  scanExternalOpportunities,
-  demoExternalOpportunities,
-  type RoadImpactInput,
-} from "@/lib/post-generator/external-scanner"
-import { discoverLocalCurrentEventsWithAI } from "@/lib/post-generator/current-events-ai"
-import { discoverExpandedPublicSafetyTopics } from "@/lib/post-generator/citizen-safety-discovery"
-import { discoverLocalWeatherMediaTopics } from "@/lib/post-generator/weather-media-discovery"
-import { getActiveCalendarEntries } from "@/lib/post-generator/calendar"
-import { isValidHolidayRecommendation } from "@/lib/post-generator/holiday-validation"
-import { normalizeCandidates } from "@/lib/post-generator/candidate-normalize"
-import {
-  hasRecommendablePost,
-  hasTopRecommended,
-  opportunityFingerprint,
-  rankAndGateExternalOpportunities,
-  topicKey,
-} from "@/lib/post-generator/rank-opportunities"
-import { discoverStrongRecommendedTopics } from "@/lib/post-generator/deep-recommended-search"
-import { rescueOfficialRankedCandidates, promoteDiscoveryCandidates } from "@/lib/post-generator/official-rescue"
-import { discoverCreatedContentFollowups } from "@/lib/post-generator/content-followup-ai"
-import { runProductionPostPipeline } from "@/lib/post-generator/production-pipeline"
-import { prepareWeatherOpportunityForPipeline } from "@/lib/post-generator/weather-message-ai"
-import { agencyRoleBrief, agencyTypeLabel } from "@/lib/post-generator/agency-relevance"
-import { buildAndSaveAgencySourceCatalog } from "@/lib/post-generator/agency-source-catalog"
-import {
-  getAgencyPreferenceProfile,
-  preferenceBriefForPrompts,
-} from "@/lib/agency-recommendation-preferences"
-import type {
-  ExternalOpportunityInput,
-  GeneratorRequest,
-  RecentAgencyContent,
-} from "@/lib/post-generator/types"
+  mergeRetainedBriefingItems,
+  parseRetainBriefingInput,
+} from "@/lib/post-generator/briefing-stability"
+import type { GeneratorRequest } from "@/lib/post-generator/types"
 
-/** Deep search can take multiple web-search passes — allow up to ~90s on Vercel. */
 export const maxDuration = 90
-
-function calendarHolidayCandidates(todayIso: string): ExternalOpportunityInput[] {
-  const date = new Date(`${todayIso}T12:00:00`)
-  const year = date.getFullYear()
-  return getActiveCalendarEntries(date)
-    .filter((entry) => entry.category === "holiday_safety" && entry.month && entry.day)
-    .filter((entry) =>
-      isValidHolidayRecommendation(
-        {
-          id: entry.id,
-          label: entry.label,
-          month: entry.month,
-          day: entry.day,
-          category: entry.category,
-        },
-        todayIso,
-        7
-      ).ok
-    )
-    .slice(0, 2)
-    .map((entry) => {
-      const eventDate = `${year}-${String(entry.month).padStart(2, "0")}-${String(entry.day).padStart(2, "0")}`
-      return {
-        id: `calendar-${entry.id}`,
-        title: entry.label,
-        summary: `${entry.label} is a timely communication opportunity for your community.`,
-        category: entry.category,
-        sourceLabel: "Seasonal Recommendation" as const,
-        whyItMatters: `${entry.label} is relevant right now. A short, role-appropriate safety reminder helps keep residents informed.`,
-        recommendedAction: "Share a brief, practical safety reminder tied to this observance.",
-        recommendedPostTiming:
-          entry.priority === "urgent"
-            ? "Post as soon as possible."
-            : entry.priority === "recommended_today"
-              ? "Post today or tomorrow morning."
-              : "Plan to post within the next few days.",
-        priority: entry.priority === "urgent" ? "urgent" : entry.priority,
-        signals: entry.signals,
-        sourceName: "SaferU seasonal calendar",
-        eventStart: eventDate,
-        eventEnd: eventDate,
-        verifiedFacts: [`${entry.label} is observed around ${eventDate}.`],
-        publicCallToAction: ["Share one practical safety step residents can take."],
-        doNotClaim: ["Do not invent local incidents, closures, or emergencies."],
-        confidenceLevel: "medium",
-      } satisfies ExternalOpportunityInput
-    })
-}
 
 export async function POST(request: Request) {
   const session = await getMemberSession()
@@ -110,12 +36,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Press Center subscription required" }, { status: 403 })
   }
 
-  if (!checkRateLimit(`pio-opportunities:${session.email}`, 30, 60 * 60 * 1000)) {
-    return NextResponse.json({ error: "Too many requests. Please slow down." }, { status: 429 })
-  }
   const ip = getClientIp(request)
   if (!checkRateLimit(`pio-opportunities-ip:${ip}`, 60, 60 * 60 * 1000)) {
     return NextResponse.json({ error: "Too many requests." }, { status: 429 })
+  }
+
+  if (!localPreview && !checkRateLimit(`pio-tomorrow-briefing:${session.email}`, 12, 60 * 60 * 1000)) {
+    return NextResponse.json({ error: "Too many briefing requests this hour." }, { status: 429 })
   }
 
   try {
@@ -125,7 +52,7 @@ export async function POST(request: Request) {
         ? body.serviceZips.join(" ")
         : String(body.serviceZips || body.zips || "")
     )
-    let county = String(body.county || "").trim()
+    const county = String(body.county || "").trim()
     const city = String(body.city || "").trim()
     const state = String(body.state || "").trim()
     const agencyName = String(body.agencyName || "").trim()
@@ -164,543 +91,45 @@ export async function POST(request: Request) {
     const agencyTypeOther = String(
       resolvedDept.departmentOther || body.agencyTypeOther || body.departmentOther || ""
     ).trim()
-    await ensureContentLoaded()
-    await buildAndSaveAgencySourceCatalog({
-      memberEmail: session.email,
-      agencyName,
-      state,
-      city,
-      county,
-      serviceAreaType,
-      agencyOfficialUrls: Array.isArray(body.agencyOfficialUrls)
-        ? body.agencyOfficialUrls.map(String).slice(0, 20)
-        : [],
-    })
 
-    const roadImpacts: RoadImpactInput[] = Array.isArray(body.roadImpacts)
-      ? (body.roadImpacts as unknown[])
-          .map((item: unknown): RoadImpactInput | null => {
-            if (!item || typeof item !== "object") return null
-            const o = item as Record<string, unknown>
-            const roadName = String(o.roadName || "").trim()
-            const description = String(o.description || "").trim()
-            if (!roadName || !description) return null
-            return {
-              id: o.id ? String(o.id) : undefined,
-              roadName,
-              description,
-              startDate: o.startDate ? String(o.startDate) : undefined,
-              endDate: o.endDate ? String(o.endDate) : undefined,
-              detour: o.detour ? String(o.detour) : undefined,
-              sourceName: o.sourceName ? String(o.sourceName) : undefined,
-              sourceUrl: o.sourceUrl ? String(o.sourceUrl) : undefined,
-            }
-          })
-          .filter((item): item is RoadImpactInput => Boolean(item))
-      : []
+    await ensureContentLoaded()
 
     const todayIso =
       typeof body.todayIso === "string" && body.todayIso
         ? body.todayIso
         : new Date().toISOString().slice(0, 10)
-    const postedFingerprints = Array.isArray(body.postedFingerprints)
-      ? body.postedFingerprints.map(String)
-      : []
     const recentTopicKeys = Array.isArray(body.recentTopicKeys)
       ? body.recentTopicKeys.map(String)
       : []
-    const preferenceProfile = await getAgencyPreferenceProfile(session.memberId)
-    const preferenceBrief = preferenceBriefForPrompts(preferenceProfile)
-    const recentCreatedContent: RecentAgencyContent[] = Array.isArray(body.recentCreatedContent)
-      ? (body.recentCreatedContent as unknown[])
-          .map((item): RecentAgencyContent | null => {
-            if (!item || typeof item !== "object") return null
-            const value = item as Record<string, unknown>
-            const kind = String(value.kind || "")
-            if (!["press_release", "video_request", "event_campaign"].includes(kind)) return null
-            const id = String(value.id || "").trim().slice(0, 120)
-            const title = String(value.title || "").trim().slice(0, 200)
-            const content = String(value.content || "").trim().slice(0, 2500)
-            const createdAt = String(value.createdAt || "").trim().slice(0, 40)
-            if (!id || !title || !content || !createdAt) return null
-            return {
-              id,
-              kind: kind as RecentAgencyContent["kind"],
-              title,
-              content,
-              createdAt,
-              eventDate: value.eventDate ? String(value.eventDate).slice(0, 20) : undefined,
-              agencyRole: value.agencyRole ? String(value.agencyRole).slice(0, 80) : undefined,
-            }
-          })
-          .filter((item): item is RecentAgencyContent => Boolean(item))
-          .slice(0, 18)
-      : []
+    const dismissedIds = Array.isArray(body.dismissedIds) ? body.dismissedIds.map(String) : []
 
-    const useDemo = Boolean(body.demo)
-    let candidates: ExternalOpportunityInput[] = []
-    if (useDemo) {
-      candidates = demoExternalOpportunities(serviceZips)
-    } else {
-      try {
-        candidates = await scanExternalOpportunities({
-          serviceZips,
-          roadImpacts,
-          state,
-          city,
-          county,
-          serviceAreaType,
-        })
-      } catch (error) {
-        console.error("External opportunity scan failed:", error)
-        candidates = []
-      }
-
-      const uniqueExisting = new Map(
-        candidates.map((opp) => [opp.title.trim().toLowerCase(), opp])
-      )
-      // Count DISTINCT topic families — not titles. Three heat alerts still count as 1 slot.
-      const usedTopicFamilies = new Set(
-        [...uniqueExisting.values()].map((opp) => topicKey(opp))
-      )
-      // Search broadly; strict scoring and final PIO validation will curate the few worth showing.
-      const discoveryTarget = 18
-      const slotsRemaining = () => Math.max(0, discoveryTarget - usedTopicFamilies.size)
-      const addCandidate = (opportunity: ExternalOpportunityInput) => {
-        const family = topicKey(opportunity)
-        if (usedTopicFamilies.has(family)) return false
-        const key = opportunity.title.trim().toLowerCase()
-        if (uniqueExisting.has(key)) return false
-        uniqueExisting.set(key, opportunity)
-        usedTopicFamilies.add(family)
-        return true
-      }
-
-      const nwsContext = candidates
-        .filter(
-          (opp) =>
-            opp.sourceLabel === "Weather Alert" ||
-            (opp.signals ?? []).some((s) =>
-              /weather|heat|storm|flood|wind|winter|tornado/i.test(s)
-            )
-        )
-        .map((opp) => ({
-          title: opp.title,
-          summary: opp.summary,
-          signals: opp.signals,
-        }))
-
-      // Only pull TV/AccuWeather when NWS didn't already cover a weather topic family.
-      const hasWeatherFamily = [...usedTopicFamilies].some((k) =>
-        ["heat", "severe_weather", "flood", "winter"].includes(k)
-      )
-      const weatherMediaNeeded = Math.min(hasWeatherFamily ? 0 : 1, slotsRemaining())
-      if (weatherMediaNeeded > 0) {
-        const weatherMedia = await discoverLocalWeatherMediaTopics({
-          state,
-          city,
-          county,
-          serviceAreaType,
-          serviceZips,
-          agencyType,
-          needed: weatherMediaNeeded,
-          todayIso,
-          nwsContext,
-          excludeTitles: [...uniqueExisting.values()].map((opp) => opp.title),
-        })
-        if (weatherMedia.ok) {
-          for (const opportunity of weatherMedia.data) addCandidate(opportunity)
-        } else {
-          console.warn(
-            "[post-opportunities] Local weather media discovery unavailable:",
-            weatherMedia.reason,
-            weatherMedia.detail || ""
-          )
-        }
-      }
-
-      const activeSignals = [
-        ...new Set([
-          ...[...uniqueExisting.values()].flatMap((opp) => opp.signals ?? []).filter(Boolean),
-          ...usedTopicFamilies,
-        ]),
-      ]
-
-      const expandedNeeded = Math.max(6, Math.min(8, slotsRemaining()))
-      if (expandedNeeded > 0) {
-        const expandedTopics = await discoverExpandedPublicSafetyTopics({
-          state,
-          city,
-          county,
-          serviceAreaType,
-          serviceZips,
-          agencyType,
-          needed: expandedNeeded,
-          todayIso,
-          activeSignals,
-          excludeTitles: [...uniqueExisting.values()].map((opp) => opp.title),
-        })
-        if (expandedTopics.ok) {
-          for (const opportunity of expandedTopics.data) addCandidate(opportunity)
-        } else {
-          console.warn(
-            "[post-opportunities] Expanded public safety discovery unavailable:",
-            expandedTopics.reason,
-            expandedTopics.detail || ""
-          )
-        }
-      }
-
-      const needed = Math.max(4, slotsRemaining())
-      if (needed > 0) {
-        const discovered = await discoverLocalCurrentEventsWithAI({
-          state,
-          city,
-          county,
-          serviceAreaType,
-          serviceZips,
-          needed,
-          todayIso,
-          agencyType,
-          excludeTitles: [...uniqueExisting.values()].map((opp) => opp.title),
-        })
-        if (discovered.ok) {
-          for (const opportunity of discovered.data) addCandidate(opportunity)
-        } else {
-          console.warn(
-            "[post-opportunities] AI event discovery unavailable:",
-            discovered.reason,
-            discovered.detail || ""
-          )
-        }
-      }
-      // Seasonal calendar items are lowest priority — only when live discovery is thin.
-      if (slotsRemaining() > 0 && uniqueExisting.size < 6) {
-        for (const opportunity of calendarHolidayCandidates(todayIso)) {
-          addCandidate(opportunity)
-        }
-      }
-      candidates = [...uniqueExisting.values()]
-
-      if (recentCreatedContent.length > 0) {
-        const followups = await discoverCreatedContentFollowups({
-          content: recentCreatedContent,
-          agencyName,
-          agencyType,
-          agencyTypeOther,
-          city,
-          state,
-          todayIso,
-        })
-        if (followups.ok) {
-          // Let scoring compare a proactive follow-up against any live item in the
-          // same family; do not discard the agency-created context prematurely.
-          for (const opportunity of followups.data) {
-            uniqueExisting.set(opportunity.title.trim().toLowerCase(), opportunity)
-            usedTopicFamilies.add(topicKey(opportunity))
-          }
-          candidates = [...uniqueExisting.values()]
-        } else {
-          console.warn(
-            "[post-opportunities] Created-content follow-up analysis unavailable:",
-            followups.reason,
-            followups.detail || ""
-          )
-        }
-      }
-
-      if (uniqueExisting.size < 5) {
-        const boost = await discoverStrongRecommendedTopics({
-          state,
-          city,
-          county,
-          serviceAreaType,
-          serviceZips,
-          agencyType,
-          agencyName,
-          todayIso,
-          needed: 5,
-          excludeTitles: [...uniqueExisting.values()].map((opp) => opp.title),
-          activeSignals: [...usedTopicFamilies],
-        })
-        if (boost.ok) {
-          for (const opportunity of boost.data) addCandidate(opportunity)
-          candidates = [...uniqueExisting.values()]
-        } else {
-          console.warn(
-            "[post-opportunities] Boost discovery unavailable:",
-            boost.reason,
-            boost.detail || ""
-          )
-        }
-      }
-    }
-
-    const normalizedPreview = normalizeCandidates(candidates)
-    console.info(
-      "[post-opportunities] normalized candidates",
-      Object.fromEntries(
-        [...normalizedPreview.reduce((m, c) => m.set(c.sourceType, (m.get(c.sourceType) || 0) + 1), new Map())]
-      )
-    )
-
-    const rankPrefs = {
-      endorsedTopicKeys: preferenceProfile.endorsedTopicKeys,
-      declinedTopicKeys: preferenceProfile.declinedTopicKeys,
-      publishedTopicKeys: preferenceProfile.publishedTopicKeys,
-    }
-
-    let ranked = rankAndGateExternalOpportunities(candidates, {
-      agencyType,
-      agencyName,
-      city,
-      county,
-      todayIso,
-      postedFingerprints,
-      recentTopicKeys,
-      // Demo fixtures may omit source URLs; live path enforces trust.
-      requireTrustedSource: !useDemo,
-      ...rankPrefs,
-    })
-
-    // Deep search when ranking produced zero — empty is valid; do not hunt filler.
-    // Also allow a single recovery pass later if the production pipeline wipes ranked
-    // official items (e.g. evidence failure), so live alerts are not silently replaced
-    // by SaferU curated-only briefings.
-    const runDeepSearch = async (excludeTitles: string[]) => {
-      const deep = await discoverStrongRecommendedTopics({
-        state,
-        city,
-        county,
-        serviceAreaType,
-        serviceZips,
-        agencyType,
-        agencyName,
-        todayIso,
-        needed: 6,
-        excludeTitles,
-        activeSignals: [
-          ...new Set([
-            ...candidates.flatMap((opp) => opp.signals ?? []),
-            ...ranked.map((opp) => topicKey(opp)),
-          ]),
-        ],
-      })
-      if (deep.ok && deep.data.length > 0) {
-        candidates = [...candidates, ...deep.data]
-        ranked = rankAndGateExternalOpportunities(candidates, {
-          agencyType,
-          agencyName,
-          city,
-          county,
-          todayIso,
-          postedFingerprints,
-          recentTopicKeys,
-          requireTrustedSource: true,
-          ...rankPrefs,
-        })
-        console.info(
-          `[post-opportunities] Deep search added ${deep.data.length} candidates; ` +
-            `top_recommended=${hasTopRecommended(ranked)} recommendable=${hasRecommendablePost(ranked)}`
-        )
-        return true
-      }
-      console.warn(
-        "[post-opportunities] Deep recommended search unavailable:",
-        deep.ok ? "empty" : deep.reason,
-        deep.ok ? "" : deep.detail || ""
-      )
-      return false
-    }
-
-    if (!useDemo && ranked.length < 3) {
-      console.info(
-        `[post-opportunities] Only ${ranked.length} ranked recommendation(s) — starting deep search passes.`
-      )
-      await runDeepSearch(candidates.map((opp) => opp.title))
-    }
-
-    if (!useDemo && ranked.length === 0 && candidates.length > 0) {
-      const relaxed = rankAndGateExternalOpportunities(candidates, {
-        agencyType,
-        agencyName,
-        city,
-        county,
-        todayIso,
-        postedFingerprints,
-        recentTopicKeys,
-        requireTrustedSource: true,
-        minPioRating: 3,
-        ...rankPrefs,
-      })
-      if (relaxed.length > 0) {
-        console.info(
-          `[post-opportunities] Relaxed rank accepted ${relaxed.length} candidate(s) after strict gate returned zero.`
-        )
-        ranked = relaxed
-      }
-    }
-
-    const candidatesFound = candidates.length
-    // This path is intentionally fail-closed. Demo fixtures remain deterministic.
-    let pipelineSummary
-    let pipelineDiagnostics
-    let pipelineSelectionSummary: string | undefined
-    let pipelineNoRecommendationReason: string | null | undefined
-    let pipelineRejectedCount: number | undefined
-    const typeLabel = agencyTypeLabel(agencyType, agencyTypeOther)
-    const pipelineContext = {
+    const briefing = await runTomorrowBriefing({
       agencyName: agencyName || "the public safety agency",
       agencyType,
       agencyTypeOther,
-      agencyRoleProfile: agencyRoleBrief(agencyType),
-      agencyVoiceProfile: `${typeLabel}: calm, credible, clear, professional, community-oriented PIO voice. Always name "${agencyName || "the agency"}" when speaking to residents; never use generic stand-ins like "our local police" or "our department."`,
-      agencyServices: Array.isArray(body.agencyServices)
-        ? body.agencyServices.map(String).slice(0, 30)
-        : [],
       city,
       county,
       state,
       serviceAreaType,
       serviceZips,
       todayIso,
-      localDateTime:
-        typeof body.localDateTime === "string" && body.localDateTime
-          ? body.localDateTime
-          : new Date().toISOString(),
-      timezone:
-        typeof body.timezone === "string" && body.timezone
-          ? body.timezone
-          : "America/New_York",
-      recentAgencyPosts: Array.isArray(body.recentAgencyPosts)
-        ? body.recentAgencyPosts.slice(0, 30)
-        : [],
-      recentRecommendations: Array.isArray(body.recentRecommendations)
-        ? body.recentRecommendations.slice(0, 30)
-        : [],
-      dismissedRecommendations: Array.isArray(body.dismissedIds)
-        ? body.dismissedIds.slice(0, 50)
-        : [],
-      recentSaferUContent: recentCreatedContent,
-      upcomingEvents: Array.isArray(body.upcomingEvents) ? body.upcomingEvents.slice(0, 30) : [],
-      availableSaferUContent: Array.isArray(body.availableSaferUContent)
-        ? body.availableSaferUContent.slice(0, 30)
-        : [],
-      recentSignals: [
-        ...recentTopicKeys,
-        ...preferenceProfile.endorsedTopicKeys.map((k) => `endorsed:${k}`),
-      ],
-      recentCommunicationPillars: Array.isArray(body.recentCommunicationPillars)
-        ? body.recentCommunicationPillars.map(String).slice(0, 20)
-        : [],
-      knownActiveConditions: candidates
-        .filter((candidate) => candidate.priority === "urgent")
-        .slice(0, 10),
-      excludedTopics: [
-        ...(Array.isArray(body.dismissedIds) ? body.dismissedIds.map(String) : []),
-        ...preferenceProfile.declinedTopicKeys,
-        ...(preferenceBrief ? [preferenceBrief] : []),
-      ],
-    }
-    const rankedBeforePipeline = ranked.length
-    const rankedForRescue = [...ranked]
-    ranked = ranked.map((opp) => prepareWeatherOpportunityForPipeline(opp, pipelineContext))
-    if (!useDemo && ranked.length > 0) {
-      const pipeline = await runProductionPostPipeline(pipelineContext, ranked)
-      ranked = pipeline.approved
-      pipelineSummary = pipeline.stage1Summary
-      pipelineDiagnostics = pipeline.diagnostics
-      pipelineSelectionSummary = pipeline.selectionSummary
-      pipelineNoRecommendationReason = pipeline.noRecommendationReason
-      pipelineRejectedCount = pipeline.rejectedCount
-      if (pipeline.diagnostics.usedDeterministicFallback) {
-        console.warn(
-          "[post-opportunities] Pipeline used deterministic verified fallback:",
-          pipeline.diagnostics.fallbackReason,
-          `approved=${pipeline.diagnostics.approvedCount}`
-        )
-      }
-      // If evidence/stages wiped everything after ranking found official items,
-      // attempt one recovery discovery pass (not filler — still goes through rank+pipeline).
-      if (ranked.length === 0 && rankedBeforePipeline > 0) {
-        console.warn(
-          `[post-opportunities] Pipeline emptied ${rankedBeforePipeline} ranked item(s); attempting recovery discovery`
-        )
-        const recovered = await runDeepSearch([
-          ...candidates.map((opp) => opp.title),
-          ...pipeline.diagnostics.droppedAtEvidence.map((d) => d.id),
-        ])
-        if (recovered && ranked.length > 0) {
-          const retry = await runProductionPostPipeline(pipelineContext, ranked)
-          ranked = retry.approved
-          pipelineSummary = retry.stage1Summary
-          pipelineSelectionSummary = retry.selectionSummary
-          pipelineNoRecommendationReason = retry.noRecommendationReason
-          pipelineRejectedCount = retry.rejectedCount
-          pipelineDiagnostics = {
-            ...retry.diagnostics,
-            fallbackReason:
-              `${pipeline.diagnostics.fallbackReason || "pipeline_empty"};recovery_attempt`,
-          }
-        }
-      }
+      recentTopicKeys,
+      dismissedTitles: dismissedIds,
+    })
+
+    if (!briefing.ok) {
+      return NextResponse.json(aiErrorPayload(briefing.reason, briefing.detail), { status: 503 })
     }
 
-    if (!useDemo && ranked.length === 0 && rankedForRescue.length > 0) {
-      const rescued = rescueOfficialRankedCandidates(rankedForRescue)
-      if (rescued.length > 0) {
-        console.warn(
-          `[post-opportunities] Official rescue kept ${rescued.length} verified item(s) after pipeline returned zero.`
-        )
-        ranked = rescued
-        pipelineNoRecommendationReason = null
-        pipelineSelectionSummary =
-          "Surfaced verified official sources for your area after additional review could not confirm other items."
-        pipelineDiagnostics = {
-          ...(pipelineDiagnostics ?? {
-            rankedIn: rankedForRescue.length,
-            verifiedEvidence: 0,
-            droppedAtEvidence: [],
-            approvedCount: rescued.length,
-            usedDeterministicFallback: true,
-          }),
-          approvedCount: rescued.length,
-          usedDeterministicFallback: true,
-          fallbackReason: `${
-            pipelineDiagnostics?.fallbackReason || "pipeline_empty"
-          };official_rescue`,
-        }
-      }
-    }
-
-    if (!useDemo && ranked.length === 0 && candidates.length > 0) {
-      const promoted = promoteDiscoveryCandidates(candidates)
-      if (promoted.length > 0) {
-        console.warn(
-          `[post-opportunities] Discovery promotion surfaced ${promoted.length} verified item(s) that failed strict ranking.`
-        )
-        ranked = promoted
-        pipelineNoRecommendationReason = null
-        pipelineSelectionSummary =
-          "Surfaced verified items from official discovery sources for your area."
-        pipelineDiagnostics = {
-          ...(pipelineDiagnostics ?? {
-            rankedIn: 0,
-            verifiedEvidence: promoted.length,
-            droppedAtEvidence: [],
-            approvedCount: promoted.length,
-            usedDeterministicFallback: true,
-          }),
-          approvedCount: promoted.length,
-          usedDeterministicFallback: true,
-          fallbackReason: "discovery_promotion",
-        }
-      }
-    }
-
-    const externalOpportunities: ExternalOpportunityInput[] = ranked.map(
-      ({ internalScores: _scores, ...rest }) => rest
-    )
+    const retained = parseRetainBriefingInput(body.retainBriefing)
+    const mergedOpportunities =
+      briefing.data.opportunities.length >= DEFAULT_DAILY_RECOMMENDATION_LIMIT
+        ? briefing.data.opportunities.slice(0, DEFAULT_DAILY_RECOMMENDATION_LIMIT)
+        : mergeRetainedBriefingItems(
+            briefing.data.opportunities,
+            retained,
+            dismissedIds
+          )
 
     const req: GeneratorRequest = {
       agencyName,
@@ -711,26 +140,32 @@ export async function POST(request: Request) {
       state,
       serviceZips,
       todayIso,
-      dismissedIds: Array.isArray(body.dismissedIds) ? body.dismissedIds : [],
+      dismissedIds,
       usedContentIds: Array.isArray(body.usedContentIds) ? body.usedContentIds : [],
-      postedFingerprints,
+      postedFingerprints: Array.isArray(body.postedFingerprints)
+        ? body.postedFingerprints.map(String)
+        : [],
       recentTopicKeys,
       savedIds: Array.isArray(body.savedIds) ? body.savedIds : [],
-      externalOpportunities,
-      dailyLimit: 4,
+      externalOpportunities: mergedOpportunities,
+      dailyLimit: DEFAULT_DAILY_RECOMMENDATION_LIMIT,
     }
 
     const result = generatePostOpportunities(req)
-    if (pipelineSelectionSummary) result.selectionSummary = pipelineSelectionSummary
-    if (pipelineNoRecommendationReason !== undefined) {
-      result.noRecommendationReason = pipelineNoRecommendationReason
-    }
-    if (typeof pipelineRejectedCount === "number") {
-      result.rejectedCandidateCount = pipelineRejectedCount
-    }
-    const dailyOpportunities = flattenOpportunities(result)
 
-    const opportunities = dailyOpportunities.map((opp) => ({
+    if (briefing.data.noPostsRecommended) {
+      result.noRecommendationReason =
+        "No timely, verified, locally relevant posts were found for tomorrow. SaferU will not recommend filler content."
+      result.emptyState = result.topRecommended.length === 0 && result.couldPost.length === 0
+    } else if (mergedOpportunities.length > 0) {
+      result.selectionSummary = briefing.data.schedule
+        ? `Tomorrow's posting plan is ready (${mergedOpportunities.length} verified recommendation${mergedOpportunities.length === 1 ? "" : "s"}).`
+        : `${mergedOpportunities.length} verified recommendation${mergedOpportunities.length === 1 ? "" : "s"} for tomorrow.`
+      result.noRecommendationReason = null
+      result.emptyState = false
+    }
+
+    const opportunities = flattenOpportunities(result).map((opp) => ({
       ...opp,
       fingerprint: opportunityFingerprint(opp),
       topicKey: topicKey(opp),
@@ -746,18 +181,17 @@ export async function POST(request: Request) {
       fromSaferU: result.fromSaferU,
       emptyState: result.emptyState,
       noRecommendationReason: result.noRecommendationReason,
-      selectionSummary: result.selectionSummary,
-      rejectedCandidateCount: result.rejectedCandidateCount,
+      selectionSummary: result.selectionSummary ?? null,
+      rejectedCandidateCount: 0,
       generatedAt: result.generatedAt,
       opportunities,
-      demo: useDemo,
-      pipelineVersion: "recommendation-v1",
-      pipelineSummary,
-      pipelineDiagnostics,
+      demo: false,
+      pipelineVersion: "tomorrow-briefing-prompt-reset",
+      briefingMarkdown: briefing.data.markdown,
       discoveryStats: {
-        candidatesFound,
-        rankedAfterGate: rankedForRescue.length,
-        approvedAfterPipeline: ranked.length,
+        candidatesFound: mergedOpportunities.length,
+        rankedAfterGate: mergedOpportunities.length,
+        approvedAfterPipeline: mergedOpportunities.length,
       },
     })
   } catch (e) {

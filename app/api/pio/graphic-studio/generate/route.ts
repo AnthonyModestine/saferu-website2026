@@ -5,6 +5,12 @@ import { generateSafetyGraphic } from "@/lib/graphic-studio/generate"
 import { generateSafetySocialCaption } from "@/lib/graphic-studio/social-caption"
 import { saveGraphicStudioRecord, resolveMemberAgencyLogo } from "@/lib/graphic-studio-store"
 import {
+  debitAiTokens,
+  outOfTokensResponse,
+  rejectIfOutOfTokens,
+} from "@/lib/pio-token-gate"
+import { TOKEN_ESTIMATES } from "@/lib/openai-usage"
+import {
   isSafetyAudience,
   isSafetyGraphicStyle,
   isSafetyTipCategory,
@@ -17,6 +23,9 @@ export async function POST(request: Request) {
   const auth = await requireGraphicStudioAccess(request, "pio-graphic-generate", 20, 40)
   if (auth instanceof NextResponse) return auth
   const { session } = auth
+
+  const outOfTokens = await rejectIfOutOfTokens(session.email)
+  if (outOfTokens) return outOfTokens
 
   try {
     const body = await request.json()
@@ -83,6 +92,13 @@ export async function POST(request: Request) {
       agencyName,
     })
     const caption = captionResult.ok ? captionResult.data : ""
+
+    const debit = await debitAiTokens(
+      session.email,
+      (result.tokensUsed ?? 0) + (captionResult.ok ? captionResult.tokensUsed ?? 0 : 0),
+      TOKEN_ESTIMATES.graphicStudioImage + TOKEN_ESTIMATES.graphicStudioCaption
+    )
+    if (!debit.ok) return outOfTokensResponse()
 
     const graphicId = crypto.randomUUID()
     const sources = (Array.isArray(body.sourceRecords) ? body.sourceRecords : []) as GraphicStudioSource[]

@@ -3,18 +3,20 @@ import {
   generateMultiOutput,
   parseMultiOutputSelection,
   selectionHasAny,
+  type MultiOutputRevision,
   type MultiOutputSelection,
 } from "@/lib/multi-output-ai"
 import { getMemberSession } from "@/lib/member-session"
 import { getIsPaidByEmail } from "@/lib/member-access"
 import { isOnActiveTrial } from "@/lib/pio-trial"
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
-import { consumeGeneration, getGenerationStatus } from "@/lib/pio-generations"
+import { consumeTokens, getTokenStatus, OUT_OF_TOKENS_MESSAGE } from "@/lib/pio-generations"
 import { aiErrorPayload } from "@/lib/ai-result"
 import { validatePressReleaseInput } from "@/lib/pio-generate-validation"
 import { logPressReleaseSessions } from "@/lib/pio-session-helper"
 import { resolveMemberDepartment } from "@/lib/member-profile"
 import { normalizePressReleasePayload } from "@/lib/pio-normalized-facts"
+import { TOKEN_ESTIMATES, tokensOrEstimate } from "@/lib/openai-usage"
 
 const MAX = 1000 // max chars for free-text fields
 
@@ -49,19 +51,16 @@ export async function POST(request: Request) {
 
   let status
   try {
-    status = await getGenerationStatus(session.email)
+    status = await getTokenStatus(session.email)
   } catch (e) {
-    console.error("[generate-all] generation status error:", e)
+    console.error("[generate-all] token status error:", e)
     return NextResponse.json(
-      { error: "Could not verify generation quota. Check database connection.", code: "quota_error" },
+      { error: "Could not verify AI token allowance. Check database connection.", code: "quota_error" },
       { status: 500 }
     )
   }
   if (status.remaining === 0) {
-    return NextResponse.json(
-      { error: "You have used all your generations for this month. Purchase a generation pack to continue." },
-      { status: 403 }
-    )
+    return NextResponse.json({ error: OUT_OF_TOKENS_MESSAGE }, { status: 403 })
   }
 
   try {
@@ -105,18 +104,36 @@ export async function POST(request: Request) {
       )
     }
 
-    const result = await generateMultiOutput(payload, selection)
+    const revisionDirection = cap(body.revisionDirection, 1000)
+    const previous = body.previousDrafts
+    const revision: MultiOutputRevision | null = revisionDirection
+      ? {
+          direction: revisionDirection,
+          previousDrafts:
+            previous && typeof previous === "object"
+              ? {
+                  pressRelease: cap((previous as Record<string, unknown>).pressRelease, 8000) || undefined,
+                  facebook: cap((previous as Record<string, unknown>).facebook, 2000) || undefined,
+                  twitter: cap((previous as Record<string, unknown>).twitter, 500) || undefined,
+                  talkingPoints:
+                    cap((previous as Record<string, unknown>).talkingPoints, 4000) || undefined,
+                  communityRequest:
+                    cap((previous as Record<string, unknown>).communityRequest, 4000) || undefined,
+                }
+              : undefined,
+        }
+      : null
+
+    const result = await generateMultiOutput(payload, selection, revision)
     if (!result.ok) {
       console.error("[generate-all] AI failed:", result.reason, result.detail ?? "")
       return NextResponse.json(aiErrorPayload(result.reason, result.detail), { status: 503 })
     }
 
-    const consumed = await consumeGeneration(session.email)
+    const debit = tokensOrEstimate(result.tokensUsed, TOKEN_ESTIMATES.generateAll)
+    const consumed = await consumeTokens(session.email, debit)
     if (!consumed) {
-      return NextResponse.json(
-        { error: "You have used all your generations for this month. Purchase a generation pack to continue." },
-        { status: 403 }
-      )
+      return NextResponse.json({ error: OUT_OF_TOKENS_MESSAGE }, { status: 403 })
     }
 
     const includeVideoRequest = Boolean(selection.videoRequest && result.data.communityRequest)
