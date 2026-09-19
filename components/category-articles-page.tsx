@@ -4,8 +4,8 @@ import Link from "next/link"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { ArticleCard } from "@/components/article-card"
-import { ChevronRight, ShieldCheck, Flame, Star, CloudLightning, AlertTriangle, Users, Shield, FileText } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { ChevronRight, ShieldCheck, Flame, Star, CloudLightning, AlertTriangle, Users, Shield } from "lucide-react"
+import { ContentLibraryEmpty } from "@/components/content-library-empty"
 import type { Article, Category } from "@/lib/data/content-library"
 import { getArticlePublicPath } from "@/lib/category-layout"
 import { getCategoryAccent } from "@/lib/category-accents"
@@ -70,24 +70,12 @@ export function CategoryArticlesPage({
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <h2 className="mb-6 text-xl font-bold text-[#1A365D]">Articles</h2>
             {articles.length === 0 ? (
-              <div className="mx-auto max-w-md rounded-2xl border border-[#E2E8F5] bg-white p-10 text-center shadow-sm">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-[#F0F4F8]">
-                  <FileText className="h-6 w-6 text-[#5c6b85]" />
-                </div>
-                <h3 className="mt-4 text-lg font-bold text-[#1A365D]">
-                  No articles have been added yet.
-                </h3>
-                <p className="mt-2 text-sm text-[#42536e]">
-                  New safety content is added regularly. Browse the rest of the library in the
-                  meantime.
-                </p>
-                <Button
-                  asChild
-                  className="mt-6 rounded-xl bg-[#1A365D] px-6 font-semibold text-white hover:bg-[#1A365D]/90"
-                >
-                  <Link href="/templates">Browse Content Library</Link>
-                </Button>
-              </div>
+              <ContentLibraryEmpty
+                title="Check back soon"
+                description="Articles for this category are being prepared. Please check back later."
+                actionHref="/templates"
+                actionLabel="Browse Content Library"
+              />
             ) : (
               <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                 {articles.map(({ article, subcategoryId }) => (

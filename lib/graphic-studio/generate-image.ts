@@ -6,7 +6,7 @@ import { GRAPHIC_SIZE, imageModel } from "@/lib/graphic-studio/constants"
 import { buildImagePrompt } from "@/lib/graphic-studio/prompts"
 import { createBlankCanvasBuffer, type LogoAsset } from "@/lib/graphic-studio/logo-assets"
 
-/** gpt-image-2 supports 2048x1152; OpenAI SDK types may lag behind. */
+/** gpt-image-2.5-sunburst supports 2048x1152; OpenAI SDK types may lag behind. */
 const IMAGE_SIZE = GRAPHIC_SIZE as "1536x1024"
 
 type GeneratedArtwork = { buffer: Buffer; model: string }

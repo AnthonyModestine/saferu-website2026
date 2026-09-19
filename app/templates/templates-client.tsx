@@ -17,6 +17,7 @@ import {
   Search,
   X,
 } from "lucide-react"
+import { isFlatCategory } from "@/lib/category-layout"
 import type { Category } from "@/lib/data/content-library"
 import type { LucideIcon } from "lucide-react"
 
@@ -240,7 +241,10 @@ export function TemplatesPageClient({ categories }: { categories: Category[] }) 
                   const accent = accentMap[category.id] || "#1470AF"
                   const href = hrefMap[category.id] || `/${category.id}`
                   const isMembersOnly = category.id === "whats-new"
+                  const flat = isFlatCategory(category.id)
 
+                  // Nested layout: public sections. Flat layout: sections are storage buckets only.
+                  const publicSections = flat ? [] : category.subcategories
                   const totalArticles = category.subcategories.reduce(
                     (sum, sub) => sum + sub.articles.length,
                     0
@@ -277,28 +281,39 @@ export function TemplatesPageClient({ categories }: { categories: Category[] }) 
                           {category.description}
                         </p>
 
-                        <div className="mt-4 flex gap-4 text-xs font-medium text-[#5c6b85]">
-                          <span>{category.subcategories.length} sections</span>
-                          <span>{totalArticles} articles</span>
-                          <span>{totalPosts} posts</span>
+                        <div className="mt-4 flex flex-wrap gap-4 text-xs font-medium text-[#5c6b85]">
+                          {!flat && (
+                            <span>
+                              {publicSections.length}{" "}
+                              {publicSections.length === 1 ? "section" : "sections"}
+                            </span>
+                          )}
+                          <span>
+                            {totalArticles} {totalArticles === 1 ? "article" : "articles"}
+                          </span>
+                          <span>
+                            {totalPosts} {totalPosts === 1 ? "post" : "posts"}
+                          </span>
                         </div>
 
                         <div className="mt-4 flex-1">
-                          <div className="flex flex-wrap gap-2">
-                            {category.subcategories.slice(0, 4).map((sub) => (
-                              <span
-                                key={sub.id}
-                                className="rounded-full border border-[#E2E8F5] bg-[#F0F4F8] px-2.5 py-1 text-xs text-[#42536e]"
-                              >
-                                {sub.title}
-                              </span>
-                            ))}
-                            {category.subcategories.length > 4 && (
-                              <span className="rounded-full border border-[#E2E8F5] bg-[#F0F4F8] px-2.5 py-1 text-xs text-[#42536e]">
-                                +{category.subcategories.length - 4} more
-                              </span>
-                            )}
-                          </div>
+                          {publicSections.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {publicSections.slice(0, 4).map((sub) => (
+                                <span
+                                  key={sub.id}
+                                  className="rounded-full border border-[#E2E8F5] bg-[#F0F4F8] px-2.5 py-1 text-xs text-[#42536e]"
+                                >
+                                  {sub.title}
+                                </span>
+                              ))}
+                              {publicSections.length > 4 && (
+                                <span className="rounded-full border border-[#E2E8F5] bg-[#F0F4F8] px-2.5 py-1 text-xs text-[#42536e]">
+                                  +{publicSections.length - 4} more
+                                </span>
+                              )}
+                            </div>
+                          ) : null}
                         </div>
 
                         <Button

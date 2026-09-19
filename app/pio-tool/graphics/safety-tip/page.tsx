@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { ArrowLeft, Copy, Download, Expand, Loader2, Sparkles } from "lucide-react"
+import { ArrowLeft, Bookmark, BookmarkCheck, Copy, Download, Expand, Loader2, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -26,6 +26,8 @@ import {
   GRAPHIC_REVISE_EXPECTED_MS,
   useEstimatedProgress,
 } from "@/lib/graphic-studio/use-estimated-progress"
+import { SAVED_GRAPHICS_PATH } from "@/lib/press-center-features"
+import { GraphicStudioFeedback } from "@/components/pio/graphic-studio-feedback"
 
 type PreparedMessage = {
   headline: string
@@ -55,6 +57,10 @@ export default function SafetyTipGraphicPage() {
   const [adjustingCaption, setAdjustingCaption] = useState<CaptionAdjustMode | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [saveMessage, setSaveMessage] = useState<string | null>(null)
+  const [feedbackKey, setFeedbackKey] = useState(0)
 
   const imageProgress = useEstimatedProgress(
     generating || revising,
@@ -76,8 +82,11 @@ export default function SafetyTipGraphicPage() {
     setError(null)
     setPrepared(null)
     setPreview(null)
+    setGraphicId(null)
     setCaption("")
     setEditRequest("")
+    setSaved(false)
+    setSaveMessage(null)
     try {
       const res = await fetch("/api/pio/graphic-studio/prepare-message", {
         method: "POST",
@@ -145,6 +154,9 @@ export default function SafetyTipGraphicPage() {
       setGraphicId(typeof data.graphicId === "string" ? data.graphicId : null)
       if (typeof data.imageDataUrl === "string") {
         setPreview(data.imageDataUrl)
+        setSaved(false)
+        setSaveMessage(null)
+        setFeedbackKey((k) => k + 1)
       } else {
         setError("Could not generate graphic. Please try again.")
         return
@@ -240,6 +252,7 @@ export default function SafetyTipGraphicPage() {
           editRequest: notes,
           headline,
           message,
+          graphicId,
           ...agencyPayload,
         }),
       })
@@ -255,6 +268,9 @@ export default function SafetyTipGraphicPage() {
       if (typeof (data as { imageDataUrl?: string }).imageDataUrl === "string") {
         setPreview((data as { imageDataUrl: string }).imageDataUrl)
         setEditRequest("")
+        setSaved(false)
+        setSaveMessage(null)
+        setFeedbackKey((k) => k + 1)
       } else {
         setError("Could not revise graphic. Please try again.")
       }
@@ -273,6 +289,43 @@ export default function SafetyTipGraphicPage() {
     a.click()
   }
 
+  const saveGraphic = async () => {
+    if (!preview || !graphicId) {
+      setError("Generate a graphic before saving.")
+      return
+    }
+    setSaving(true)
+    setError(null)
+    setSaveMessage(null)
+    try {
+      const compressed = await compressGraphicDataUrlForUpload(preview, 2048, 0.9)
+      const res = await fetch("/api/pio/graphic-studio/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          graphicId,
+          imageDataUrl: compressed,
+          headline,
+          message,
+          caption,
+          topic,
+          style,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(String((data as { error?: string }).error || "Could not save graphic."))
+        return
+      }
+      setSaved(true)
+      setSaveMessage("Saved to AI Assistant → Saved Graphics.")
+    } catch {
+      setError("Could not save this graphic. Please try again.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const copyCaption = async () => {
     if (!caption.trim()) return
     await navigator.clipboard.writeText(caption)
@@ -280,7 +333,7 @@ export default function SafetyTipGraphicPage() {
     window.setTimeout(() => setCopied(false), 1500)
   }
 
-  const busy = preparing || generating || revising || Boolean(adjustingCaption)
+  const busy = preparing || generating || revising || saving || Boolean(adjustingCaption)
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-6 md:p-8">
@@ -500,10 +553,43 @@ export default function SafetyTipGraphicPage() {
               <Download className="mr-2 h-4 w-4" />
               Download PNG
             </Button>
+            <Button
+              type="button"
+              onClick={() => void saveGraphic()}
+              disabled={!preview || !graphicId || saving || saved}
+              variant="outline"
+              className={
+                saved
+                  ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+                  : "border-[#F59E0B]/40 text-[#B45309]"
+              }
+            >
+              {saving ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : saved ? (
+                <BookmarkCheck className="mr-2 h-4 w-4" />
+              ) : (
+                <Bookmark className="mr-2 h-4 w-4" />
+              )}
+              {saving ? "Saving…" : saved ? "Saved" : "Save graphic"}
+            </Button>
             <Button asChild type="button" variant="outline">
               <Link href="/pio-tool/settings">Agency logo settings</Link>
             </Button>
           </div>
+
+          {saveMessage && (
+            <p className="text-sm text-emerald-700">
+              {saveMessage}{" "}
+              <Link href={SAVED_GRAPHICS_PATH} className="font-semibold underline underline-offset-2">
+                View saved graphics
+              </Link>
+            </p>
+          )}
+
+          {preview && graphicId && (
+            <GraphicStudioFeedback key={`${graphicId}-${feedbackKey}`} graphicId={graphicId} />
+          )}
 
           {preview && (
             <>

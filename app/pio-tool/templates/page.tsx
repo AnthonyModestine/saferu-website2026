@@ -9,7 +9,7 @@ import {
   getEventTemplates,
   type PioEventTemplate,
 } from "@/lib/pio-event-templates-store"
-import { CalendarDays, Plus, Trash2, Copy } from "lucide-react"
+import { Layers, Plus, Trash2, Copy } from "lucide-react"
 
 export default function TemplatesPage() {
   return (
@@ -34,10 +34,10 @@ function TemplatesPageInner() {
     <div className="mx-auto max-w-4xl space-y-6 pb-10">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-[#0f1c3f]">Templates</h1>
+          <h1 className="text-2xl font-bold text-[#0f1c3f]">Event Templates</h1>
           <p className="mt-1 text-sm text-[#667795]">
-            Recurring community events you marked to reuse. Open a template to create the next
-            occurrence.
+            Reusable blueprints for recurring community events. Open a template to schedule the next
+            occurrence — separate from your upcoming events calendar.
           </p>
         </div>
         <Button asChild className="bg-[#2563EB] hover:bg-[#1d4ed8]">
@@ -50,10 +50,10 @@ function TemplatesPageInner() {
 
       {templates.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[#c7d2e5] bg-white px-6 py-12 text-center shadow-sm">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-[#ECFDF5] text-[#10B981]">
-            <CalendarDays className="h-6 w-6" />
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-[#F3E8FF] text-[#7C5CFC]">
+            <Layers className="h-6 w-6" />
           </div>
-          <p className="font-semibold text-[#0f1c3f]">No recurring event templates yet</p>
+          <p className="font-semibold text-[#0f1c3f]">No event templates yet</p>
           <p className="mt-1 text-sm text-[#7a8ab0]">
             When creating an event, check <span className="font-medium">This is a recurring event</span>{" "}
             — it will be saved here automatically.

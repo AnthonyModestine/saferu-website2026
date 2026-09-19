@@ -21,6 +21,7 @@ import {
   MessageSquareQuote,
   Menu,
   Mail,
+  Sparkles,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -38,6 +39,7 @@ const navigation = [
   { name: "Email", href: "/admin/email", icon: Mail },
   { name: "Tickets", href: "/admin/tickets", icon: MessageSquare },
   { name: "Member feedback", href: "/admin/member-feedback", icon: MessageSquareQuote },
+  { name: "Graphic Studio", href: "/admin/graphics", icon: Sparkles },
   { name: "Categories", href: "/admin/categories", icon: FolderTree },
   { name: "Articles", href: "/admin/articles", icon: FileText },
   { name: "Posts", href: "/admin/posts", icon: Images },

@@ -696,20 +696,19 @@ export function ContentLibrarySection() {
   )
 }
 
-/** Section 9 — Mission. */
+/** Section 9 — Mission (light block so it contrasts with Graphic Studio above). */
 export function Mission() {
   return (
-    <section className="relative overflow-hidden bg-[#0B1B3A] py-24 sm:py-32">
+    <section className="relative overflow-hidden bg-gradient-to-b from-[#F0F4F8] to-white py-24 sm:py-32">
       <div className="pointer-events-none absolute inset-0" aria-hidden="true">
-        <div className="absolute left-1/2 top-1/2 h-[420px] w-[720px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#F2B233]/10 blur-[130px]" />
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff05_1px,transparent_1px),linear-gradient(to_bottom,#ffffff05_1px,transparent_1px)] bg-[size:3.5rem_3.5rem]" />
+        <div className="absolute left-1/2 top-1/2 h-[420px] w-[720px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#1470AF]/8 blur-[130px]" />
       </div>
       <div className="relative mx-auto max-w-4xl px-4 text-center sm:px-6 lg:px-8">
-        <h2 className="text-balance text-4xl font-bold tracking-tight text-white sm:text-5xl lg:text-6xl">
+        <h2 className="text-balance text-4xl font-bold tracking-tight text-[#1A365D] sm:text-5xl lg:text-6xl">
           Better Communication Builds{" "}
           <span className="text-[#F2B233]">Safer Communities.</span>
         </h2>
-        <p className="mx-auto mt-8 max-w-3xl text-lg leading-relaxed text-[#b8c7e0] sm:text-xl">
+        <p className="mx-auto mt-8 max-w-3xl text-lg leading-relaxed text-[#42536e] sm:text-xl">
           Clear, consistent communication helps residents prepare, prevent incidents, understand
           local risks, and build trust in the agencies that serve them.
         </p>

@@ -7,9 +7,24 @@ import path from "path"
 import { ensureSchema, getSql, isDatabaseConfigured } from "@/lib/db"
 import type { DateRange } from "@/lib/pio-analytics"
 import { isFlatCategory } from "@/lib/category-layout"
+import { contentLibrary } from "@/lib/data/content-library"
 
 const DATA_DIR = path.join(process.cwd(), "data")
 const STORE_PATH = path.join(DATA_DIR, "content-analytics.json")
+
+/** Public Content Library category IDs — exclude Press Center and other app routes. */
+export const CONTENT_LIBRARY_CATEGORY_IDS = new Set(
+  contentLibrary.map((c) => c.id).concat(["natural-disasters"])
+)
+
+/** True when pathname is a curated Content Library page (not Press Center, admin, etc.). */
+export function isContentLibraryPath(pathname: string | undefined | null): boolean {
+  if (!pathname) return false
+  const segments = pathname.replace(/^\/|\/$/g, "").split("/").filter(Boolean)
+  if (segments.length === 0) return false
+  if (segments[0] === "templates") return true
+  return CONTENT_LIBRARY_CATEGORY_IDS.has(segments[0])
+}
 
 export type ContentEventType = "page_view" | "copy" | "download"
 
@@ -69,7 +84,9 @@ function buildJourneyAnalytics(events: ContentEvent[]): ContentAnalyticsDashboar
   const journeysToDownload = new Map<string, number>()
 
   for (const sessionEvents of bySession.values()) {
-    const sorted = [...sessionEvents].sort((a, b) => a.createdAt - b.createdAt)
+    const sorted = [...sessionEvents]
+      .filter((e) => !e.path || isContentLibraryPath(e.path))
+      .sort((a, b) => a.createdAt - b.createdAt)
     const viewPaths = sorted
       .filter((e) => e.eventType === "page_view" && e.path)
       .map((e) => e.path as string)
@@ -149,8 +166,11 @@ export function parseContentPath(pathname: string): {
   subcategoryId?: string
   articleId?: string
 } {
+  if (!isContentLibraryPath(pathname)) return {}
+
   const segments = pathname.replace(/^\/|\/$/g, "").split("/").filter(Boolean)
   if (segments.length < 2) return {}
+  if (segments[0] === "templates") return {}
   if (segments[0] === "whats-new" && segments[1]) {
     return { categoryId: "whats-new", articleId: segments[1] }
   }
@@ -282,14 +302,23 @@ export async function getContentAnalytics(
   let totalDownloads = 0
 
   for (const e of events) {
+    if (e.path && !isContentLibraryPath(e.path)) continue
+    const categoryHint = e.categoryId ?? (e.path ? parseContentPath(e.path).categoryId : undefined)
+    if (categoryHint && !CONTENT_LIBRARY_CATEGORY_IDS.has(categoryHint) && categoryHint !== "unknown") {
+      continue
+    }
+
     const parsed = e.path ? parseContentPath(e.path) : {}
     const articleId = e.articleId ?? parsed.articleId
     if (!articleId) continue
 
-    const pathKey = e.path || [e.categoryId ?? parsed.categoryId, e.subcategoryId ?? parsed.subcategoryId, articleId].filter(Boolean).join("/")
+    const categoryId = e.categoryId ?? parsed.categoryId
+    if (!categoryId || !CONTENT_LIBRARY_CATEGORY_IDS.has(categoryId)) continue
+
+    const pathKey = e.path || [categoryId, e.subcategoryId ?? parsed.subcategoryId, articleId].filter(Boolean).join("/")
     if (!pathKey) continue
 
-    const title = e.articleTitle || articleId || pathKey
+    const title = e.articleTitle || articleId.replace(/-/g, " ") || pathKey
     const cur = articleStats.get(pathKey) ?? {
       title,
       path: e.path || `/${pathKey}`,
@@ -309,16 +338,18 @@ export async function getContentAnalytics(
     }
     articleStats.set(pathKey, cur)
 
-    const cat = e.categoryId ?? parsed.categoryId ?? "unknown"
-    const catCur = categoryStats.get(cat) ?? { views: 0, copies: 0, downloads: 0 }
+    const catCur = categoryStats.get(categoryId) ?? { views: 0, copies: 0, downloads: 0 }
     if (e.eventType === "page_view") catCur.views += 1
     else if (e.eventType === "copy") catCur.copies += 1
     else if (e.eventType === "download") catCur.downloads += 1
-    categoryStats.set(cat, catCur)
+    categoryStats.set(categoryId, catCur)
   }
 
   const viewedPaths = new Set(
-    events.filter((e) => e.eventType === "page_view").map((e) => e.path).filter(Boolean)
+    events
+      .filter((e) => e.eventType === "page_view" && e.path && isContentLibraryPath(e.path))
+      .map((e) => e.path)
+      .filter(Boolean)
   )
 
   const unusedArticles =

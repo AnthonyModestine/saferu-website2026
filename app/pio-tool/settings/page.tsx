@@ -40,6 +40,7 @@ export default function AgencySettingsPage() {
   const [genUsage, setGenUsage] = useState<{
     used: number
     quota: number
+    monthlyRemaining?: number
     packs: number
     remaining: number
   } | null>(null)
@@ -432,11 +433,17 @@ export default function AgencySettingsPage() {
             <div className="rounded-lg border border-border bg-muted/30 p-4 text-sm text-muted-foreground space-y-1">
               <p className="font-medium text-foreground">AI tokens this month</p>
               <p>
-                {genUsage.used.toLocaleString()} of {genUsage.quota.toLocaleString()} included tokens
-                used
-                {genUsage.packs > 0 ? ` · ${genUsage.packs.toLocaleString()} extra from packs` : ""}
+                Monthly:{" "}
+                {(genUsage.monthlyRemaining ?? Math.max(0, genUsage.quota - genUsage.used)).toLocaleString()}{" "}
+                left ({genUsage.used.toLocaleString()} of {genUsage.quota.toLocaleString()} used)
               </p>
-              <p className="text-xs">Included tokens reset at the start of each calendar month.</p>
+              <p>
+                Packs: {genUsage.packs.toLocaleString()} left · {genUsage.remaining.toLocaleString()}{" "}
+                total available
+              </p>
+              <p className="text-xs">
+                Included monthly tokens reset at the start of each calendar month. Pack tokens carry over.
+              </p>
             </div>
           )}
           <Button

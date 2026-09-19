@@ -10,14 +10,14 @@ Safety graphics for Press Center agencies.
 2. **User review** — edit headline and on-graphic message in the UI.
 
 3. **Generate** — `POST /api/pio/graphic-studio/generate`  
-   GPT Image 2 creates 2048×1152 artwork (logo as reference when available). Sharp composites the original agency logo bottom-right. Optional vision QA before display.
+   GPT Image 2.5 Sunburst creates 2048×1152 artwork (logo as reference when available). Sharp composites the original agency logo bottom-right. Optional vision QA before display.
 
 ## Models (env overrides)
 
 | Variable | Default |
 |----------|---------|
 | `OPENAI_GRAPHIC_RESEARCH_MODEL` | `gpt-5.6` |
-| `OPENAI_GRAPHIC_IMAGE_MODEL` | `gpt-image-2` |
+| `OPENAI_GRAPHIC_IMAGE_MODEL` | `gpt-image-2.5-sunburst` |
 | `OPENAI_GRAPHIC_QA_MODEL` | `gpt-4o-mini` |
 
 ## Code layout
@@ -28,7 +28,7 @@ lib/graphic-studio/
   prompts.ts        — research + image prompts
   schemas.ts        — Zod + JSON schemas
   research.ts       — Responses API research step
-  generate-image.ts   — GPT Image 2 generate/edit
+  generate-image.ts   — GPT Image 2.5 Sunburst generate/edit
   logo-assets.ts    — load logo, blank canvas
   logo-composite.ts — Sharp compositing (unaltered logo)
   qa.ts             — optional vision QA

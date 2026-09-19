@@ -38,8 +38,8 @@ export function useEstimatedProgress(active: boolean, expectedMs: number): numbe
   return progress
 }
 
-/** Typical wait for high-quality 16:9 OpenAI image create (with logo). */
-export const GRAPHIC_GENERATE_EXPECTED_MS = 95_000
+/** Typical wait for high-quality 16:9 Sunburst image create (with logo). */
+export const GRAPHIC_GENERATE_EXPECTED_MS = 120_000
 
-/** Typical wait for surgical image revise. */
-export const GRAPHIC_REVISE_EXPECTED_MS = 80_000
+/** Typical wait for surgical Sunburst image revise. */
+export const GRAPHIC_REVISE_EXPECTED_MS = 100_000

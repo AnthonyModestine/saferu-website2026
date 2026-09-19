@@ -11,10 +11,11 @@ import { getPostMessage } from "@/lib/post-message"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
-import { ChevronRight, ArrowLeft, Download, ShieldCheck, Flame, Star, CloudLightning, AlertTriangle, Users, Shield, ImageIcon } from "lucide-react"
+import { ChevronRight, ArrowLeft, Download, ShieldCheck, Flame, Star, CloudLightning, AlertTriangle, Users, Shield } from "lucide-react"
 import { PostMessageBlock } from "@/components/post-message-block"
 import { PostMediaPreview, PostMediaPlaceholder } from "@/components/post-media-preview"
 import { PostMediaLightbox } from "@/components/post-media-lightbox"
+import { ContentLibraryEmpty } from "@/components/content-library-empty"
 import type { Article, Subcategory, Category } from "@/lib/data/content-library"
 import { isFlatCategory, getCategoryPublicPath } from "@/lib/category-layout"
 import { getCategoryAccent } from "@/lib/category-accents"
@@ -179,15 +180,12 @@ export function ArticleDetailPage({
         <section className="py-10 sm:py-12">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             {posts.length === 0 ? (
-              <div className="mx-auto max-w-md rounded-2xl border border-[#E2E8F5] bg-white p-10 text-center shadow-sm">
-                <ImageIcon className="mx-auto h-8 w-8 text-[#5c6b85]" />
-                <h2 className="mt-4 text-lg font-bold text-[#1A365D]">
-                  No posts have been added yet.
-                </h2>
-                <p className="mt-2 text-sm text-[#42536e]">
-                  Ready-to-share content for this article is coming soon.
-                </p>
-              </div>
+              <ContentLibraryEmpty
+                title="Check back soon"
+                description="Ready-to-share graphics for this article are being prepared. Please check back later."
+                actionHref={skipSubcategoryNav ? categoryHomeHref : `/${category.id}/${subcategory.id}`}
+                actionLabel={`Back to ${skipSubcategoryNav ? category.title : subcategory.title}`}
+              />
             ) : (
               <>
                 <div className="mb-6">

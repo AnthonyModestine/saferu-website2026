@@ -994,9 +994,9 @@ function EventsListView() {
     <div className="mx-auto max-w-5xl space-y-6 pb-10">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-[#0f1c3f]">Events</h1>
+          <h1 className="text-2xl font-bold text-[#0f1c3f]">Upcoming Events</h1>
           <p className="mt-1 text-sm text-[#667795]">
-            Upcoming community events, grouped by month.
+            Your scheduled events and posting timeline, grouped by month.
           </p>
         </div>
         <Button asChild className="bg-[#2563EB] hover:bg-[#1d4ed8]">

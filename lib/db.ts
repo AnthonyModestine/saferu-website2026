@@ -289,5 +289,17 @@ export async function ensureSchema(): Promise<void> {
     )
   `
 
+  await db`
+    CREATE TABLE IF NOT EXISTS graphic_studio_records (
+      graphic_id TEXT PRIMARY KEY,
+      user_email TEXT NOT NULL,
+      data JSONB NOT NULL DEFAULT '{}',
+      saved_at BIGINT,
+      updated_at BIGINT NOT NULL
+    )
+  `
+  await db`CREATE INDEX IF NOT EXISTS idx_graphic_studio_user_saved
+    ON graphic_studio_records (user_email, saved_at DESC NULLS LAST)`
+
   schemaReady = true
 }

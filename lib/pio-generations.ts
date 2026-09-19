@@ -144,20 +144,27 @@ async function writeRecord(email: string, record: MemberRecord): Promise<void> {
 }
 
 export type TokenStatus = {
+  /** Tokens used from this month's included allowance */
   used: number
+  /** Included monthly allowance (100,000) */
   quota: number
+  /** Remaining from this month's included allowance */
+  monthlyRemaining: number
+  /** Leftover purchased/admin pack tokens (carry over) */
   packs: number
+  /** monthlyRemaining + packs */
   remaining: number
 }
 
-/** Returns { used, quota, packs, remaining } for the current month (all in tokens). */
+/** Returns token usage for the current UTC month. */
 export async function getTokenStatus(email: string): Promise<TokenStatus> {
   const record = await readRecord(email)
   const month = currentMonthKey()
   const used = typeof record[month] === "number" ? record[month] : 0
   const packs = record.packs
-  const remaining = Math.max(0, MONTHLY_TOKEN_QUOTA - used) + packs
-  return { used, quota: MONTHLY_TOKEN_QUOTA, packs, remaining }
+  const monthlyRemaining = Math.max(0, MONTHLY_TOKEN_QUOTA - used)
+  const remaining = monthlyRemaining + packs
+  return { used, quota: MONTHLY_TOKEN_QUOTA, monthlyRemaining, packs, remaining }
 }
 
 /** @deprecated Prefer getTokenStatus — same shape, token units. */

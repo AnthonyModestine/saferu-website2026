@@ -102,6 +102,21 @@ export async function POST(request: Request) {
 
     const graphicId = crypto.randomUUID()
     const sources = (Array.isArray(body.sourceRecords) ? body.sourceRecords : []) as GraphicStudioSource[]
+
+    let imageUrl: string | null = null
+    try {
+      const { storeGraphicStudioImageFromDataUrl } = await import(
+        "@/lib/graphic-studio/store-image"
+      )
+      const stored = await storeGraphicStudioImageFromDataUrl(graphicId, result.data.imageDataUrl)
+      imageUrl = stored.url
+    } catch (err) {
+      console.warn(
+        "[api/pio/graphic-studio/generate] Could not persist image for admin review:",
+        err instanceof Error ? err.message : err
+      )
+    }
+
     await saveGraphicStudioRecord({
       graphic_id: graphicId,
       agency_id: agencyName || session.email,
@@ -127,6 +142,9 @@ export async function POST(request: Request) {
       generated_at: new Date().toISOString(),
       revision_count: 0,
       status: "generated",
+      image_url: imageUrl,
+      social_caption: caption || "",
+      feedback: null,
     })
 
     return NextResponse.json({

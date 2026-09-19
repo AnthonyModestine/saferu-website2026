@@ -55,12 +55,35 @@ function isOnActiveTrial(m: MemberRow): boolean {
   return m.trialEndAt > Math.floor(Date.now() / 1000)
 }
 
-function formatTokens(m: MemberRow): string {
-  const g = m.tokens ?? m.generations
-  if (!g) return "—"
+function tokenInfo(m: MemberRow) {
+  return m.tokens ?? m.generations
+}
+
+function monthlyLeft(g: NonNullable<ReturnType<typeof tokenInfo>>): number {
+  return g.monthlyRemaining ?? Math.max(0, g.quota - g.used)
+}
+
+function TokensCell({ m }: { m: MemberRow }) {
+  const g = tokenInfo(m)
+  if (!g) return <span className="text-muted-foreground">—</span>
   const fmt = (n: number) => n.toLocaleString()
-  const packNote = g.packs > 0 ? `, +${fmt(g.packs)} pack` : ""
-  return `${fmt(g.remaining)} left (${fmt(g.used)}/${fmt(g.quota)} used${packNote})`
+  const leftMonthly = monthlyLeft(g)
+  return (
+    <div className="min-w-[11rem] space-y-0.5 text-xs sm:text-sm leading-snug">
+      <p className="text-gray-900">
+        <span className="font-medium">Monthly:</span>{" "}
+        {fmt(leftMonthly)} left
+        <span className="text-gray-500">
+          {" "}
+          ({fmt(g.used)}/{fmt(g.quota)} used)
+        </span>
+      </p>
+      <p className={g.packs > 0 ? "text-gray-900" : "text-gray-500"}>
+        <span className="font-medium">Packs:</span> {fmt(g.packs)} left
+      </p>
+      <p className="text-[11px] text-gray-500">Total {fmt(g.remaining)} available</p>
+    </div>
+  )
 }
 
 function paymentStatusLabel(status: MemberPaymentStatus): string {
@@ -100,17 +123,35 @@ function PaymentBadge({ status }: { status: MemberPaymentStatus }) {
 }
 
 function buildCSV(members: MemberRow[]): string {
-  const headers = ["Email", "Name", "Customer ID", "Payment status", "Access", "AI tokens remaining", "Subscription status", "Joined"]
-  const rows = members.map((m) => [
-    m.email ?? "",
-    m.name ?? "",
-    m.id,
-    paymentStatusLabel(m.paymentStatus),
-    m.access,
-    (m.tokens ?? m.generations) ? String((m.tokens ?? m.generations)!.remaining) : "",
-    m.subscriptionStatus ?? "",
-    formatDate(m.createdAt),
-  ])
+  const headers = [
+    "Email",
+    "Name",
+    "Customer ID",
+    "Payment status",
+    "Access",
+    "Monthly tokens used",
+    "Monthly tokens left",
+    "Pack tokens left",
+    "Total tokens available",
+    "Subscription status",
+    "Joined",
+  ]
+  const rows = members.map((m) => {
+    const g = tokenInfo(m)
+    return [
+      m.email ?? "",
+      m.name ?? "",
+      m.id,
+      paymentStatusLabel(m.paymentStatus),
+      m.access,
+      g ? String(g.used) : "",
+      g ? String(monthlyLeft(g)) : "",
+      g ? String(g.packs) : "",
+      g ? String(g.remaining) : "",
+      m.subscriptionStatus ?? "",
+      formatDate(m.createdAt),
+    ]
+  })
   const escape = (s: string) => {
     const t = String(s).replace(/"/g, '""')
     return t.includes(",") || t.includes('"') || t.includes("\n") ? `"${t}"` : t
@@ -304,8 +345,8 @@ export function MembersListClient({ initialMembers, total, error }: Props) {
       subscriptionStatus: "active",
       trialEndAt: null,
       disabled: false,
-      tokens: { used: 42_000, quota: 100_000, packs: 0, remaining: 58_000 },
-      generations: { used: 42_000, quota: 100_000, packs: 0, remaining: 58_000 },
+      tokens: { used: 42_000, quota: 100_000, monthlyRemaining: 58_000, packs: 0, remaining: 58_000 },
+      generations: { used: 42_000, quota: 100_000, monthlyRemaining: 58_000, packs: 0, remaining: 58_000 },
     },
     {
       id: "example_2",
@@ -318,8 +359,8 @@ export function MembersListClient({ initialMembers, total, error }: Props) {
       subscriptionStatus: "canceled",
       trialEndAt: Math.floor(Date.now() / 1000) + 5 * 24 * 3600, // 5 days from now
       disabled: false,
-      tokens: { used: 12_000, quota: 100_000, packs: 25_000, remaining: 113_000 },
-      generations: { used: 12_000, quota: 100_000, packs: 25_000, remaining: 113_000 },
+      tokens: { used: 12_000, quota: 100_000, monthlyRemaining: 88_000, packs: 25_000, remaining: 113_000 },
+      generations: { used: 12_000, quota: 100_000, monthlyRemaining: 88_000, packs: 25_000, remaining: 113_000 },
     },
   ]
 
@@ -661,7 +702,9 @@ export function MembersListClient({ initialMembers, total, error }: Props) {
                     <PaymentBadge status={m.paymentStatus} />
                   </td>
                   <td className="py-3 pr-4 text-gray-700">{m.access}</td>
-                  <td className="py-3 pr-4 text-gray-600 text-xs sm:text-sm">{formatTokens(m)}</td>
+                  <td className="py-3 pr-4">
+                    <TokensCell m={m} />
+                  </td>
                   <td className="py-3 pr-4 text-gray-500">{formatDate(m.createdAt)}</td>
                   <td className="py-3 pr-4 text-gray-600">
                     <div className="flex flex-wrap items-center gap-1.5">

@@ -12,4 +12,5 @@ export const PRESS_CENTER_FEATURES = {
 } as const
 
 export const GRAPHIC_STUDIO_PATH = "/pio-tool/graphics"
+export const SAVED_GRAPHICS_PATH = "/pio-tool/saved-graphics"
 export const POST_GENERATOR_PATH = "/pio-tool/ideas"

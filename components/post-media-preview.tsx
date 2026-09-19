@@ -53,7 +53,7 @@ export function PostMediaPreview({
 }
 
 export function PostMediaPlaceholder({
-  label = "No graphic",
+  label = "Check back soon",
   className = "",
 }: {
   label?: string
@@ -62,12 +62,13 @@ export function PostMediaPlaceholder({
   return (
     <div
       data-media-fallback
-      className={`absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground text-sm ${className}`}
+      className={`absolute inset-0 flex flex-col items-center justify-center gap-2 px-4 text-center text-muted-foreground text-sm ${className}`}
       style={{ background: "linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%)" }}
       aria-hidden
     >
       <Film className="h-8 w-8 opacity-40" />
       <span className="font-medium">{label}</span>
+      <span className="text-xs opacity-80">Graphic being prepared</span>
     </div>
   )
 }

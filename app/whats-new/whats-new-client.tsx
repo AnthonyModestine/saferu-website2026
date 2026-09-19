@@ -1,12 +1,13 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Star, Lock, FileText, Bell, Sparkles } from "lucide-react"
+import { Star, Lock, Bell, Sparkles } from "lucide-react"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ArticleCard } from "@/components/article-card"
+import { ContentLibraryEmpty } from "@/components/content-library-empty"
 import Link from "next/link"
 import { useMemberSession } from "@/lib/use-member-session"
 import type { Article } from "@/lib/data/content-library"
@@ -130,16 +131,12 @@ export function WhatsNewClient({
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <h2 className="mb-6 text-xl font-bold text-[#1A365D]">Latest content</h2>
             {articles.length === 0 ? (
-              <div className="mx-auto max-w-md rounded-2xl border border-[#E2E8F5] bg-white p-10 text-center shadow-sm">
-                <FileText className="mx-auto h-8 w-8 text-[#5c6b85]" />
-                <h3 className="mt-4 text-lg font-bold text-[#1A365D]">No new content right now.</h3>
-                <p className="mt-2 text-sm text-[#42536e]">
-                  New member content is added weekly. Browse the public library in the meantime.
-                </p>
-                <Button asChild className="mt-6 bg-[#1A365D] text-white hover:bg-[#1A365D]/90">
-                  <Link href="/templates">Browse Content Library</Link>
-                </Button>
-              </div>
+              <ContentLibraryEmpty
+                title="Check back soon"
+                description="New member graphics are added weekly. Please check back later, or browse the public Content Library in the meantime."
+                actionHref="/templates"
+                actionLabel="Browse Content Library"
+              />
             ) : (
               <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                 {articles.map((article) => (

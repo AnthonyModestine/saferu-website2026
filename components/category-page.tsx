@@ -5,6 +5,7 @@ import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { PostPackCard } from "@/components/post-pack-card"
 import { PostPackModal } from "@/components/post-pack-modal"
+import { ContentLibraryEmpty } from "@/components/content-library-empty"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Search, AlertTriangle } from "lucide-react"
@@ -118,11 +119,10 @@ export function CategoryPage({
                 ))}
               </div>
             ) : (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground">
-                  No posts found matching your criteria.
-                </p>
-              </div>
+              <ContentLibraryEmpty
+                title="Check back soon"
+                description="No matching graphics were found for this search. Try another term, or check back later as new content is added."
+              />
             )}
           </div>
         </section>

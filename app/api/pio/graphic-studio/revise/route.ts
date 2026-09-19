@@ -2,7 +2,11 @@ import { NextResponse } from "next/server"
 import { graphicStudioErrorPayload } from "@/lib/ai-result"
 import { requireGraphicStudioAccess } from "@/lib/graphic-studio/api-auth"
 import { reviseSafetyGraphic } from "@/lib/graphic-studio/revise-image"
-import { resolveMemberAgencyLogo } from "@/lib/graphic-studio-store"
+import {
+  getGraphicStudioRecord,
+  resolveMemberAgencyLogo,
+  updateGraphicImage,
+} from "@/lib/graphic-studio-store"
 import {
   debitAiTokens,
   outOfTokensResponse,
@@ -72,6 +76,36 @@ export async function POST(request: Request) {
       TOKEN_ESTIMATES.graphicStudioRevise
     )
     if (!debit.ok) return outOfTokensResponse()
+
+    const graphicId = String(body.graphicId || "").trim()
+    if (graphicId) {
+      const existing = await getGraphicStudioRecord(graphicId)
+      if (existing && existing.user_id.toLowerCase() === session.email.toLowerCase()) {
+        try {
+          const { storeGraphicStudioImageFromDataUrl } = await import(
+            "@/lib/graphic-studio/store-image"
+          )
+          const stored = await storeGraphicStudioImageFromDataUrl(
+            graphicId,
+            result.data.imageDataUrl
+          )
+          await updateGraphicImage({
+            graphicId,
+            userEmail: session.email,
+            imageUrl: stored.url,
+            status: existing.saved_at ? "saved" : "revised",
+            revisionCount: (existing.revision_count || 0) + 1,
+            generationModel: result.data.generationModel,
+            clearFeedback: true,
+          })
+        } catch (err) {
+          console.warn(
+            "[api/pio/graphic-studio/revise] Could not update stored image:",
+            err instanceof Error ? err.message : err
+          )
+        }
+      }
+    }
 
     return NextResponse.json({
       imageDataUrl: result.data.imageDataUrl,

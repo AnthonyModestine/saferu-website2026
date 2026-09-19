@@ -84,5 +84,5 @@ export async function generateSafetyGraphic(opts: {
 }
 
 function imageModelLabel(): string {
-  return process.env.OPENAI_GRAPHIC_IMAGE_MODEL?.trim() || "gpt-image-2"
+  return process.env.OPENAI_GRAPHIC_IMAGE_MODEL?.trim() || "gpt-image-2.5-sunburst"
 }

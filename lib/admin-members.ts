@@ -19,6 +19,7 @@ export type { MemberPaymentStatus } from "@/lib/member-payment-status"
 export interface MemberTokenInfo {
   used: number
   quota: number
+  monthlyRemaining: number
   packs: number
   remaining: number
 }
@@ -42,7 +43,7 @@ export interface MemberRow {
   trialEndAt: number | null
   /** True if account is disabled by admin */
   disabled: boolean
-  /** Press Center AI tokens remaining this month (+ packs) */
+  /** Press Center AI tokens: monthly used/left + pack leftover */
   tokens: MemberTokenInfo | null
   /** @deprecated Prefer tokens */
   generations: MemberTokenInfo | null

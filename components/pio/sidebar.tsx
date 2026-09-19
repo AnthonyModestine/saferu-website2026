@@ -9,6 +9,7 @@ import {
   Video,
   CalendarDays,
   Bookmark,
+  BookmarkCheck,
   Calendar,
   Shield,
   LogOut,
@@ -16,16 +17,18 @@ import {
   Sparkles,
   Lock,
   Home,
+  ImageIcon,
+  Layers,
 } from "lucide-react"
 import { useAgency } from "@/lib/agency-context"
 import { useMemberSession } from "@/lib/use-member-session"
 import { pressCenterSignInUrl, pressCenterSignUpUrl } from "@/lib/press-center-routes"
 import {
   GRAPHIC_STUDIO_PATH,
+  SAVED_GRAPHICS_PATH,
   PRESS_CENTER_FEATURES,
   POST_GENERATOR_PATH,
 } from "@/lib/press-center-features"
-import { ImageIcon } from "lucide-react"
 
 const createItems = [
   {
@@ -44,7 +47,7 @@ const createItems = [
   },
   {
     title: "Community Events",
-    description: "Promote and manage community events",
+    description: "Create a new event and posting plan",
     href: "/pio-tool/events?new=1",
     icon: CalendarDays,
     accent: "text-[#10B981]",
@@ -80,24 +83,39 @@ const assistantItems = [
     description: "See what you should communicate today",
     href: "/pio-tool",
     icon: LayoutDashboard,
+    accent: "text-[#93A4C7]",
   },
   {
     title: "Saved Content",
-    description: "View and manage your drafts",
+    description: "Press releases and video request drafts",
     href: "/pio-tool/history",
     icon: Bookmark,
+    accent: "text-[#3B82F6]",
   },
+  ...(PRESS_CENTER_FEATURES.graphicStudioVisible
+    ? [
+        {
+          title: "Saved Graphics",
+          description: "Graphics you saved from Graphic Studio",
+          href: SAVED_GRAPHICS_PATH,
+          icon: BookmarkCheck,
+          accent: "text-[#F59E0B]",
+        },
+      ]
+    : []),
   {
-    title: "Templates",
-    description: "Reuse recurring community events",
+    title: "Event Templates",
+    description: "Reusable blueprints for recurring events",
     href: "/pio-tool/templates",
-    icon: CalendarDays,
+    icon: Layers,
+    accent: "text-[#7C5CFC]",
   },
   {
-    title: "Events",
-    description: "Upcoming community events by month",
+    title: "Upcoming Events",
+    description: "Your scheduled events and posting timeline",
     href: "/pio-tool/events",
     icon: Calendar,
+    accent: "text-[#10B981]",
   },
 ]
 
@@ -268,6 +286,7 @@ export function PIOSidebar() {
                       title={item.title}
                       description={item.description}
                       icon={item.icon}
+                      accent={item.accent}
                     />
                   )
                 }
@@ -286,7 +305,7 @@ export function PIOSidebar() {
                     <item.icon
                       className={cn(
                         "mt-0.5 h-5 w-5 shrink-0",
-                        active ? "text-white" : "text-[#93A4C7]"
+                        active ? "text-white" : item.accent || "text-[#93A4C7]"
                       )}
                     />
                     <span className="min-w-0">

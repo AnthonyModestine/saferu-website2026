@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { recordEvent } from "@/lib/metrics"
 import type { TrackEvent } from "@/lib/metrics"
-import { recordContentEvent, parseContentPath } from "@/lib/content-analytics"
+import { recordContentEvent, parseContentPath, isContentLibraryPath } from "@/lib/content-analytics"
 import { getMemberSession } from "@/lib/member-session"
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
 
@@ -46,8 +46,13 @@ export async function POST(request: NextRequest) {
       ...rest,
     })
 
-    if (event === "page_view" || event === "copy" || event === "download") {
-      const parsed = path ? parseContentPath(path) : {}
+    // Content Library analytics only — ignore Press Center, admin, account, etc.
+    if (
+      (event === "page_view" || event === "copy" || event === "download") &&
+      path &&
+      isContentLibraryPath(path)
+    ) {
+      const parsed = parseContentPath(path)
       await recordContentEvent({
         eventType: event,
         path,
