@@ -69,8 +69,14 @@ export function ArticlesPage({ category, subcategory }: ArticlesPageProps) {
         {/* Articles grid */}
         <section className="py-10 sm:py-12">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div className="mb-6 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-[#1A365D]">Articles</h2>
+            <div className="mb-6 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-bold text-[#1A365D]">Articles</h2>
+                <p className="mt-0.5 text-sm text-[#5c6b85]">
+                  {subcategory.articles.length}{" "}
+                  {subcategory.articles.length === 1 ? "topic" : "topics"} ready to browse
+                </p>
+              </div>
               <Button
                 variant="ghost"
                 size="sm"
@@ -92,7 +98,7 @@ export function ArticlesPage({ category, subcategory }: ArticlesPageProps) {
                 actionLabel={`Browse ${category.title}`}
               />
             ) : (
-              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="mx-auto flex max-w-3xl flex-col gap-3">
                 {subcategory.articles.map((article) => (
                   <ArticleCard
                     key={article.id}
