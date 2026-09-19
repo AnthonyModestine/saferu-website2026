@@ -19,10 +19,10 @@ export default function HomePage() {
         <Hero />
         <TrustedBy />
         <CoreOutcomes />
+        <ContentLibrarySection />
         <PressCenterPreview />
         <AgencyFeedback />
         <AiPostGeneratorSection />
-        <ContentLibrarySection />
         <Mission />
       </main>
       <Footer />
