@@ -37,7 +37,7 @@ const navigation = [
   { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
   { name: "Members", href: "/admin/members", icon: Users },
   { name: "Email", href: "/admin/email", icon: Mail },
-  { name: "Tickets", href: "/admin/tickets", icon: MessageSquare },
+  { name: "Tickets", href: "/admin/tickets", icon: MessageSquare, badgeKey: "tickets" as const },
   { name: "Member feedback", href: "/admin/member-feedback", icon: MessageSquareQuote },
   { name: "Graphic Studio", href: "/admin/graphics", icon: Sparkles },
   { name: "Categories", href: "/admin/categories", icon: FolderTree },
@@ -47,6 +47,10 @@ const navigation = [
   { name: "Media Library", href: "/admin/media", icon: ImageIcon },
   { name: "Metrics", href: "/admin/metrics", icon: BarChart3 },
 ]
+
+type NavBadges = {
+  tickets?: number
+}
 
 function getPageTitle(pathname: string): string {
   const match = navigation.find(
@@ -104,7 +108,25 @@ function AdminSidebarFooter({ onNavigate }: { onNavigate?: () => void }) {
   )
 }
 
-export function AdminSidebarNav({ onNavigate }: { onNavigate?: () => void }) {
+function UnreadBadge({ count }: { count: number }) {
+  if (count <= 0) return null
+  return (
+    <span
+      className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-bold leading-none text-white"
+      aria-label={`${count} unread`}
+    >
+      {count > 99 ? "99+" : count}
+    </span>
+  )
+}
+
+export function AdminSidebarNav({
+  onNavigate,
+  badges,
+}: {
+  onNavigate?: () => void
+  badges?: NavBadges
+}) {
   const pathname = usePathname()
 
   return (
@@ -115,6 +137,8 @@ export function AdminSidebarNav({ onNavigate }: { onNavigate?: () => void }) {
           const isActive =
             pathname === item.href ||
             (item.href !== "/admin" && pathname.startsWith(item.href))
+          const badgeCount =
+            "badgeKey" in item && item.badgeKey === "tickets" ? (badges?.tickets ?? 0) : 0
 
           return (
             <Link
@@ -129,8 +153,12 @@ export function AdminSidebarNav({ onNavigate }: { onNavigate?: () => void }) {
               )}
             >
               <item.icon className="h-5 w-5 shrink-0" />
-              {item.name}
-              {isActive && <ChevronRight className="ml-auto h-4 w-4" />}
+              <span className="min-w-0 flex-1 truncate">{item.name}</span>
+              {badgeCount > 0 ? (
+                <UnreadBadge count={badgeCount} />
+              ) : (
+                isActive && <ChevronRight className="h-4 w-4 shrink-0" />
+              )}
             </Link>
           )
         })}
@@ -140,15 +168,15 @@ export function AdminSidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   )
 }
 
-export function AdminSidebar() {
+export function AdminSidebar({ badges }: { badges?: NavBadges }) {
   return (
     <div className="flex h-screen w-64 flex-col bg-[#1a365d] text-white">
-      <AdminSidebarNav />
+      <AdminSidebarNav badges={badges} />
     </div>
   )
 }
 
-export function AdminMobileHeader() {
+export function AdminMobileHeader({ badges }: { badges?: NavBadges }) {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
   const pageTitle = getPageTitle(pathname)
@@ -157,8 +185,18 @@ export function AdminMobileHeader() {
     <header className="sticky top-0 z-40 flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-3 shadow-sm lg:hidden">
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger asChild>
-          <Button variant="outline" size="icon" className="shrink-0" aria-label="Open admin menu">
+          <Button
+            variant="outline"
+            size="icon"
+            className="relative shrink-0"
+            aria-label="Open admin menu"
+          >
             <Menu className="h-5 w-5" />
+            {(badges?.tickets ?? 0) > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                {(badges?.tickets ?? 0) > 99 ? "99+" : badges?.tickets}
+              </span>
+            )}
           </Button>
         </SheetTrigger>
         <SheetContent
@@ -166,7 +204,7 @@ export function AdminMobileHeader() {
           className="flex w-[min(100vw-2rem,280px)] flex-col border-0 bg-[#1a365d] p-0 text-white sm:max-w-xs [&>button]:text-white [&>button]:opacity-80"
         >
           <SheetTitle className="sr-only">Admin navigation</SheetTitle>
-          <AdminSidebarNav onNavigate={() => setOpen(false)} />
+          <AdminSidebarNav badges={badges} onNavigate={() => setOpen(false)} />
         </SheetContent>
       </Sheet>
       <div className="min-w-0">

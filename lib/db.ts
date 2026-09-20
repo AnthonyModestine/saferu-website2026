@@ -301,5 +301,12 @@ export async function ensureSchema(): Promise<void> {
   await db`CREATE INDEX IF NOT EXISTS idx_graphic_studio_user_saved
     ON graphic_studio_records (user_email, saved_at DESC NULLS LAST)`
 
+  await db`
+    CREATE TABLE IF NOT EXISTS member_last_logins (
+      email TEXT PRIMARY KEY,
+      last_login_at BIGINT NOT NULL
+    )
+  `
+
   schemaReady = true
 }

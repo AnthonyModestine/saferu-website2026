@@ -8,6 +8,7 @@ import { purgeAllMemberData } from "@/lib/purge-member-data"
 import { setTrial, getTrialEnd } from "@/lib/pio-trial"
 import { getDisabledEmails, setMemberDisabled as setDisabledInStore } from "@/lib/disabled-members"
 import { addTokenPack, getTokenStatuses } from "@/lib/pio-generations"
+import { getLastLoginsByEmails } from "@/lib/member-last-login"
 import {
   accessLabel,
   derivePaymentStatus,
@@ -47,6 +48,8 @@ export interface MemberRow {
   tokens: MemberTokenInfo | null
   /** @deprecated Prefer tokens */
   generations: MemberTokenInfo | null
+  /** Last successful sign-in (Unix seconds), or null if never recorded */
+  lastLoginAt: number | null
 }
 
 export interface MembersResult {
@@ -141,6 +144,7 @@ export async function getMembersList(): Promise<MembersResult> {
           disabled: disabledSet.has((c.email ?? "").toLowerCase()),
           tokens: null,
           generations: null,
+          lastLoginAt: null,
         })
       }
     } catch (e) {
@@ -164,6 +168,7 @@ export async function getMembersList(): Promise<MembersResult> {
       disabled: disabledSet.has(m.email.toLowerCase()),
       tokens: null,
       generations: null,
+      lastLoginAt: null,
     })
   }
 
@@ -187,6 +192,17 @@ export async function getMembersList(): Promise<MembersResult> {
     const status = tokenStatuses.get(m.email.toLowerCase()) ?? null
     m.tokens = status
     m.generations = status
+  })
+
+  const lastLogins = await getLastLoginsByEmails(
+    members.map((m) => m.email ?? "").filter(Boolean)
+  )
+  members.forEach((m) => {
+    if (!m.email) {
+      m.lastLoginAt = null
+      return
+    }
+    m.lastLoginAt = lastLogins.get(m.email.toLowerCase()) ?? null
   })
 
   return { members, total: members.length }

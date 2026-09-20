@@ -19,6 +19,8 @@ export interface Ticket {
   createdAt: number // Unix seconds
   /** Set when admin has replied; used to filter "replied" vs "new" */
   repliedAt?: number
+  /** Set when an admin opens/views the ticket message */
+  readAt?: number
 }
 
 interface Store {
@@ -74,8 +76,26 @@ export async function markTicketReplied(id: string): Promise<boolean> {
   const ticket = store.tickets.find((t) => t.id === id)
   if (!ticket) return false
   ticket.repliedAt = Math.floor(Date.now() / 1000)
+  if (!ticket.readAt) ticket.readAt = ticket.repliedAt
   await writeStore(store)
   return true
+}
+
+/** Mark a ticket as read (admin opened the message). */
+export async function markTicketRead(id: string): Promise<boolean> {
+  const store = await ensureFile()
+  const ticket = store.tickets.find((t) => t.id === id)
+  if (!ticket) return false
+  if (ticket.readAt) return true
+  ticket.readAt = Math.floor(Date.now() / 1000)
+  await writeStore(store)
+  return true
+}
+
+/** Count of tickets the admin has not opened yet. */
+export async function getUnreadTicketCount(): Promise<number> {
+  const store = await ensureFile()
+  return store.tickets.filter((t) => !t.readAt).length
 }
 
 /** Delete a ticket by id. */

@@ -135,6 +135,7 @@ function buildCSV(members: MemberRow[]): string {
     "Total tokens available",
     "Subscription status",
     "Joined",
+    "Last login",
   ]
   const rows = members.map((m) => {
     const g = tokenInfo(m)
@@ -150,6 +151,7 @@ function buildCSV(members: MemberRow[]): string {
       g ? String(g.remaining) : "",
       m.subscriptionStatus ?? "",
       formatDate(m.createdAt),
+      m.lastLoginAt ? formatDate(m.lastLoginAt) : "",
     ]
   })
   const escape = (s: string) => {
@@ -347,6 +349,7 @@ export function MembersListClient({ initialMembers, total, error }: Props) {
       disabled: false,
       tokens: { used: 42_000, quota: 100_000, monthlyRemaining: 58_000, packs: 0, remaining: 58_000 },
       generations: { used: 42_000, quota: 100_000, monthlyRemaining: 58_000, packs: 0, remaining: 58_000 },
+      lastLoginAt: Math.floor(Date.now() / 1000) - 2 * 24 * 3600,
     },
     {
       id: "example_2",
@@ -361,6 +364,7 @@ export function MembersListClient({ initialMembers, total, error }: Props) {
       disabled: false,
       tokens: { used: 12_000, quota: 100_000, monthlyRemaining: 88_000, packs: 25_000, remaining: 113_000 },
       generations: { used: 12_000, quota: 100_000, monthlyRemaining: 88_000, packs: 25_000, remaining: 113_000 },
+      lastLoginAt: null,
     },
   ]
 
@@ -675,6 +679,7 @@ export function MembersListClient({ initialMembers, total, error }: Props) {
                 <th className="pb-3 pr-4 font-medium">Access</th>
                 <th className="pb-3 pr-4 font-medium">AI tokens</th>
                 <th className="pb-3 pr-4 font-medium">Joined</th>
+                <th className="pb-3 pr-4 font-medium">Last login</th>
                 <th className="pb-3 pr-4 font-medium">Status</th>
                 <th className="pb-3 pr-4 font-medium text-right">Actions</th>
               </tr>
@@ -682,7 +687,7 @@ export function MembersListClient({ initialMembers, total, error }: Props) {
             <tbody>
               {filteredMembers.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-muted-foreground">
+                  <td colSpan={9} className="py-12 text-center text-muted-foreground">
                     {filteredMembers.length === 0 && membersToShow.length > 0
                       ? "No members match the current filters. Try changing Payment, Trial, or Date joined."
                       : query
@@ -706,6 +711,9 @@ export function MembersListClient({ initialMembers, total, error }: Props) {
                     <TokensCell m={m} />
                   </td>
                   <td className="py-3 pr-4 text-gray-500">{formatDate(m.createdAt)}</td>
+                  <td className="py-3 pr-4 text-gray-500">
+                    {m.lastLoginAt ? formatDate(m.lastLoginAt) : "—"}
+                  </td>
                   <td className="py-3 pr-4 text-gray-600">
                     <div className="flex flex-wrap items-center gap-1.5">
                       {m.disabled && (

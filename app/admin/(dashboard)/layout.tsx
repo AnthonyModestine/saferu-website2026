@@ -3,6 +3,9 @@ import { redirect } from "next/navigation"
 import { checkAdminSession } from "@/lib/admin-auth"
 import { AdminSidebar, AdminMobileHeader } from "@/components/admin/admin-sidebar"
 import { ensureContentLoaded } from "@/lib/ensure-content-loaded"
+import { getUnreadTicketCount } from "@/lib/tickets-store"
+
+export const dynamic = "force-dynamic"
 
 export default async function AdminDashboardLayout({
   children,
@@ -16,14 +19,16 @@ export default async function AdminDashboardLayout({
   }
 
   await ensureContentLoaded()
+  const unreadTickets = await getUnreadTicketCount()
+  const badges = { tickets: unreadTickets }
 
   return (
     <div className="flex min-h-screen bg-gray-50">
       <div className="hidden shrink-0 lg:block">
-        <AdminSidebar />
+        <AdminSidebar badges={badges} />
       </div>
       <div className="flex min-w-0 flex-1 flex-col">
-        <AdminMobileHeader />
+        <AdminMobileHeader badges={badges} />
         <main className="flex-1 overflow-x-hidden overflow-y-auto">
           {children}
         </main>

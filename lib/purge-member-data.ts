@@ -18,6 +18,7 @@ const PIO_TRIALS_FILE = path.join(DATA_DIR, "pio-trials.json")
 const PASSWORD_RESET_FILE = path.join(DATA_DIR, "password-reset-tokens.json")
 const PIO_ANALYTICS_FILE = path.join(DATA_DIR, "pio-analytics.json")
 const CONTENT_ANALYTICS_FILE = path.join(DATA_DIR, "content-analytics.json")
+const MEMBER_LAST_LOGINS_FILE = path.join(DATA_DIR, "member-last-logins.json")
 
 export async function purgeAllMemberData(params: {
   email: string
@@ -37,6 +38,7 @@ export async function purgeAllMemberData(params: {
     purgeGenerationAnalytics(email, memberId),
     purgeContentAnalytics(email),
     purgeMemberFeedback(email),
+    purgeLastLogin(email),
     setMemberDisabled(email, false),
     memberId ? clearMemberSessionsForUser(memberId) : Promise.resolve(),
     params.removeStripe ? purgeStripeByEmail(email) : Promise.resolve(),
@@ -166,6 +168,25 @@ async function purgeContentAnalytics(email: string): Promise<void> {
     const next = events.filter((e) => e.memberEmail?.toLowerCase() !== email)
     await mkdir(DATA_DIR, { recursive: true })
     await writeFile(CONTENT_ANALYTICS_FILE, JSON.stringify(next, null, 2), "utf-8")
+  } catch {
+    // no file yet
+  }
+}
+
+async function purgeLastLogin(email: string): Promise<void> {
+  if (isDatabaseConfigured()) {
+    await ensureSchema()
+    await getSql()`DELETE FROM member_last_logins WHERE email = ${email}`
+    return
+  }
+
+  try {
+    const raw = await readFile(MEMBER_LAST_LOGINS_FILE, "utf-8")
+    const store = JSON.parse(raw) as Record<string, number>
+    if (!store || typeof store !== "object") return
+    delete store[email]
+    await mkdir(DATA_DIR, { recursive: true })
+    await writeFile(MEMBER_LAST_LOGINS_FILE, JSON.stringify(store, null, 2), "utf-8")
   } catch {
     // no file yet
   }

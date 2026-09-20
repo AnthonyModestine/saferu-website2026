@@ -93,7 +93,7 @@ const OUTPUT_OPTIONS: Array<{
   {
     id: "videoRequest",
     label: "Public Assistance Request",
-    hint: "Ask for witnesses, information, or footage",
+    hint: "Request video footage on Neighbors by Ring",
   },
 ]
 

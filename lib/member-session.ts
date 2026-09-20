@@ -6,6 +6,7 @@ import path from "path"
 import { ensureSchema, getSql, isDatabaseConfigured } from "@/lib/db"
 import { LOCAL_PREVIEW_MEMBER } from "@/lib/local-preview"
 import { isLocalPreviewServer } from "@/lib/local-preview-server"
+import { recordMemberLogin } from "@/lib/member-last-login"
 
 const DATA_DIR = path.join(process.cwd(), "data")
 const SESSIONS_FILE = path.join(DATA_DIR, "member-sessions.json")
@@ -81,6 +82,8 @@ export async function createMemberSession(params: {
     }
     await writeSessions(store)
   }
+
+  await recordMemberLogin(email)
 
   const cookieStore = await cookies()
   cookieStore.set(COOKIE_NAME, sessionId, {

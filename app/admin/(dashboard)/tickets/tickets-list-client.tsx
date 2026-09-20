@@ -21,9 +21,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Mail, MessageSquare, User, Building2, Calendar, CheckCircle, Filter } from "lucide-react"
+import { Mail, MessageSquare, User, Building2, Calendar, CheckCircle, Filter, ChevronDown } from "lucide-react"
 import type { Ticket } from "@/lib/tickets-store"
-import { markTicketReplied, deleteTicket } from "@/lib/admin-tickets"
+import { markTicketReplied, markTicketRead, deleteTicket } from "@/lib/admin-tickets"
+import { cn } from "@/lib/utils"
 
 const TOPIC_LABELS: Record<string, string> = {
   general: "General Inquiry",
@@ -52,12 +53,33 @@ export function TicketsListClient({ tickets }: { tickets: Ticket[] }) {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [openedIds, setOpenedIds] = useState<Set<string>>(() => new Set())
+  const [openingId, setOpeningId] = useState<string | null>(null)
 
   const filtered = tickets.filter((t) => {
     if (filter === "new") return !t.repliedAt
     if (filter === "replied") return !!t.repliedAt
     return true
   })
+
+  const isExpanded = (ticket: Ticket) => Boolean(ticket.readAt) || openedIds.has(ticket.id)
+
+  const handleOpenMessage = async (id: string) => {
+    setOpenedIds((prev) => {
+      const next = new Set(prev)
+      next.add(id)
+      return next
+    })
+    const ticket = tickets.find((t) => t.id === id)
+    if (ticket?.readAt) return
+
+    setOpeningId(id)
+    setError(null)
+    const result = await markTicketRead(id)
+    if (result.success) router.refresh()
+    else setError(result.error ?? "Failed to mark as read")
+    setOpeningId(null)
+  }
 
   const handleMarkReplied = async (id: string) => {
     setError(null)
@@ -84,6 +106,7 @@ export function TicketsListClient({ tickets }: { tickets: Ticket[] }) {
 
   const newCount = tickets.filter((t) => !t.repliedAt).length
   const repliedCount = tickets.filter((t) => !!t.repliedAt).length
+  const unreadCount = tickets.filter((t) => !t.readAt).length
 
   return (
     <Card>
@@ -97,7 +120,7 @@ export function TicketsListClient({ tickets }: { tickets: Ticket[] }) {
             <CardDescription>
               {tickets.length === 0
                 ? "No tickets yet."
-                : `${tickets.length} ticket${tickets.length !== 1 ? "s" : ""} — ${newCount} new, ${repliedCount} replied. Filter and mark as replied when you've sent a message.`}
+                : `${tickets.length} ticket${tickets.length !== 1 ? "s" : ""} — ${unreadCount} unread, ${newCount} unreplied, ${repliedCount} replied. Open a message to clear its unread badge.`}
             </CardDescription>
           </div>
           {tickets.length > 0 && (
@@ -129,72 +152,117 @@ export function TicketsListClient({ tickets }: { tickets: Ticket[] }) {
           </p>
         ) : (
           <ul className="space-y-6">
-            {filtered.map((ticket) => (
-              <li
-                key={ticket.id}
-                className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="flex flex-wrap items-center gap-3 text-sm">
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-[#1470AF]/10 px-2.5 py-1 text-[#1470AF]">
-                      {TOPIC_LABELS[ticket.topic] ?? ticket.topic}
-                    </span>
-                    {ticket.repliedAt && (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-2.5 py-1 text-green-800">
-                        <CheckCircle className="h-3.5 w-3.5" />
-                        Replied
-                      </span>
-                    )}
-                    <span className="flex items-center gap-1.5 text-gray-500">
-                      <Calendar className="h-3.5 w-3.5" />
-                      {formatDate(ticket.createdAt)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {!ticket.repliedAt && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={markingId === ticket.id}
-                        onClick={() => handleMarkReplied(ticket.id)}
-                      >
-                        {markingId === ticket.id ? "Marking…" : "Mark as replied"}
-                      </Button>
-                    )}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-red-700 hover:bg-red-50 hover:text-red-800"
-                      disabled={deletingId === ticket.id}
-                      onClick={() => handleDeleteClick(ticket.id)}
-                    >
-                      {deletingId === ticket.id ? "Deleting…" : "Delete"}
-                    </Button>
-                  </div>
-                </div>
-                <div className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
-                  <div className="flex items-center gap-2 text-gray-700">
-                    <User className="h-4 w-4 shrink-0 text-gray-400" />
-                    <span>{ticket.name}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-gray-700">
-                    <Mail className="h-4 w-4 shrink-0 text-gray-400" />
-                    <a href={`mailto:${ticket.email}`} className="text-[#1470AF] hover:underline">
-                      {ticket.email}
-                    </a>
-                  </div>
-                  {ticket.agency && (
-                    <div className="flex items-center gap-2 text-gray-700 sm:col-span-2">
-                      <Building2 className="h-4 w-4 shrink-0 text-gray-400" />
-                      <span>{ticket.agency}</span>
-                    </div>
+            {filtered.map((ticket) => {
+              const expanded = isExpanded(ticket)
+              const unread = !ticket.readAt
+
+              return (
+                <li
+                  key={ticket.id}
+                  className={cn(
+                    "rounded-xl border bg-white p-5 shadow-sm transition-shadow hover:shadow-md",
+                    unread ? "border-red-200 ring-1 ring-red-100" : "border-gray-200"
                   )}
-                </div>
-                <div className="mt-4 rounded-lg bg-gray-50 p-4">
-                  <p className="whitespace-pre-wrap text-sm text-gray-800">{ticket.message}</p>
-                </div>
-              </li>
-            ))}
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-3 text-sm">
+                      {unread && (
+                        <span className="inline-flex items-center rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">
+                          Unread
+                        </span>
+                      )}
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-[#1470AF]/10 px-2.5 py-1 text-[#1470AF]">
+                        {TOPIC_LABELS[ticket.topic] ?? ticket.topic}
+                      </span>
+                      {ticket.repliedAt && (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-2.5 py-1 text-green-800">
+                          <CheckCircle className="h-3.5 w-3.5" />
+                          Replied
+                        </span>
+                      )}
+                      <span className="flex items-center gap-1.5 text-gray-500">
+                        <Calendar className="h-3.5 w-3.5" />
+                        {formatDate(ticket.createdAt)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {!expanded && (
+                        <Button
+                          size="sm"
+                          disabled={openingId === ticket.id}
+                          onClick={() => void handleOpenMessage(ticket.id)}
+                          className="bg-[#1470AF] hover:bg-[#0f5a8c]"
+                        >
+                          {openingId === ticket.id ? "Opening…" : "Open message"}
+                          <ChevronDown className="ml-1 h-4 w-4" />
+                        </Button>
+                      )}
+                      {expanded && !ticket.repliedAt && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={markingId === ticket.id}
+                          onClick={() => handleMarkReplied(ticket.id)}
+                        >
+                          {markingId === ticket.id ? "Marking…" : "Mark as replied"}
+                        </Button>
+                      )}
+                      {expanded && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-red-700 hover:bg-red-50 hover:text-red-800"
+                          disabled={deletingId === ticket.id}
+                          onClick={() => handleDeleteClick(ticket.id)}
+                        >
+                          {deletingId === ticket.id ? "Deleting…" : "Delete"}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
+                    <div className="flex items-center gap-2 text-gray-700">
+                      <User className="h-4 w-4 shrink-0 text-gray-400" />
+                      <span>{ticket.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-gray-700">
+                      <Mail className="h-4 w-4 shrink-0 text-gray-400" />
+                      {expanded ? (
+                        <a href={`mailto:${ticket.email}`} className="text-[#1470AF] hover:underline">
+                          {ticket.email}
+                        </a>
+                      ) : (
+                        <span>{ticket.email}</span>
+                      )}
+                    </div>
+                    {ticket.agency && (
+                      <div className="flex items-center gap-2 text-gray-700 sm:col-span-2">
+                        <Building2 className="h-4 w-4 shrink-0 text-gray-400" />
+                        <span>{ticket.agency}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {expanded ? (
+                    <div className="mt-4 rounded-lg bg-gray-50 p-4">
+                      <p className="whitespace-pre-wrap text-sm text-gray-800">{ticket.message}</p>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => void handleOpenMessage(ticket.id)}
+                      className="mt-4 w-full rounded-lg border border-dashed border-gray-200 bg-gray-50/80 p-4 text-left text-sm text-gray-500 transition-colors hover:border-[#1470AF]/40 hover:bg-[#1470AF]/5 hover:text-gray-700"
+                    >
+                      Click to open message
+                      {ticket.message.trim()
+                        ? ` — “${ticket.message.trim().slice(0, 80)}${ticket.message.trim().length > 80 ? "…" : ""}”`
+                        : ""}
+                    </button>
+                  )}
+                </li>
+              )
+            })}
           </ul>
         )}
       </CardContent>
