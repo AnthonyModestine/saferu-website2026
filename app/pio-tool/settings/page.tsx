@@ -44,6 +44,8 @@ export default function AgencySettingsPage() {
     packs: number
     remaining: number
   } | null>(null)
+  const [portalLoading, setPortalLoading] = useState(false)
+  const [portalMessage, setPortalMessage] = useState<string | null>(null)
 
   useEffect(() => {
     if (!isSubscribed) return
@@ -54,6 +56,31 @@ export default function AgencySettingsPage() {
       })
       .catch(() => {})
   }, [isSubscribed])
+
+  const handleManageBilling = async () => {
+    setPortalMessage(null)
+    setPortalLoading(true)
+    try {
+      const res = await fetch("/api/account/portal")
+      const data = await res.json().catch(() => ({}))
+      if (res.status === 401) {
+        setPortalMessage("Please sign in to manage billing.")
+        return
+      }
+      if (data?.url) {
+        window.location.href = data.url
+        return
+      }
+      setPortalMessage(
+        data?.error ||
+          "No billing account found yet. Subscribe to Press Center first, then you can manage payment methods and invoices here."
+      )
+    } catch {
+      setPortalMessage("Something went wrong opening billing. Please try again.")
+    } finally {
+      setPortalLoading(false)
+    }
+  }
 
   const handleSave = async () => {
     setSaving(true)
@@ -109,7 +136,7 @@ export default function AgencySettingsPage() {
           <div>
             <p className="font-bold text-[#1a365d] text-lg">Get started with Press Center</p>
             <p className="text-sm text-muted-foreground mt-0.5">
-              $99/month. Confident communication for public safety — draft press releases and video requests in minutes without compromising oversight.
+              $99/month. Confident communication for public safety — draft press releases, video requests, community events, and safety graphics in minutes without compromising oversight.
             </p>
           </div>
           <Button asChild className="shrink-0 bg-[#f2b233] text-[#1a365d] hover:bg-[#f2b233]/90 font-semibold">
@@ -449,15 +476,15 @@ export default function AgencySettingsPage() {
           <Button
             variant="outline"
             className="bg-transparent"
-            onClick={() => {
-              // In production, this would call createCustomerPortalSession with the user's Stripe customer ID
-              // For now, show a placeholder
-              window.open('https://billing.stripe.com/p/login/test', '_blank')
-            }}
+            disabled={portalLoading || locked}
+            onClick={() => void handleManageBilling()}
           >
             <ExternalLink className="mr-2 h-4 w-4" />
-            Manage Billing
+            {portalLoading ? "Opening…" : "Manage Billing"}
           </Button>
+          {portalMessage ? (
+            <p className="text-sm text-muted-foreground">{portalMessage}</p>
+          ) : null}
         </CardContent>
       </Card>
 

@@ -162,11 +162,33 @@ CRITICAL LOGO RULES:
 - Integrate it into the design so the full graphic stays continuous — text and scene should flow around it, not stop short for a blank zone.`
     : `Do not invent a fake department badge, seal, patch, crest, or logo.`
 
-  return `Create one professional 16:9 public-safety social media graphic — the same way ChatGPT Image would: one clear scene, readable text, official quality, with branding included in the image itself.
+  return `PRIMARY GOAL
+
+Create a professional public-safety educational graphic where the visual actively helps teach the approved safety message.
+
+This is an educational community-safety graphic — not an event flyer, advertisement, incident graphic, or generic social-media template.
+
+The final graphic should feel like something a professional police, fire, EMS, emergency management, or local government agency would confidently publish.
 
 CANVAS: exactly 2048×1152 (16:9). High quality.
 
-Render this wording EXACTLY — do not rewrite, shorten, paraphrase, or add extra tips:
+APPROVED TEXT IS LOCKED
+
+The approved HEADLINE and MESSAGE must appear exactly as provided.
+
+Do not:
+- rewrite them
+- shorten them
+- paraphrase them
+- correct them
+- add additional wording
+- add another safety tip
+- add a statistic
+- add a slogan
+- add a URL
+- add hashtags
+
+The content has already been prepared and approved before image generation.
 
 HEADLINE (title):
 ${opts.approvedHeadline}
@@ -185,9 +207,60 @@ ${details}
 User visual notes: ${opts.visualNotes || "(none)"}
 Style: ${opts.style}
 
-Make the picture teach the safety lesson (show the hazard and/or the correct action). Not a PowerPoint slide, Canva template, brochure, or random art with text slapped on.
+VISUAL MUST TEACH
 
-TITLE & TEXT LAYOUT — YOU CHOOSE THE COMPOSITION
+The visual should help residents understand the safety lesson, not simply decorate the graphic.
+
+Someone glancing at the artwork before reading all of the text should have a reasonable idea what safety topic is being taught.
+
+Prefer a clear real-world scene, illustration, or visual concept that shows:
+- the hazard or unsafe behavior,
+- the safer behavior,
+- the consequence being prevented,
+- or the specific situation described in the approved message.
+
+Do not default to generic public-safety imagery unless it directly supports the lesson.
+
+Avoid unrelated visual filler such as random emergency lights, caution tape, emergency vehicles, shields, sirens, generic smiling families, or dramatic effects that do not help explain the safety message.
+
+ONE GRAPHIC = ONE LESSON
+
+Stay focused on the single teaching point contained in the approved headline and message.
+
+Do not add additional safety tips, secondary lessons, warnings, statistics, slogans, or unrelated information.
+
+Do not turn the graphic into a checklist unless the approved message itself requires multiple steps.
+
+TEXT READABILITY — CRITICAL
+
+The graphic will primarily be viewed on a phone.
+
+The approved message must remain easy to read at social-media size.
+
+- Headline should be clearly larger and more prominent than the body message (roughly 1.6×–2.5× the message text size).
+- Use strong contrast between text and its background.
+- Keep text away from visually busy portions of the scene.
+- Use clean, professional typography.
+- Avoid decorative, handwritten, highly condensed, distorted, or novelty typography.
+- Maintain comfortable spacing around text.
+- Do not crowd text against the edges of the image.
+- Do not place important body text over faces or important visual details.
+- Do not shrink the message excessively just to force it into a particular layout.
+- Use intentional visual hierarchy so viewers naturally see the headline first, message second, and teaching visual clearly.
+- Do not clip or cut off any wording at the edges.
+
+COMPOSITION
+
+You have creative freedom to choose the strongest:
+- composition
+- camera angle
+- subject positioning
+- environment
+- lighting
+- visual hierarchy
+- text placement
+
+Use that freedom to make the graphic feel intentionally designed rather than like a stock photograph with text placed over it.
 
 You may place the headline in any natural TITLE location that fits the design well, for example:
 - top band / top-left / top-center / top-right
@@ -195,18 +268,52 @@ You may place the headline in any natural TITLE location that fits the design we
 - left column title with visual on the right
 - title above a lower message panel
 
-Rules:
-- The headline must clearly read as the TITLE (not buried in the body).
-- The message must clearly read as supporting body copy under or near the title — not the same visual weight as the title.
-- TYPE SIZE PROPORTIONS: headline substantially larger and heavier than the message (roughly 1.6×–2.5× the message text size). Message stays secondary and fully readable on a phone.
-- Do not make headline and message the same size.
-- Do not clip or cut off any wording at the edges. Keep generous margins.
-- Vary the layout from a generic "title on top / photo in middle / paragraph at bottom" template when another arrangement teaches the lesson better — especially when the message is bullets or a callout.
-- Keep the full scene continuous — no empty reserved boxes.
+Vary the layout from a generic "title on top / photo in middle / paragraph at bottom" template when another arrangement teaches the lesson better — especially when the message is bullets or a callout.
+
+Keep the full scene continuous — no empty reserved boxes for logos or text.
+
+Professional does not mean boring. The graphic should be visually engaging enough to stop someone scrolling while still feeling credible for an official government account.
+
+VISUAL ACCURACY
+
+The image must visually support the approved safety guidance.
+
+Do not depict an unsafe behavior as though it is the recommended behavior.
+
+Do not introduce visual details that contradict the approved message.
+
+When demonstrating a hazard, make it immediately understandable without unnecessarily exaggerating danger.
+
+Avoid gore, graphic injury, fearmongering, sensational imagery, or stereotypical "criminal" characters.
+
+PROFESSIONAL PUBLIC-SAFETY STANDARD
+
+Avoid designs that feel:
+- cheap
+- overly promotional
+- childish unless clearly appropriate for the intended audience
+- excessively dramatic
+- cluttered
+- like a generic Canva template
+- like an advertisement
+- like AI-generated clickbait
+
+Aim for polished public-information design: clear hierarchy, intentional composition, strong imagery, restrained use of effects, and excellent readability.
 
 ${logoBlock}
 
-Appropriate for official government posting. No gore, no stereotypical "criminal" characters, no invented stats/laws/hashtags/agency names/URLs.`
+FINAL INTERNAL CHECK
+
+Before producing the image, verify:
+1. Does the visual actually help teach the safety lesson?
+2. Is the approved headline reproduced exactly?
+3. Is the approved message reproduced exactly?
+4. Can both be comfortably read on a phone?
+5. Did I avoid adding facts or tips that were not approved?
+6. Does this look credible enough for an official public-safety agency to publish?
+7. Is the visual directly relevant to the specific hazard/action rather than generic decoration?
+
+If any answer is no, improve the design before finalizing.`
 }
 
 export function buildReviseImagePrompt(opts: {
@@ -223,7 +330,7 @@ The current graphic already includes the real agency logo (also attached as a re
 - Leave the existing logo exactly as it appears.`
     : `Do not invent a fake department badge, seal, patch, crest, or logo.`
 
-  return `You are editing an EXISTING 16:9 public-safety graphic (first attached image).
+  return `You are editing an EXISTING 16:9 public-safety educational graphic (first attached image).
 
 SURGICAL EDIT ONLY
 Apply ONLY this requested change:
@@ -233,6 +340,7 @@ Keep everything else the same:
 - Same overall composition, scene, colors, lighting, and style
 - Same approved headline and message text (unless the edit explicitly asks to change text)
 - Same canvas size 2048×1152
+- Same teaching visual relevance — do not replace a lesson-specific scene with generic public-safety decoration
 
 Approved headline (keep unless edit asks otherwise):
 ${opts.approvedHeadline}
@@ -242,7 +350,9 @@ ${opts.approvedMessage}
 
 Do NOT regenerate a totally new graphic.
 Do NOT redesign the whole layout.
-Do NOT add new safety tips, stats, hashtags, or agency names.
+Do NOT rewrite, shorten, or paraphrase approved text unless the edit explicitly asks to change text.
+Do NOT add new safety tips, stats, slogans, hashtags, URLs, or agency names.
+Preserve phone readability: strong contrast, clear hierarchy, no clipped text.
 
 ${logoRules}
 

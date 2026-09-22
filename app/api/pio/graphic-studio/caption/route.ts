@@ -7,9 +7,9 @@ import {
   isCaptionAdjustMode,
 } from "@/lib/graphic-studio/social-caption"
 import {
-  debitAiTokens,
-  outOfTokensResponse,
-  rejectIfOutOfTokens,
+  abandonAiTokens,
+  reserveAiTokens,
+  settleAiTokens,
 } from "@/lib/pio-token-gate"
 import { TOKEN_ESTIMATES } from "@/lib/openai-usage"
 
@@ -20,8 +20,8 @@ export async function POST(request: Request) {
   if (auth instanceof NextResponse) return auth
   const { session } = auth
 
-  const outOfTokens = await rejectIfOutOfTokens(session.email)
-  if (outOfTokens) return outOfTokens
+  const reservation = await reserveAiTokens(session.email, TOKEN_ESTIMATES.graphicStudioCaption)
+  if (!reservation.ok) return reservation.response
 
   try {
     const body = await request.json()
@@ -35,9 +35,11 @@ export async function POST(request: Request) {
 
     if (action === "adjust") {
       if (!isCaptionAdjustMode(mode)) {
+        await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
         return NextResponse.json({ error: "Choose a valid caption adjustment." }, { status: 400 })
       }
       if (caption.length < 8) {
+        await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
         return NextResponse.json({ error: "Generate a caption before adjusting it." }, { status: 400 })
       }
       const result = await adjustSafetySocialCaption({
@@ -48,16 +50,17 @@ export async function POST(request: Request) {
         agencyName,
       })
       if (!result.ok) {
+        await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
         return NextResponse.json(graphicStudioErrorPayload(result.reason, result.detail), {
           status: 503,
         })
       }
-      const debit = await debitAiTokens(
+      await settleAiTokens(
         session.email,
-        result.tokensUsed,
-        TOKEN_ESTIMATES.graphicStudioCaption
+        reservation.reservationId,
+        reservation.reserved,
+        result.tokensUsed
       )
-      if (!debit.ok) return outOfTokensResponse()
       return NextResponse.json({ caption: result.data, mode })
     }
 
@@ -68,18 +71,20 @@ export async function POST(request: Request) {
       agencyName,
     })
     if (!result.ok) {
+      await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       return NextResponse.json(graphicStudioErrorPayload(result.reason, result.detail), {
         status: 503,
       })
     }
-    const debit = await debitAiTokens(
+    await settleAiTokens(
       session.email,
-      result.tokensUsed,
-      TOKEN_ESTIMATES.graphicStudioCaption
+      reservation.reservationId,
+      reservation.reserved,
+      result.tokensUsed
     )
-    if (!debit.ok) return outOfTokensResponse()
     return NextResponse.json({ caption: result.data })
   } catch (err) {
+    await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
     console.error("[api/pio/graphic-studio/caption]", err)
     return NextResponse.json({ error: "Failed to craft social caption." }, { status: 500 })
   }

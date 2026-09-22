@@ -30,6 +30,13 @@ export const TOKEN_ESTIMATES = {
   graphicStudioImage: 8_000,
   graphicStudioCaption: 2_000,
   graphicStudioRevise: 8_000,
+  translate: 3_000,
+  customizeMessage: 4_000,
+  postPackage: 15_000,
+  localIdeas: 8_000,
+  holidayContent: 10_000,
+  holidayContentWithBackgrounds: 25_000,
+  postOpportunities: 12_000,
 } as const
 
 export function tokensOrEstimate(actual: number | undefined | null, estimate: number): number {

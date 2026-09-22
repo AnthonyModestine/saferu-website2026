@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Check, FileText, Zap, Shield, Download } from "lucide-react"
+import { Check, FileText, Zap, Shield, Download, CalendarDays, ImageIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { PRODUCTS } from "@/lib/products"
@@ -22,6 +22,16 @@ const features = [
     icon: Zap,
     title: "Video Requests",
     description: "Create clear video requests for active investigations — footage and tips formatted for social media and platforms like Neighbors by Ring.",
+  },
+  {
+    icon: CalendarDays,
+    title: "Community Events",
+    description: "Plan and draft event campaign messages so residents know what is happening and how to participate.",
+  },
+  {
+    icon: ImageIcon,
+    title: "Graphic Studio",
+    description: "Create educational safety graphics with your agency logo and a ready-to-post caption.",
   },
   {
     icon: Shield,
@@ -110,7 +120,8 @@ export default function SubscribePage() {
       <div className="text-center">
         <h1 className="text-3xl font-bold text-[#1a365d]">Upgrade to Press Center</h1>
         <p className="mt-2 text-lg text-muted-foreground">
-          Signed in as {member.email}. Subscribe to unlock press release and video request drafting.
+          Signed in as {member.email}. Subscribe to unlock press releases, video requests,
+          community events, and Graphic Studio.
         </p>
       </div>
 
@@ -136,7 +147,10 @@ export default function SubscribePage() {
       <Card className="border-[#1470AF]/20">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Press Center</CardTitle>
-          <CardDescription>Crimes, fires, accidents, and public-safety incidents — press releases, social posts, and video requests.</CardDescription>
+          <CardDescription>
+            Press releases, video requests, community events, and Graphic Studio — for police,
+            fire, EMS, emergency management, and local government.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="text-center">
@@ -156,6 +170,8 @@ export default function SubscribePage() {
               "Talking points so your spokesperson walks in prepared",
               "Branded PDF with your logo — send it the moment it's done",
               "Video requests drafted and ready to post",
+              "Community event campaign messages",
+              "Graphic Studio safety graphics with your logo",
               "One-click Spanish translation for incident messaging",
               "Cancel anytime — no contracts",
             ].map((feature) => (

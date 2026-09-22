@@ -218,7 +218,8 @@ export async function deleteFreeMember(id: string): Promise<boolean> {
   await purgeAllMemberData({
     email: member.email,
     memberId: member.id,
-    removeStripe: true,
+    // Keep Stripe customer/invoices for financial records; user manages cancel via portal.
+    removeStripe: false,
   })
 
   if (isDatabaseConfigured()) {

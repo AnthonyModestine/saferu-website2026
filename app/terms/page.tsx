@@ -56,8 +56,8 @@ export default function TermsPage() {
             </P>
             <P>
               The Services may include a free Content Library and paid Press Center tools for
-              creating materials such as press releases, social-media drafts, public video or
-              witness requests, community-event communications, safety graphics, captions, talking
+              creating materials such as press releases, social-media drafts, video requests,
+              community-event communications, safety graphics, captions, talking
               points, translations, and related communications.
             </P>
             <P>

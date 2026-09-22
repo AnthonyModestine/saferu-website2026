@@ -102,6 +102,7 @@ export async function getMemberSession(): Promise<MemberSessionData | null> {
   const now = Math.floor(Date.now() / 1000)
 
   if (cookie?.value) {
+    let session: MemberSessionData | null = null
     if (isDatabaseConfigured()) {
       await ensureSchema()
       const rows = await getSql()`
@@ -111,15 +112,31 @@ export async function getMemberSession(): Promise<MemberSessionData | null> {
         LIMIT 1
       `
       const row = (rows as SessionRow[])[0]
-      if (row && Number(row.expires_at) >= now) return rowToSession(row)
+      if (row && Number(row.expires_at) >= now) session = rowToSession(row)
     } else {
       const store = await readSessions()
       const data = store[cookie.value]
-      if (data && data.expiresAt >= now) return data
+      if (data && data.expiresAt >= now) session = data
+    }
+
+    if (session) {
+      const { isDisabled } = await import("@/lib/disabled-members")
+      if (await isDisabled(session.email)) {
+        if (isDatabaseConfigured()) {
+          await getSql()`DELETE FROM member_sessions WHERE id = ${cookie.value}`
+        } else {
+          const store = await readSessions()
+          delete store[cookie.value]
+          await writeSessions(store)
+        }
+        cookieStore.delete(COOKIE_NAME)
+        return null
+      }
+      return session
     }
   }
 
-  // Localhost Next.js alone: act as a logged-in subscribed PIO user for rebuilding UI.
+  // Development + localhost only: synthesize a logged-in subscribed PIO user for local UI work.
   if (await isLocalPreviewServer()) {
     return {
       memberId: LOCAL_PREVIEW_MEMBER.memberId,

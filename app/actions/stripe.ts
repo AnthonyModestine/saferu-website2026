@@ -3,6 +3,7 @@
 import { stripe } from '../../lib/stripe'
 import { PRODUCTS } from '../../lib/products'
 import { getMemberSession } from '../../lib/member-session'
+import { getAppBaseUrl } from '../../lib/app-url'
 
 export async function startCheckoutSession(productId: string) {
   if (!stripe) {
@@ -59,7 +60,7 @@ export async function startHostedCheckoutSession(productId: string) {
 
   const session = await getMemberSession()
   const customerEmail = session?.email ?? undefined
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  const appUrl = getAppBaseUrl()
 
   const checkoutSession = await stripe.checkout.sessions.create({
     mode: product.interval ? 'subscription' : 'payment',
@@ -90,14 +91,5 @@ export async function startHostedCheckoutSession(productId: string) {
   return checkoutSession.url
 }
 
-export async function createCustomerPortalSession(customerId: string) {
-  if (!stripe) {
-    throw new Error("Stripe is not configured. Set STRIPE_SECRET_KEY.")
-  }
-  const session = await stripe.billingPortal.sessions.create({
-    customer: customerId,
-    return_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/account`,
-  })
-
-  return session.url
-}
+// Do not export a portal helper that accepts customerId from the client.
+// Portal URLs are created only via /api/account/portal (session email → Stripe customer).

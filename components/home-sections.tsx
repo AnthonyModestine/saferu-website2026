@@ -62,19 +62,20 @@ export function TrustedBy() {
 
 const OUTCOMES = [
   {
-    title: "Know what to communicate",
+    title: "Draft professional messages",
     description:
-      "Surface timely communication opportunities that matter to your agency and community.",
-    icon: Lightbulb,
-    tile: "bg-[#7C5CFC]",
-    bar: "bg-[#7C5CFC]",
-  },
-  {
-    title: "Create professional messages",
-    description: "Turn rough information into clear, agency-ready communication.",
+      "Turn confirmed facts into press releases, video requests, and social posts your team can review.",
     icon: PenLine,
     tile: "bg-[#2563EB]",
     bar: "bg-[#2563EB]",
+  },
+  {
+    title: "Build safety graphics",
+    description:
+      "Create educational community graphics in Graphic Studio — with your logo and a caption ready to share.",
+    icon: Lightbulb,
+    tile: "bg-[#7C5CFC]",
+    bar: "bg-[#7C5CFC]",
   },
   {
     title: "Share trusted safety content",
@@ -95,8 +96,8 @@ export function CoreOutcomes() {
             Everything your agency needs to communicate with confidence
           </h2>
           <p className="mt-5 text-lg leading-relaxed text-[#42536e]">
-            From knowing what to say, to creating it, to sharing it — SaferU supports the entire
-            communication workflow in one focused workspace.
+            From drafting incident messages to building safety graphics and sharing library
+            content — SaferU supports your communication workflow in one focused workspace.
           </p>
         </div>
         <div className="mt-14 grid gap-6 md:grid-cols-3">
@@ -141,7 +142,7 @@ const PRESS_CENTER_TOOLS = [
     tone: "bg-[#E07C3E]",
   },
   {
-    label: "Event Campaigns",
+    label: "Community Events",
     detail: "Build coordinated messages for before, during, and after each event.",
     icon: CalendarDays,
     tone: "bg-[#4A9D6B]",
@@ -379,7 +380,7 @@ export function AgencyFeedback() {
             Why Agencies Choose SaferU
           </h2>
           <p className="mt-3 text-lg leading-relaxed text-[#42536e]">
-            Real experiences from the professionals keeping their communities informed.
+            How public safety teams use SaferU to stay clear, timely, and consistent.
           </p>
         </div>
         <div className="mt-9 grid gap-4 md:grid-cols-2">
@@ -456,11 +457,11 @@ export function GraphicStudioSection() {
               Graphic Studio
             </p>
             <h2 className="mt-3 text-balance text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">
-              Look like you have a full-time PIO
+              Agency-ready safety graphics, without a design team
             </h2>
             <p className="mt-6 text-lg leading-relaxed text-[#b8c7e0]">
               From a safety idea to a post-ready graphic — with your logo on it and a caption ready
-              to share. No designer. No blank canvas. Just say what matters and publish.
+              to share. No blank canvas. Your team still reviews before you publish.
             </p>
 
             <Button
@@ -568,8 +569,8 @@ export function ContentLibrarySection() {
             <div className="mt-8 flex flex-wrap gap-2">
               {[
                 "Crime Prevention",
-                "Fire Safety",
-                "Weather",
+                "Fire Prevention",
+                "Weather Preparedness",
                 "Natural Disasters",
                 "Community Awareness",
               ].map((category) => (
@@ -642,7 +643,7 @@ export function ContentLibrarySection() {
                 <Flame className="absolute -bottom-8 -left-5 h-32 w-32 text-white/10" />
                 <div className="px-5 text-center">
                   <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-white/80">
-                    Fire Safety
+                    Fire Prevention
                   </p>
                   <p className="mt-2 text-xl font-black uppercase leading-tight text-white">
                     Close before

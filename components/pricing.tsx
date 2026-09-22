@@ -35,7 +35,7 @@ const PRESS_CENTER_FEATURES: { label: string; ai?: boolean }[] = [
   { label: "Press Release Generator", ai: true },
   { label: "Social media versions included with each press release" },
   { label: "Video Request Generator", ai: true },
-  { label: "Community Event Campaigns" },
+  { label: "Community Events", ai: true },
   { label: "Graphic Studio", ai: true },
   { label: "Safety graphics with department logos", ai: true },
   { label: "Agency profile and branding" },
@@ -49,15 +49,14 @@ const PRESS_CENTER_FEATURES: { label: string; ai?: boolean }[] = [
 const TOKEN_USES = [
   "Generates a press release package",
   "Creates a video request",
-  "Generates an event campaign message",
-  "Creates a post from an AI recommendation",
+  "Generates a community event campaign message",
+  "Creates a Graphic Studio safety graphic (research, image, caption, or revision)",
   "Regenerates a new version",
   "Processes the information needed to create the requested communication",
 ]
 
 const TOKEN_NON_USES = [
   "Browsing the Content Library",
-  "Viewing recommendation cards",
   "Viewing sources",
   "Editing an existing draft manually",
   "Saving content",
@@ -79,7 +78,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "How many communications can I create?",
-    a: "The number varies based on the length and complexity of each communication. A full press release package uses more tokens than a short community post. Your monthly allowance is designed to support regular agency communication across SaferU's creation tools.",
+    a: "The number varies based on the length and complexity of each communication. A full press release package uses more tokens than a short video request. Your monthly allowance is designed to support regular agency communication across SaferU's creation tools.",
   },
   {
     q: "Does Graphic Studio use AI tokens?",
@@ -91,7 +90,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "What happens when we reach the monthly limit?",
-    a: "The agency can continue using the Content Library, viewing recommendations, editing drafts, saving work, copying messages, and downloading content. New AI drafting becomes available again when the monthly token allowance resets or when additional tokens are purchased.",
+    a: "The agency can continue using the Content Library, editing drafts, saving work, copying messages, and downloading content. New AI drafting becomes available again when the monthly token allowance resets or when additional tokens are purchased.",
   },
   {
     q: "Do unused tokens roll over?",
@@ -151,8 +150,8 @@ export function Pricing() {
           </h1>
           <p className="mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-muted-foreground">
             Start with free, ready-to-share public safety content. Upgrade to Press Center when
-            your agency needs a faster way to create professional messages, plan communications,
-            and know what may be worth sharing.
+            your agency needs a faster way to draft press releases, video requests, community
+            events, and safety graphics — with your team still reviewing before anything is published.
           </p>
 
           {/* Billing toggle */}
@@ -329,8 +328,9 @@ export function Pricing() {
             </h2>
             <p className="mx-auto mt-4 max-w-3xl text-lg leading-relaxed text-muted-foreground">
               Press Center includes 100,000 AI tokens each month for creating press releases,
-              video requests, event messages, and community posts. The number of communications an
-              agency can create depends on the length and complexity of each request.
+              video requests, community event messages, and Graphic Studio safety graphics. The
+              number of communications an agency can create depends on the length and complexity of
+              each request.
             </p>
           </div>
 

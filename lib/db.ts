@@ -308,5 +308,66 @@ export async function ensureSchema(): Promise<void> {
     )
   `
 
+  await db`
+    CREATE TABLE IF NOT EXISTS stripe_processed_events (
+      event_id TEXT PRIMARY KEY,
+      event_type TEXT NOT NULL,
+      processed_at BIGINT NOT NULL
+    )
+  `
+
+  await db`
+    CREATE TABLE IF NOT EXISTS disabled_members (
+      email TEXT PRIMARY KEY,
+      disabled_at BIGINT NOT NULL
+    )
+  `
+
+  await db`
+    CREATE TABLE IF NOT EXISTS contact_tickets (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      agency TEXT,
+      topic TEXT NOT NULL,
+      message TEXT NOT NULL,
+      created_at BIGINT NOT NULL,
+      replied_at BIGINT,
+      read_at BIGINT
+    )
+  `
+  await db`CREATE INDEX IF NOT EXISTS idx_contact_tickets_created ON contact_tickets (created_at DESC)`
+  await db`CREATE INDEX IF NOT EXISTS idx_contact_tickets_unread ON contact_tickets (read_at) WHERE read_at IS NULL`
+
+  await db`
+    CREATE TABLE IF NOT EXISTS pio_token_balances (
+      email TEXT PRIMARY KEY,
+      month_key TEXT NOT NULL,
+      monthly_used INT NOT NULL DEFAULT 0,
+      packs INT NOT NULL DEFAULT 0,
+      updated_at BIGINT NOT NULL
+    )
+  `
+
+  await db`
+    CREATE TABLE IF NOT EXISTS pio_token_reservations (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL,
+      amount INT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'held',
+      created_at BIGINT NOT NULL
+    )
+  `
+  await db`CREATE INDEX IF NOT EXISTS idx_pio_token_reservations_email ON pio_token_reservations (email, status)`
+
+  await db`
+    CREATE TABLE IF NOT EXISTS rate_limit_buckets (
+      bucket_key TEXT PRIMARY KEY,
+      count INT NOT NULL DEFAULT 0,
+      reset_at BIGINT NOT NULL
+    )
+  `
+  await db`CREATE INDEX IF NOT EXISTS idx_rate_limit_reset ON rate_limit_buckets (reset_at)`
+
   schemaReady = true
 }

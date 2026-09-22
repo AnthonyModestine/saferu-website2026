@@ -1,16 +1,16 @@
+/**
+ * Stripe webhook handler.
+ * Verifies the signature using STRIPE_WEBHOOK_SECRET.
+ * Token pack credits are idempotent via stripe_processed_events (Neon) or a local file store.
+ */
+
 import { NextResponse } from "next/server"
 import { stripe } from "@/lib/stripe"
 import type Stripe from "stripe"
 import { addTokenPack } from "@/lib/pio-generations"
 import { productTokenAmount } from "@/lib/products"
+import { claimStripeEvent, releaseStripeEventClaim } from "@/lib/stripe-webhook-idempotency"
 
-/**
- * Stripe webhook handler.
- * Verifies the signature using STRIPE_WEBHOOK_SECRET from environment variables.
- *
- * Recommended events:
- *   customer.subscription.*, invoice.payment_*, checkout.session.completed
- */
 export async function POST(request: Request) {
   if (!stripe) {
     return NextResponse.json({ error: "Stripe not configured" }, { status: 500 })
@@ -35,6 +35,12 @@ export async function POST(request: Request) {
   } catch (err) {
     console.error("Webhook signature verification failed:", err)
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 })
+  }
+
+  const claimed = await claimStripeEvent(event.id, event.type)
+  if (!claimed) {
+    // Already processed successfully — acknowledge without re-applying side effects
+    return NextResponse.json({ received: true, duplicate: true })
   }
 
   try {
@@ -95,6 +101,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ received: true })
   } catch (err) {
+    // Allow Stripe to retry; release claim so the next delivery can process
+    await releaseStripeEventClaim(event.id)
     console.error("Webhook handler error:", err)
     return NextResponse.json({ error: "Webhook processing failed" }, { status: 500 })
   }

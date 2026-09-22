@@ -4,9 +4,13 @@ import { getMemberSession } from "@/lib/member-session"
 import { getIsPaidByEmail } from "@/lib/member-access"
 import { isOnActiveTrial } from "@/lib/pio-trial"
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
-import { consumeTokens, getTokenStatus, OUT_OF_TOKENS_MESSAGE } from "@/lib/pio-generations"
 import { aiErrorPayload } from "@/lib/ai-result"
-import { TOKEN_ESTIMATES, tokensOrEstimate } from "@/lib/openai-usage"
+import {
+  abandonAiTokens,
+  reserveAiTokens,
+  settleAiTokens,
+} from "@/lib/pio-token-gate"
+import { TOKEN_ESTIMATES } from "@/lib/openai-usage"
 
 const MAX = 1000
 
@@ -57,10 +61,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Too many requests." }, { status: 429 })
   }
 
-  const status = await getTokenStatus(session.email)
-  if (status.remaining === 0) {
-    return NextResponse.json({ error: OUT_OF_TOKENS_MESSAGE }, { status: 403 })
-  }
+  const reservation = await reserveAiTokens(session.email, TOKEN_ESTIMATES.eventPosts)
+  if (!reservation.ok) return reservation.response
 
   try {
     const body = await request.json()
@@ -125,30 +127,36 @@ export async function POST(request: Request) {
       body.allowOptionalFinalReminder === false ? false : !registrationOnly
 
     if (!eventName) {
+      await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       return NextResponse.json({ error: "Event title is required." }, { status: 400 })
     }
     if (!isValidYmd(eventDate)) {
+      await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       return NextResponse.json({ error: "A valid event date is required." }, { status: 400 })
     }
     if (
       registrationDeadline &&
       (!isValidYmd(registrationDeadline) || registrationDeadline > eventDate)
     ) {
+      await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       return NextResponse.json(
         { error: "Registration deadline must be a valid date on or before the event." },
         { status: 400 }
       )
     }
     if (!locationName) {
+      await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       return NextResponse.json({ error: "Event location is required." }, { status: 400 })
     }
     if (!eventDescription || eventDescription.length < 20) {
+      await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       return NextResponse.json(
         { error: "Add a short description of the event so AI can draft useful posts." },
         { status: 400 }
       )
     }
     if (hostingRole !== "hosting" && !hostOrganization) {
+      await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       return NextResponse.json(
         { error: "Add the host organization when your agency is not the sole host." },
         { status: 400 }
@@ -216,6 +224,7 @@ export async function POST(request: Request) {
     })
 
     if (!result.ok) {
+      await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       console.error("[generate-event-posts] AI failed:", result.reason, result.detail ?? "")
       if (result.reason === "empty_input" && result.detail) {
         return NextResponse.json({ error: result.detail, code: result.reason }, { status: 400 })
@@ -223,11 +232,12 @@ export async function POST(request: Request) {
       return NextResponse.json(aiErrorPayload(result.reason, result.detail), { status: 503 })
     }
 
-    const debit = tokensOrEstimate(result.tokensUsed, TOKEN_ESTIMATES.eventPosts)
-    const consumed = await consumeTokens(session.email, debit)
-    if (!consumed) {
-      return NextResponse.json({ error: OUT_OF_TOKENS_MESSAGE }, { status: 403 })
-    }
+    await settleAiTokens(
+      session.email,
+      reservation.reservationId,
+      reservation.reserved,
+      result.tokensUsed
+    )
 
     return NextResponse.json({
       posts: result.data.posts,
@@ -238,6 +248,7 @@ export async function POST(request: Request) {
       humanReviewReason: result.data.humanReviewReason,
     })
   } catch (err) {
+    await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
     console.error("[generate-event-posts]", err)
     return NextResponse.json({ error: "Failed to generate event posts." }, { status: 500 })
   }

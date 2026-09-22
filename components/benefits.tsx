@@ -73,7 +73,7 @@ export function Benefits() {
             size="lg"
             className="bg-[#f2b233] text-[#1a365d] hover:bg-[#f2b233]/90 font-bold shadow-lg px-8 py-6 text-lg rounded-lg"
           >
-            <Link href="/member-site">
+            <Link href="/sign-up">
               Join SaferU for Free
               <ArrowRight className="ml-2 h-5 w-5" />
             </Link>

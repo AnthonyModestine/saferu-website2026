@@ -92,7 +92,7 @@ const OUTPUT_OPTIONS: Array<{
   },
   {
     id: "videoRequest",
-    label: "Public Assistance Request",
+    label: "Video Request",
     hint: "Request video footage on Neighbors by Ring",
   },
 ]
@@ -1275,7 +1275,7 @@ export default function NewPressReleasePage() {
                       value="twitter"
                       className="rounded-full px-3 py-1.5 text-xs data-[state=active]:bg-white data-[state=active]:text-[#1D4ED8] data-[state=active]:shadow-sm sm:text-sm"
                     >
-                      X / Twitter
+                      X
                     </TabsTrigger>
                   )}
                   {selectedOutputs.talkingPoints && (
@@ -1291,7 +1291,7 @@ export default function NewPressReleasePage() {
                       value="community-request"
                       className="rounded-full px-3 py-1.5 text-xs data-[state=active]:bg-white data-[state=active]:text-[#1D4ED8] data-[state=active]:shadow-sm sm:text-sm"
                     >
-                      Assistance Request
+                      Video Request
                     </TabsTrigger>
                   )}
                 </TabsList>
@@ -1446,7 +1446,7 @@ export default function NewPressReleasePage() {
                       value={generatedTwitter}
                       onChange={(e) => setGeneratedTwitter(e.target.value)}
                       className="min-h-[100px] w-full resize-none border-0 bg-transparent font-sans text-sm leading-relaxed whitespace-pre-wrap text-[#405172] focus:outline-none focus:ring-0"
-                      placeholder="X/Twitter post will appear here..."
+                      placeholder="X post will appear here..."
                     />
                     <p className="mt-2 text-xs text-[#7a8ab0]">
                       {generatedTwitter.length} / 280 characters

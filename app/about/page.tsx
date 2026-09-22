@@ -30,7 +30,7 @@ const AGENCY_TYPES = [
 
 const PRESS_CENTER_POINTS = [
   "Draft incident and general press releases with social posts and talking points",
-  "Create public video and witness requests for investigations",
+  "Create video requests for investigations — footage and tips ready for social and Neighbors by Ring",
   "Plan community event campaigns with timed messages before, during, and after",
   "Build safety graphics in Graphic Studio with your agency logo locked in place",
   "Optional Spanish versions of generated messages when you need them",

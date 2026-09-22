@@ -5,9 +5,9 @@ import { generateSafetyGraphic } from "@/lib/graphic-studio/generate"
 import { generateSafetySocialCaption } from "@/lib/graphic-studio/social-caption"
 import { saveGraphicStudioRecord, resolveMemberAgencyLogo } from "@/lib/graphic-studio-store"
 import {
-  debitAiTokens,
-  outOfTokensResponse,
-  rejectIfOutOfTokens,
+  abandonAiTokens,
+  reserveAiTokens,
+  settleAiTokens,
 } from "@/lib/pio-token-gate"
 import { TOKEN_ESTIMATES } from "@/lib/openai-usage"
 import {
@@ -24,8 +24,11 @@ export async function POST(request: Request) {
   if (auth instanceof NextResponse) return auth
   const { session } = auth
 
-  const outOfTokens = await rejectIfOutOfTokens(session.email)
-  if (outOfTokens) return outOfTokens
+  const reservation = await reserveAiTokens(
+    session.email,
+    TOKEN_ESTIMATES.graphicStudioImage + TOKEN_ESTIMATES.graphicStudioCaption
+  )
+  if (!reservation.ok) return reservation.response
 
   try {
     const body = await request.json()
@@ -55,18 +58,22 @@ export async function POST(request: Request) {
     )
 
     if (category && !isSafetyTipCategory(category)) {
+      await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       return NextResponse.json({ error: "Invalid safety category." }, { status: 400 })
     }
     if ((audience && !isSafetyAudience(audience)) || (style && !isSafetyGraphicStyle(style))) {
+      await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       return NextResponse.json({ error: "Invalid audience or style." }, { status: 400 })
     }
     if (!headline || !message) {
+      await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       return NextResponse.json(
         { error: "Approve a headline and message before generating." },
         { status: 400 }
       )
     }
     if (!visualConcept) {
+      await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       return NextResponse.json({ error: "Visual concept is required." }, { status: 400 })
     }
 
@@ -82,6 +89,7 @@ export async function POST(request: Request) {
     })
 
     if (!result.ok) {
+      await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       return NextResponse.json(graphicStudioErrorPayload(result.reason, result.detail), { status: 503 })
     }
 
@@ -93,12 +101,12 @@ export async function POST(request: Request) {
     })
     const caption = captionResult.ok ? captionResult.data : ""
 
-    const debit = await debitAiTokens(
+    await settleAiTokens(
       session.email,
-      (result.tokensUsed ?? 0) + (captionResult.ok ? captionResult.tokensUsed ?? 0 : 0),
-      TOKEN_ESTIMATES.graphicStudioImage + TOKEN_ESTIMATES.graphicStudioCaption
+      reservation.reservationId,
+      reservation.reserved,
+      (result.tokensUsed ?? 0) + (captionResult.ok ? captionResult.tokensUsed ?? 0 : 0)
     )
-    if (!debit.ok) return outOfTokensResponse()
 
     const graphicId = crypto.randomUUID()
     const sources = (Array.isArray(body.sourceRecords) ? body.sourceRecords : []) as GraphicStudioSource[]
@@ -155,6 +163,7 @@ export async function POST(request: Request) {
       caption,
     })
   } catch (err) {
+    await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
     console.error("[api/pio/graphic-studio/generate]", err)
     return NextResponse.json({ error: "Failed to generate graphic." }, { status: 500 })
   }

@@ -16,7 +16,7 @@ export function validatePressReleaseInput(body: {
     return "Describe the incident type when selecting Other."
   }
   if (summary.length < 25) {
-    return "Add an incident summary with the facts of what happened before generating. Press Center only uses information you provide — it will not invent details."
+    return "Add an incident summary with the facts of what happened before generating. Press Center is designed to use only information you provide — always review drafts before publishing."
   }
   return null
 }
@@ -46,5 +46,5 @@ export function validateVideoRequestInput(body: {
   if (what.length >= 10 && timeframe.length >= 5) return null
   if (description.length >= 10 && (address.length >= 5 || timeframe.length >= 5)) return null
 
-  return "Add incident details and what footage you need before generating. Press Center only uses information you provide — it will not invent details."
+  return "Add incident details and what footage you need before generating. Press Center is designed to use only information you provide — always review drafts before publishing."
 }

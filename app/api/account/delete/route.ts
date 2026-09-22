@@ -2,11 +2,11 @@ import { NextResponse } from "next/server"
 import { getMemberSession, clearMemberSession } from "@/lib/member-session"
 import { getFreeMemberByEmail, deleteFreeMember } from "@/lib/members-store"
 import { verifyPassword } from "@/lib/password"
-import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
+import { checkAuthRateLimit, getClientIp } from "@/lib/auth-rate-limit"
 
 export async function POST(request: Request) {
   const ip = getClientIp(request)
-  if (!checkRateLimit(`delete-account:${ip}`, 5, 60 * 60 * 1000)) {
+  if (!(await checkAuthRateLimit(`delete-account:${ip}`, 5, 60 * 60 * 1000))) {
     return NextResponse.json({ error: "Too many attempts. Please try again later." }, { status: 429 })
   }
 

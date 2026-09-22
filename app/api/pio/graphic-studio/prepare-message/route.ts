@@ -8,9 +8,9 @@ import {
   isSafetyTipCategory,
 } from "@/lib/pio-graphic-studio-types"
 import {
-  debitAiTokens,
-  outOfTokensResponse,
-  rejectIfOutOfTokens,
+  abandonAiTokens,
+  reserveAiTokens,
+  settleAiTokens,
 } from "@/lib/pio-token-gate"
 import { TOKEN_ESTIMATES } from "@/lib/openai-usage"
 
@@ -21,8 +21,8 @@ export async function POST(request: Request) {
   if (auth instanceof NextResponse) return auth
   const { session } = auth
 
-  const outOfTokens = await rejectIfOutOfTokens(session.email)
-  if (outOfTokens) return outOfTokens
+  const reservation = await reserveAiTokens(session.email, TOKEN_ESTIMATES.graphicStudioPrepare)
+  if (!reservation.ok) return reservation.response
 
   try {
     const body = await request.json()
@@ -33,12 +33,15 @@ export async function POST(request: Request) {
     const visualNotes = String(body.visualNotes || body.visualRequest || "").trim()
 
     if (category && !isSafetyTipCategory(category)) {
+      await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       return NextResponse.json({ error: "Invalid safety category." }, { status: 400 })
     }
     if ((audience && !isSafetyAudience(audience)) || (style && !isSafetyGraphicStyle(style))) {
+      await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       return NextResponse.json({ error: "Invalid audience or style." }, { status: 400 })
     }
     if (topic.length < 8) {
+      await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       return NextResponse.json(
         { error: "Describe what residents should know (at least a short sentence)." },
         { status: 400 }
@@ -54,15 +57,16 @@ export async function POST(request: Request) {
     })
 
     if (!result.ok) {
+      await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       return NextResponse.json(graphicStudioErrorPayload(result.reason, result.detail), { status: 503 })
     }
 
-    const debit = await debitAiTokens(
+    await settleAiTokens(
       session.email,
-      result.tokensUsed,
-      TOKEN_ESTIMATES.graphicStudioPrepare
+      reservation.reservationId,
+      reservation.reserved,
+      result.tokensUsed
     )
-    if (!debit.ok) return outOfTokensResponse()
 
     return NextResponse.json({
       headline: result.data.headline,
@@ -73,6 +77,7 @@ export async function POST(request: Request) {
       sourceRecords: result.data.source_records,
     })
   } catch (err) {
+    await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
     console.error("[api/pio/graphic-studio/prepare-message]", err)
     return NextResponse.json({ error: "Failed to prepare message." }, { status: 500 })
   }

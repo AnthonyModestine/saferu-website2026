@@ -10,13 +10,17 @@ import { getMemberSession } from "@/lib/member-session"
 import { getIsPaidByEmail } from "@/lib/member-access"
 import { isOnActiveTrial } from "@/lib/pio-trial"
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
-import { consumeTokens, getTokenStatus, OUT_OF_TOKENS_MESSAGE } from "@/lib/pio-generations"
 import { aiErrorPayload } from "@/lib/ai-result"
 import { validatePressReleaseInput } from "@/lib/pio-generate-validation"
 import { logPressReleaseSessions } from "@/lib/pio-session-helper"
 import { resolveMemberDepartment } from "@/lib/member-profile"
 import { normalizePressReleasePayload } from "@/lib/pio-normalized-facts"
-import { TOKEN_ESTIMATES, tokensOrEstimate } from "@/lib/openai-usage"
+import {
+  abandonAiTokens,
+  reserveAiTokens,
+  settleAiTokens,
+} from "@/lib/pio-token-gate"
+import { TOKEN_ESTIMATES } from "@/lib/openai-usage"
 
 const MAX = 1000 // max chars for free-text fields
 
@@ -49,9 +53,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Too many requests." }, { status: 429 })
   }
 
-  let status
+  let reservation
   try {
-    status = await getTokenStatus(session.email)
+    reservation = await reserveAiTokens(session.email, TOKEN_ESTIMATES.generateAll)
   } catch (e) {
     console.error("[generate-all] token status error:", e)
     return NextResponse.json(
@@ -59,9 +63,7 @@ export async function POST(request: Request) {
       { status: 500 }
     )
   }
-  if (status.remaining === 0) {
-    return NextResponse.json({ error: OUT_OF_TOKENS_MESSAGE }, { status: 403 })
-  }
+  if (!reservation.ok) return reservation.response
 
   try {
     const body = await request.json()
@@ -73,6 +75,7 @@ export async function POST(request: Request) {
       otherIncidentType: body.otherIncidentType,
     })
     if (validationError) {
+      await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       return NextResponse.json({ error: validationError }, { status: 400 })
     }
 
@@ -98,6 +101,7 @@ export async function POST(request: Request) {
         Boolean(payload.footageTimeframe?.trim() || payload.whatToLookFor?.trim()),
     }
     if (!selectionHasAny(selection)) {
+      await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       return NextResponse.json(
         { error: "Select at least one message type to generate." },
         { status: 400 }
@@ -126,15 +130,17 @@ export async function POST(request: Request) {
 
     const result = await generateMultiOutput(payload, selection, revision)
     if (!result.ok) {
+      await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       console.error("[generate-all] AI failed:", result.reason, result.detail ?? "")
       return NextResponse.json(aiErrorPayload(result.reason, result.detail), { status: 503 })
     }
 
-    const debit = tokensOrEstimate(result.tokensUsed, TOKEN_ESTIMATES.generateAll)
-    const consumed = await consumeTokens(session.email, debit)
-    if (!consumed) {
-      return NextResponse.json({ error: OUT_OF_TOKENS_MESSAGE }, { status: 403 })
-    }
+    await settleAiTokens(
+      session.email,
+      reservation.reservationId,
+      reservation.reserved,
+      result.tokensUsed
+    )
 
     const includeVideoRequest = Boolean(selection.videoRequest && result.data.communityRequest)
 
@@ -157,6 +163,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ...result.data, sessionIds })
   } catch (e) {
+    await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
     console.error("Generate all outputs error:", e)
     return NextResponse.json({ error: "Failed to generate outputs." }, { status: 500 })
   }

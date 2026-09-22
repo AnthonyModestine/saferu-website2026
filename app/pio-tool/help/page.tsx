@@ -63,8 +63,8 @@ export default function HelpPage() {
           </CardHeader>
           <CardContent>
             <CardDescription>
-              Enter only confirmed facts. Press Center will not invent information and
-              will automatically clean speculation from your input.
+              Enter only confirmed facts. Press Center is designed to draft from the information
+              you provide — it should not invent incident details. Always review before publishing.
             </CardDescription>
           </CardContent>
         </Card>
@@ -113,8 +113,11 @@ export default function HelpPage() {
           </CardHeader>
           <CardContent>
             <CardDescription>
-              Contact our support team at support@saferu.com for assistance with
-              the Press Center.
+              Contact our support team at{" "}
+              <a href="mailto:support@saferu.com" className="font-medium text-primary underline-offset-2 hover:underline">
+                support@saferu.com
+              </a>{" "}
+              for assistance with the Press Center.
             </CardDescription>
           </CardContent>
         </Card>

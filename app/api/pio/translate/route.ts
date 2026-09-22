@@ -6,6 +6,12 @@ import { isOnActiveTrial } from "@/lib/pio-trial"
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
 import { aiErrorPayload } from "@/lib/ai-result"
 import { recordGenerationAction, generationSessionBelongsToMember } from "@/lib/pio-analytics"
+import {
+  abandonAiTokens,
+  reserveAiTokens,
+  settleAiTokens,
+} from "@/lib/pio-token-gate"
+import { TOKEN_ESTIMATES } from "@/lib/openai-usage"
 
 const MAX_TEXT = 5000
 
@@ -36,10 +42,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Too many requests." }, { status: 429 })
   }
 
+  const reservation = await reserveAiTokens(session.email, TOKEN_ESTIMATES.translate)
+  if (!reservation.ok) return reservation.response
+
   try {
     const body = await request.json()
     const text = cap(body.text)
     if (!text) {
+      await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       return NextResponse.json(
         { error: "Nothing to translate. Generate a message first." },
         { status: 400 }
@@ -50,9 +60,17 @@ export async function POST(request: Request) {
       contentType: body.contentType === "event" ? "event" : "general",
     })
     if (!result.ok) {
+      await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       console.error("[translate] AI failed:", result.reason, result.detail ?? "")
       return NextResponse.json(aiErrorPayload(result.reason, result.detail), { status: 503 })
     }
+
+    const settled = await settleAiTokens(
+      session.email,
+      reservation.reservationId,
+      reservation.reserved,
+      null
+    )
 
     const generationSessionId = body.generationSessionId
       ? String(body.generationSessionId).trim()
@@ -68,8 +86,9 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json({ translation: result.data })
+    return NextResponse.json({ translation: result.data, tokensUsed: settled.amount })
   } catch (e) {
+    await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
     console.error("Translate error:", e)
     return NextResponse.json({ error: "Failed to translate." }, { status: 500 })
   }

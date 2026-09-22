@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { getMemberSession } from "@/lib/member-session"
-import { createCustomerPortalSession } from "@/app/actions/stripe"
+import { createBillingPortalUrl } from "@/lib/stripe-portal"
 import { stripe } from "@/lib/stripe"
 
 /** GET: return Stripe customer portal URL for the signed-in member, or null if no Stripe customer. */
@@ -19,10 +19,10 @@ export async function GET() {
     if (!customer) {
       return NextResponse.json({ url: null })
     }
-    const url = await createCustomerPortalSession(customer.id)
+    const url = await createBillingPortalUrl(customer.id)
     return NextResponse.json({ url })
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Failed to create portal session"
-    return NextResponse.json({ url: null, error: message }, { status: 500 })
+    console.error("[account/portal]", e instanceof Error ? e.message : e)
+    return NextResponse.json({ url: null, error: "Failed to create portal session" }, { status: 500 })
   }
 }

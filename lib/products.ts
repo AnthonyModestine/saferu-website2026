@@ -15,7 +15,7 @@ export const SUBSCRIPTION_PRODUCTS: Product[] = [
     id: "pio-tool-monthly",
     name: "Press Center",
     description:
-      "Communication workspace for public safety agencies. Includes 100,000 AI tokens each month for press releases, video requests, event campaigns, community posts, and Graphic Studio.",
+      "Communication workspace for public safety agencies. Includes 100,000 AI tokens each month for press releases, video requests, community events, and Graphic Studio.",
     priceInCents: 9900, // $99.00/month
     interval: "month",
     tokens: 100_000,
@@ -24,7 +24,7 @@ export const SUBSCRIPTION_PRODUCTS: Product[] = [
     id: "pio-tool-annual",
     name: "Press Center (Annual)",
     description:
-      "Communication workspace for public safety agencies, billed annually. Includes 100,000 AI tokens each month for press releases, video requests, event campaigns, community posts, and Graphic Studio.",
+      "Communication workspace for public safety agencies, billed annually. Includes 100,000 AI tokens each month for press releases, video requests, community events, and Graphic Studio.",
     priceInCents: 99900, // $999.00/year
     interval: "year",
     tokens: 100_000,

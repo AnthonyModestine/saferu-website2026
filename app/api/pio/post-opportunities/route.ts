@@ -18,6 +18,12 @@ import {
   parseRetainBriefingInput,
 } from "@/lib/post-generator/briefing-stability"
 import type { GeneratorRequest } from "@/lib/post-generator/types"
+import {
+  abandonAiTokens,
+  reserveAiTokens,
+  settleAiTokens,
+} from "@/lib/pio-token-gate"
+import { TOKEN_ESTIMATES } from "@/lib/openai-usage"
 
 export const maxDuration = 90
 
@@ -45,6 +51,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Too many briefing requests this hour." }, { status: 429 })
   }
 
+  const reservation = await reserveAiTokens(session.email, TOKEN_ESTIMATES.postOpportunities)
+  if (!reservation.ok) return reservation.response
+
   try {
     const body = await request.json()
     const serviceZips = parseServiceZips(
@@ -67,6 +76,7 @@ export async function POST(request: Request) {
       (serviceAreaType === "city" && Boolean(city))
 
     if (!state || !hasServiceArea) {
+      await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       return NextResponse.json(
         {
           error:
@@ -118,8 +128,16 @@ export async function POST(request: Request) {
     })
 
     if (!briefing.ok) {
+      await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       return NextResponse.json(aiErrorPayload(briefing.reason, briefing.detail), { status: 503 })
     }
+
+    const settled = await settleAiTokens(
+      session.email,
+      reservation.reservationId,
+      reservation.reserved,
+      null
+    )
 
     const retained = parseRetainBriefingInput(body.retainBriefing)
     const mergedOpportunities =
@@ -193,8 +211,10 @@ export async function POST(request: Request) {
         rankedAfterGate: mergedOpportunities.length,
         approvedAfterPipeline: mergedOpportunities.length,
       },
+      tokensUsed: settled.amount,
     })
   } catch (e) {
+    await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
     console.error("Post opportunities error:", e)
     return NextResponse.json({ error: "Failed to generate post opportunities." }, { status: 500 })
   }

@@ -48,8 +48,8 @@ export function PIOPreviewGate({ children }: { children: React.ReactNode }) {
             </p>
             <p className="text-sm text-muted-foreground mt-0.5">
               {member
-                ? "You're signed in with a free account. Subscribe to draft press releases and video requests."
-                : "$99/month. Confident communication for public safety — draft press releases and video requests in minutes without compromising oversight."}
+                ? "You're signed in with a free account. Subscribe to draft press releases, video requests, community events, and Graphic Studio safety graphics."
+                : "$99/month. Confident communication for public safety — draft press releases, video requests, community events, and safety graphics in minutes without compromising oversight."}
             </p>
           </div>
           <Button

@@ -11,6 +11,12 @@ import {
   type HolidayBackgroundRequest,
 } from "@/lib/pio-holiday-image-ai"
 import type { HolidayTheme } from "@/lib/pio-holiday-graphic"
+import {
+  abandonAiTokens,
+  reserveAiTokens,
+  settleAiTokens,
+} from "@/lib/pio-token-gate"
+import { TOKEN_ESTIMATES } from "@/lib/openai-usage"
 
 type HolidayInput = {
   id: string
@@ -38,14 +44,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Too many requests." }, { status: 429 })
   }
 
+  let includeBackgrounds = false
+  let agencyName = ""
+  let city = ""
+  let state = ""
+  let holidays: HolidayInput[] = []
+
   try {
     const body = await request.json()
-    const agencyName = String(body.agencyName || "").trim()
-    const city = String(body.city || "").trim()
-    const state = String(body.state || "").trim()
-    const includeBackgrounds = Boolean(body.includeBackgrounds)
+    agencyName = String(body.agencyName || "").trim()
+    city = String(body.city || "").trim()
+    state = String(body.state || "").trim()
+    includeBackgrounds = Boolean(body.includeBackgrounds)
 
-    const holidays: HolidayInput[] = Array.isArray(body.holidays)
+    holidays = Array.isArray(body.holidays)
       ? body.holidays
           .map((item: unknown) => {
             if (!item || typeof item !== "object") return null
@@ -57,13 +69,24 @@ export async function POST(request: Request) {
             if (!id || !label) return null
             return { id, label, slogan, theme }
           })
-          .filter((item): item is HolidayInput => Boolean(item))
+          .filter((item: HolidayInput | null): item is HolidayInput => Boolean(item))
       : []
+  } catch (e) {
+    console.error("Holiday content error:", e)
+    return NextResponse.json({ error: "Failed to generate holiday content." }, { status: 500 })
+  }
 
-    if (!holidays.length) {
-      return NextResponse.json({ error: "No holidays provided." }, { status: 400 })
-    }
+  if (!holidays.length) {
+    return NextResponse.json({ error: "No holidays provided." }, { status: 400 })
+  }
 
+  const estimate = includeBackgrounds
+    ? TOKEN_ESTIMATES.holidayContentWithBackgrounds
+    : TOKEN_ESTIMATES.holidayContent
+  const reservation = await reserveAiTokens(session.email, estimate)
+  if (!reservation.ok) return reservation.response
+
+  try {
     const [messagesResult, backgrounds] = await Promise.all([
       generateHolidayMessagesBatch(holidays, agencyName, city, state),
       includeBackgrounds
@@ -81,18 +104,28 @@ export async function POST(request: Request) {
     ])
 
     if (!messagesResult.ok) {
+      await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       return NextResponse.json(
         aiErrorPayload(messagesResult.reason, messagesResult.detail),
         { status: 503 }
       )
     }
 
+    const settled = await settleAiTokens(
+      session.email,
+      reservation.reservationId,
+      reservation.reserved,
+      null
+    )
+
     return NextResponse.json({
       messages: messagesResult.data,
       backgrounds: includeBackgrounds ? backgrounds : undefined,
       backgroundsGenerated: includeBackgrounds ? Object.keys(backgrounds).length : 0,
+      tokensUsed: settled.amount,
     })
   } catch (e) {
+    await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
     console.error("Holiday content error:", e)
     return NextResponse.json({ error: "Failed to generate holiday content." }, { status: 500 })
   }

@@ -8,6 +8,12 @@ import { aiErrorPayload } from "@/lib/ai-result"
 import { formatDepartmentLabel } from "@/lib/department-types"
 import { generatePostOpportunityPackage } from "@/lib/post-opportunity-package-ai"
 import { resolveMemberAgencyLogo } from "@/lib/graphic-studio-store"
+import {
+  abandonAiTokens,
+  reserveAiTokens,
+  settleAiTokens,
+} from "@/lib/pio-token-gate"
+import { TOKEN_ESTIMATES } from "@/lib/openai-usage"
 
 export const maxDuration = 120
 
@@ -38,10 +44,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Too many requests.", code: "rate_limited" }, { status: 429 })
   }
 
+  const reservation = await reserveAiTokens(session.email, TOKEN_ESTIMATES.postPackage)
+  if (!reservation.ok) return reservation.response
+
   try {
     const body = await request.json()
     const title = String(body.title || "").trim()
     if (!title) {
+      await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       return NextResponse.json({ error: "Post title is required." }, { status: 400 })
     }
 
@@ -84,15 +94,25 @@ export async function POST(request: Request) {
     })
 
     if (!result.ok) {
+      await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       return NextResponse.json(aiErrorPayload(result.reason, result.detail), { status: 503 })
     }
+
+    const settled = await settleAiTokens(
+      session.email,
+      reservation.reservationId,
+      reservation.reserved,
+      null
+    )
 
     return NextResponse.json({
       message: result.data.message,
       imageDataUrl: result.data.imageDataUrl,
       generationModel: result.data.generationModel,
+      tokensUsed: settled.amount,
     })
   } catch (err) {
+    await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
     console.error("[api/pio/generate-post-package]", err)
     return NextResponse.json({ error: "Failed to generate post package." }, { status: 500 })
   }

@@ -7,11 +7,17 @@ import { Check, Loader2, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 
+/**
+ * Public page — does not display Stripe/customer PII.
+ * Checkout verification requires a matching authenticated member session
+ * (/api/stripe/checkout-session enforces session + email match).
+ */
 function CheckoutSuccessContent() {
   const searchParams = useSearchParams()
   const sessionId = searchParams.get("session_id")?.trim() ?? ""
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [needsSignIn, setNeedsSignIn] = useState(false)
 
   useEffect(() => {
     if (!sessionId) {
@@ -24,27 +30,67 @@ function CheckoutSuccessContent() {
 
     async function load() {
       try {
-        const res = await fetch(
-          `/api/stripe/checkout-session?session_id=${encodeURIComponent(sessionId)}`
-        )
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}))
-          if (!cancelled) setError(data.error || "Could not verify your payment.")
+        const sessionRes = await fetch("/api/auth/session")
+        const sessionData = await sessionRes.json().catch(() => ({}))
+        const member = sessionData?.member
+
+        if (!member) {
+          if (!cancelled) {
+            setNeedsSignIn(true)
+            setError(
+              "Payment may have completed. Sign in with the same email you used at checkout to open Press Center."
+            )
+          }
           return
         }
 
-        const sessionRes = await fetch("/api/auth/session")
-        const sessionData = await sessionRes.json().catch(() => ({}))
-        if (!cancelled && sessionData?.member?.paid) {
+        if (member.paid) {
+          if (!cancelled) window.location.replace("/pio-tool")
+          return
+        }
+
+        // Confirm this checkout belongs to the signed-in member (API returns no PII to others).
+        const res = await fetch(
+          `/api/stripe/checkout-session?session_id=${encodeURIComponent(sessionId)}`
+        )
+        if (res.status === 401) {
+          if (!cancelled) {
+            setNeedsSignIn(true)
+            setError("Please sign in to confirm your payment.")
+          }
+          return
+        }
+        if (res.status === 404) {
+          if (!cancelled) {
+            setError(
+              "We could not match this checkout to your account. Sign in with the email used at checkout, or contact support if you were charged."
+            )
+          }
+          return
+        }
+        if (!res.ok) {
+          if (!cancelled) setError("Could not verify your payment.")
+          return
+        }
+
+        // Successful match — token packs credit via webhook; subscriptions flip paid shortly.
+        // Re-check session once; otherwise ask user to open Press Center / wait briefly.
+        const again = await fetch("/api/auth/session")
+        const againData = await again.json().catch(() => ({}))
+        if (!cancelled && againData?.member?.paid) {
           window.location.replace("/pio-tool")
           return
         }
 
         if (!cancelled) {
-          setError("Payment received, but your account is not signed in. Please sign in to open Press Center.")
+          setError(
+            "Payment received. If Press Center is not unlocked yet, wait a moment and refresh, or open Press Center from your account."
+          )
         }
       } catch {
-        if (!cancelled) setError("Something went wrong. Please contact support if you were charged.")
+        if (!cancelled) {
+          setError("Something went wrong. Please contact support if you were charged.")
+        }
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -69,21 +115,21 @@ function CheckoutSuccessContent() {
     return (
       <Card className="mx-auto max-w-lg border-amber-200">
         <CardContent className="pt-8 pb-8 text-center space-y-4">
-          {error.includes("not signed in") ? (
+          {needsSignIn ? (
             <>
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-green-100">
                 <Check className="h-7 w-7 text-green-600" />
               </div>
-              <h1 className="text-xl font-bold text-[#1a365d]">Payment successful</h1>
+              <h1 className="text-xl font-bold text-[#1a365d]">Almost there</h1>
               <p className="text-sm text-muted-foreground">{error}</p>
               <Button asChild className="bg-[#f2b233] text-[#1a365d] hover:bg-[#f2b233]/90 font-semibold">
-                <Link href="/sign-in?returnUrl=%2Fpio-tool">Sign in to Press Center</Link>
+                <Link href="/sign-in?returnUrl=%2Fpio-tool%2Fcheckout-success">Sign in</Link>
               </Button>
             </>
           ) : (
             <>
               <AlertCircle className="mx-auto h-10 w-10 text-amber-600" />
-              <h1 className="text-xl font-bold text-[#1a365d]">We couldn&apos;t verify checkout</h1>
+              <h1 className="text-xl font-bold text-[#1a365d]">Checkout status</h1>
               <p className="text-sm text-muted-foreground">{error}</p>
               <Button asChild variant="outline">
                 <Link href="/pio-tool">Back to Press Center</Link>

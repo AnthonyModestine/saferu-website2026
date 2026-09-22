@@ -12,6 +12,12 @@ import { isLocalPreviewServer } from "@/lib/local-preview-server"
 import { formatDepartmentLabel } from "@/lib/department-types"
 import type { CustomizeMessageMode } from "@/lib/post-generator/types"
 import { resolveEventHolidayContext } from "@/lib/event-message-prompts"
+import {
+  abandonAiTokens,
+  reserveAiTokens,
+  settleAiTokens,
+} from "@/lib/pio-token-gate"
+import { TOKEN_ESTIMATES } from "@/lib/openai-usage"
 
 export const maxDuration = 30
 
@@ -58,6 +64,9 @@ export async function POST(request: Request) {
     )
   }
 
+  const reservation = await reserveAiTokens(session.email, TOKEN_ESTIMATES.customizeMessage)
+  if (!reservation.ok) return reservation.response
+
   try {
     const body = await request.json()
     const action = String(body.action || "customize")
@@ -86,26 +95,35 @@ export async function POST(request: Request) {
         jurisdictionFit
       )
       if (!result.ok) {
+        await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
         return NextResponse.json(aiErrorPayload(result.reason, result.detail), { status: 503 })
       }
-      return NextResponse.json({ message: result.data })
+      const settled = await settleAiTokens(
+        session.email,
+        reservation.reservationId,
+        reservation.reserved,
+        null
+      )
+      return NextResponse.json({ message: result.data, tokensUsed: settled.amount })
     }
 
     const mode = String(body.mode || "shorten") as CustomizeMessageMode
     if (!CUSTOMIZE_MODES.includes(mode)) {
+      await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       return NextResponse.json({ error: "Invalid customize mode." }, { status: 400 })
     }
 
     const message = String(body.message || "").trim()
     if (!message) {
+      await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       return NextResponse.json({ error: "Add a message before customizing." }, { status: 400 })
     }
 
     const verifiedFactsRaw = Array.isArray(body.verifiedFacts) ? body.verifiedFacts.map(String) : []
     const verifiedFacts = verifiedFactsRaw
-      .map((text) => text.trim())
+      .map((text: string) => text.trim())
       .filter(Boolean)
-      .map((text, index) => ({
+      .map((text: string, index: number) => ({
         id: `fact-${index + 1}`,
         text,
       }))
@@ -137,10 +155,18 @@ export async function POST(request: Request) {
       }
     )
     if (!result.ok) {
+      await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       return NextResponse.json(aiErrorPayload(result.reason, result.detail), { status: 503 })
     }
-    return NextResponse.json({ message: result.data })
+    const settled = await settleAiTokens(
+      session.email,
+      reservation.reservationId,
+      reservation.reserved,
+      null
+    )
+    return NextResponse.json({ message: result.data, tokensUsed: settled.amount })
   } catch (e) {
+    await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
     console.error("Customize message error:", e)
     return NextResponse.json({ error: "Failed to customize message." }, { status: 500 })
   }

@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server"
 import { addFreeMember } from "@/lib/members-store"
 import { recordEvent } from "@/lib/metrics"
-import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
+import { checkAuthRateLimit, getClientIp } from "@/lib/auth-rate-limit"
 import { isDepartmentType } from "@/lib/department-types"
 
 export async function POST(request: Request) {
   // 5 signups per IP per hour to prevent account farming
   const ip = getClientIp(request)
-  if (!checkRateLimit(`signup:${ip}`, 5, 60 * 60 * 1000)) {
+  if (!(await checkAuthRateLimit(`signup:${ip}`, 5, 60 * 60 * 1000))) {
     return NextResponse.json({ error: "Too many signup attempts. Please try again later." }, { status: 429 })
   }
 

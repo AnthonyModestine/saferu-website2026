@@ -393,6 +393,12 @@ export async function setMemberDisabled(email: string, disabled: boolean): Promi
   if (!normalized) return { success: false, error: "Email is required" }
   try {
     await setDisabledInStore(normalized, disabled)
+    if (disabled) {
+      const { getFreeMemberByEmail } = await import("@/lib/members-store")
+      const { clearMemberSessionsForUser } = await import("@/lib/member-session")
+      const member = await getFreeMemberByEmail(normalized)
+      if (member) await clearMemberSessionsForUser(member.id)
+    }
     return { success: true }
   } catch (e) {
     const message = e instanceof Error ? e.message : "Failed to update"
@@ -414,5 +420,8 @@ export async function setMemberTemporaryPassword(
   const freeId = memberId.slice(5)
   const { updateMemberPassword } = await import("@/lib/members-store")
   const updated = await updateMemberPassword(freeId, plain)
-  return updated ? { success: true } : { success: false, error: "Member not found" }
+  if (!updated) return { success: false, error: "Member not found" }
+  const { clearMemberSessionsForUser } = await import("@/lib/member-session")
+  await clearMemberSessionsForUser(freeId)
+  return { success: true }
 }

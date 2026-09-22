@@ -10,6 +10,12 @@ import {
   parseServiceZips,
 } from "@/lib/local-ideas-ai"
 import { isLocalPreviewServer } from "@/lib/local-preview-server"
+import {
+  abandonAiTokens,
+  reserveAiTokens,
+  settleAiTokens,
+} from "@/lib/pio-token-gate"
+import { TOKEN_ESTIMATES } from "@/lib/openai-usage"
 
 export async function POST(request: Request) {
   const session = await getMemberSession()
@@ -34,6 +40,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Too many requests." }, { status: 429 })
   }
 
+  const reservation = await reserveAiTokens(session.email, TOKEN_ESTIMATES.localIdeas)
+  if (!reservation.ok) return reservation.response
+
   try {
     const body = await request.json()
     const state = String(body.state || "").trim()
@@ -46,6 +55,7 @@ export async function POST(request: Request) {
     )
 
     if (!state || serviceZips.length === 0) {
+      await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       return NextResponse.json(
         {
           error:
@@ -60,17 +70,27 @@ export async function POST(request: Request) {
     if (!result.ok) {
       // Localhost / missing key: still return useful demo ideas tied to location
       if (localPreview || result.reason === "missing_api_key") {
+        await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
         return NextResponse.json({
           ideas: demoLocalIdeas(payload),
           demo: true,
         })
       }
+      await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       console.error("[local-ideas] AI failed:", result.reason, result.detail ?? "")
       return NextResponse.json(aiErrorPayload(result.reason, result.detail), { status: 503 })
     }
 
-    return NextResponse.json({ ideas: result.data, demo: false })
+    const settled = await settleAiTokens(
+      session.email,
+      reservation.reservationId,
+      reservation.reserved,
+      null
+    )
+
+    return NextResponse.json({ ideas: result.data, demo: false, tokensUsed: settled.amount })
   } catch (e) {
+    await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
     console.error("Local ideas error:", e)
     return NextResponse.json({ error: "Failed to generate local ideas." }, { status: 500 })
   }

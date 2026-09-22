@@ -12,6 +12,8 @@ import { unauthorizedIfNotAdmin } from "@/lib/require-admin-api"
 import { revalidateContentPages } from "@/lib/revalidate-content"
 
 export async function GET() {
+  const denied = await unauthorizedIfNotAdmin()
+  if (denied) return denied
   await loadContentMeta()
   return NextResponse.json({
     images: getImageOverrides(),

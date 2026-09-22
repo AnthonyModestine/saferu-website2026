@@ -14,9 +14,10 @@ export function isLocalHostname(hostHeader: string | null | undefined): boolean 
   return host === "localhost" || host === "127.0.0.1"
 }
 
-/** Client: true when browser is on localhost and not in guest preview. */
+/** Client: true when browser is on localhost in development and not in guest preview. */
 export function isLocalPreviewClient(): boolean {
   if (typeof window === "undefined") return false
+  if (process.env.NODE_ENV !== "development") return false
   if (!isLocalHostname(window.location.hostname)) return false
   return !isLocalGuestPreviewClient()
 }
@@ -27,6 +28,7 @@ export function isLocalPreviewClient(): boolean {
  */
 export function isLocalGuestPreviewClient(): boolean {
   if (typeof window === "undefined") return false
+  if (process.env.NODE_ENV !== "development") return false
   if (!isLocalHostname(window.location.hostname)) return false
   try {
     const params = new URLSearchParams(window.location.search)

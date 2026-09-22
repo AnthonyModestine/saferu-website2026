@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server"
 import { verifyAdminPassword } from "@/lib/admin-auth"
-import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
+import { checkAuthRateLimit, getClientIp } from "@/lib/auth-rate-limit"
 
 export async function POST(request: Request) {
   const ip = getClientIp(request)
-  if (!checkRateLimit(`admin-login:${ip}`, 10, 15 * 60 * 1000)) {
+  if (!(await checkAuthRateLimit(`admin-login:${ip}`, 10, 15 * 60 * 1000))) {
     return NextResponse.json(
       { error: "Too many login attempts. Please try again in 15 minutes." },
       { status: 429 }

@@ -1,33 +1,26 @@
 import { NextResponse } from "next/server"
 import { getMemberSession } from "@/lib/member-session"
-import { isLocalPreviewServer } from "@/lib/local-preview-server"
-import { LOCAL_PREVIEW_MEMBER } from "@/lib/local-preview"
 import {
   getAgencyPreferenceProfile,
   recordRecommendationPreference,
   type RecommendationPreferenceAction,
 } from "@/lib/agency-recommendation-preferences"
 import { topicKey } from "@/lib/post-generator/rank-opportunities"
-import type { ExternalOpportunityInput } from "@/lib/post-generator/types"
 
 const ACTIONS = new Set<RecommendationPreferenceAction>(["endorse", "decline", "published"])
 
 export async function GET() {
   const session = await getMemberSession()
-  const preview = isLocalPreviewServer()
-  const memberId = session?.memberId || (preview ? LOCAL_PREVIEW_MEMBER.memberId : null)
-  if (!memberId) {
+  if (!session?.memberId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
-  const profile = await getAgencyPreferenceProfile(memberId)
+  const profile = await getAgencyPreferenceProfile(session.memberId)
   return NextResponse.json({ ok: true, profile })
 }
 
 export async function POST(req: Request) {
   const session = await getMemberSession()
-  const preview = isLocalPreviewServer()
-  const memberId = session?.memberId || (preview ? LOCAL_PREVIEW_MEMBER.memberId : null)
-  if (!memberId) {
+  if (!session?.memberId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
@@ -59,20 +52,14 @@ export async function POST(req: Request) {
     typeof body.topicKey === "string" && body.topicKey.trim()
       ? body.topicKey.trim()
       : topicKey({
-          id: opportunityId,
           title,
           category,
           signals,
-          sourceLabel: (sourceLabel || "SaferU Curated Content") as ExternalOpportunityInput["sourceLabel"],
           summary: "",
-          whyItMatters: "",
-          recommendedAction: "",
-          recommendedPostTiming: "",
-          priority: "optional",
         })
 
   const record = await recordRecommendationPreference({
-    memberId,
+    memberId: session.memberId,
     agencyName: typeof body.agencyName === "string" ? body.agencyName : undefined,
     action,
     opportunityId,
@@ -83,6 +70,6 @@ export async function POST(req: Request) {
     signals,
   })
 
-  const profile = await getAgencyPreferenceProfile(memberId)
+  const profile = await getAgencyPreferenceProfile(session.memberId)
   return NextResponse.json({ ok: true, record, profile })
 }

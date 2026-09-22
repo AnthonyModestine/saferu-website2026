@@ -8,9 +8,9 @@ import {
   updateGraphicImage,
 } from "@/lib/graphic-studio-store"
 import {
-  debitAiTokens,
-  outOfTokensResponse,
-  rejectIfOutOfTokens,
+  abandonAiTokens,
+  reserveAiTokens,
+  settleAiTokens,
 } from "@/lib/pio-token-gate"
 import { TOKEN_ESTIMATES } from "@/lib/openai-usage"
 
@@ -21,8 +21,8 @@ export async function POST(request: Request) {
   if (auth instanceof NextResponse) return auth
   const { session } = auth
 
-  const outOfTokens = await rejectIfOutOfTokens(session.email)
-  if (outOfTokens) return outOfTokens
+  const reservation = await reserveAiTokens(session.email, TOKEN_ESTIMATES.graphicStudioRevise)
+  if (!reservation.ok) return reservation.response
 
   try {
     const body = await request.json()
@@ -32,10 +32,12 @@ export async function POST(request: Request) {
     const message = String(body.message || "").trim()
 
     if (!imageDataUrl.startsWith("data:image/")) {
+      await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       return NextResponse.json({ error: "Current graphic is required to make an edit." }, { status: 400 })
     }
     // Vercel request body limit ~4.5MB — reject early with a clear message
     if (imageDataUrl.length > 3_800_000) {
+      await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       return NextResponse.json(
         {
           error:
@@ -45,6 +47,7 @@ export async function POST(request: Request) {
       )
     }
     if (editRequest.length < 4) {
+      await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       return NextResponse.json(
         { error: "Describe what you want changed (keep it specific)." },
         { status: 400 }
@@ -65,17 +68,18 @@ export async function POST(request: Request) {
     })
 
     if (!result.ok) {
+      await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       return NextResponse.json(graphicStudioErrorPayload(result.reason, result.detail), {
         status: 503,
       })
     }
 
-    const debit = await debitAiTokens(
+    await settleAiTokens(
       session.email,
-      result.tokensUsed,
-      TOKEN_ESTIMATES.graphicStudioRevise
+      reservation.reservationId,
+      reservation.reserved,
+      result.tokensUsed
     )
-    if (!debit.ok) return outOfTokensResponse()
 
     const graphicId = String(body.graphicId || "").trim()
     if (graphicId) {
@@ -112,6 +116,7 @@ export async function POST(request: Request) {
       generationModel: result.data.generationModel,
     })
   } catch (err) {
+    await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
     console.error("[api/pio/graphic-studio/revise]", err)
     return NextResponse.json({ error: "Failed to revise graphic." }, { status: 500 })
   }

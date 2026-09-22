@@ -4,7 +4,17 @@
  */
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY
-const FROM = process.env.RESEND_FROM ?? "SaferU <onboarding@resend.dev>"
+
+function getFromAddress(): string {
+  const configured = process.env.RESEND_FROM?.trim()
+  if (configured) return configured
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "RESEND_FROM is required in production (e.g. SaferU <support@saferu.com>). Do not use onboarding@resend.dev."
+    )
+  }
+  return "SaferU <onboarding@resend.dev>"
+}
 
 function formatResendError(message: string): string {
   const lower = message.toLowerCase()
@@ -28,12 +38,30 @@ async function sendHtmlEmail(params: {
     return { ok: false, error: "Email is not configured. Add RESEND_API_KEY on Vercel." }
   }
 
+  let from: string
+  try {
+    from = getFromAddress()
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Email sender is not configured."
+    console.error("[send-email]", message)
+    return { ok: false, error: message }
+  }
+
+  if (process.env.NODE_ENV === "production" && from.includes("@resend.dev")) {
+    console.error("[send-email] RESEND_FROM must not use @resend.dev in production")
+    return {
+      ok: false,
+      error:
+        "Email sender is misconfigured for production. Set RESEND_FROM to a verified saferu.com address.",
+    }
+  }
+
   const { Resend } = await import("resend")
   const resend = new Resend(RESEND_API_KEY)
 
   try {
     const { error } = await resend.emails.send({
-      from: FROM,
+      from,
       to: [params.to.trim().toLowerCase()],
       subject: params.subject,
       html: params.html,

@@ -2,11 +2,11 @@ import { NextResponse } from "next/server"
 import { getFreeMemberByEmail, updateMemberPassword } from "@/lib/members-store"
 import { consumeResetToken } from "@/lib/password-reset-tokens"
 import { clearMemberSessionsForUser } from "@/lib/member-session"
-import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
+import { checkAuthRateLimit, getClientIp } from "@/lib/auth-rate-limit"
 
 export async function POST(request: Request) {
   const ip = getClientIp(request)
-  if (!checkRateLimit(`reset-password:${ip}`, 10, 60 * 60 * 1000)) {
+  if (!(await checkAuthRateLimit(`reset-password:${ip}`, 10, 60 * 60 * 1000))) {
     return NextResponse.json(
       { error: "Too many attempts. Please try again later." },
       { status: 429 }

@@ -4,9 +4,13 @@ import { getMemberSession } from "@/lib/member-session"
 import { getIsPaidByEmail } from "@/lib/member-access"
 import { isOnActiveTrial } from "@/lib/pio-trial"
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
-import { consumeTokens, getTokenStatus, OUT_OF_TOKENS_MESSAGE } from "@/lib/pio-generations"
 import { aiErrorPayload } from "@/lib/ai-result"
-import { TOKEN_ESTIMATES, tokensOrEstimate } from "@/lib/openai-usage"
+import {
+  abandonAiTokens,
+  reserveAiTokens,
+  settleAiTokens,
+} from "@/lib/pio-token-gate"
+import { TOKEN_ESTIMATES } from "@/lib/openai-usage"
 
 function cap(val: unknown, max = 2000): string {
   return String(val ?? "").trim().slice(0, max)
@@ -35,10 +39,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Too many requests." }, { status: 429 })
   }
 
-  const status = await getTokenStatus(session.email)
-  if (status.remaining === 0) {
-    return NextResponse.json({ error: OUT_OF_TOKENS_MESSAGE }, { status: 403 })
-  }
+  const reservation = await reserveAiTokens(session.email, TOKEN_ESTIMATES.eventCancellation)
+  if (!reservation.ok) return reservation.response
 
   try {
     const body = await request.json()
@@ -56,18 +58,22 @@ export async function POST(request: Request) {
         : ("Facebook" as const)
 
     if (!eventName) {
+      await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       return NextResponse.json({ error: "Event title is required." }, { status: 400 })
     }
     if (!cancellationReason || cancellationReason.length < 5) {
+      await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       return NextResponse.json(
         { error: "Add a short cancellation reason (at least 5 characters)." },
         { status: 400 }
       )
     }
     if (!locationName) {
+      await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       return NextResponse.json({ error: "Event location is required." }, { status: 400 })
     }
     if (!eventDate || !/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) {
+      await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       return NextResponse.json({ error: "A valid event date is required." }, { status: 400 })
     }
 
@@ -89,15 +95,17 @@ export async function POST(request: Request) {
     })
 
     if (!result.ok) {
+      await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       console.error("[generate-event-cancellation] AI failed:", result.reason, result.detail ?? "")
       return NextResponse.json(aiErrorPayload(result.reason, result.detail), { status: 503 })
     }
 
-    const debit = tokensOrEstimate(result.tokensUsed, TOKEN_ESTIMATES.eventCancellation)
-    const consumed = await consumeTokens(session.email, debit)
-    if (!consumed) {
-      return NextResponse.json({ error: OUT_OF_TOKENS_MESSAGE }, { status: 403 })
-    }
+    await settleAiTokens(
+      session.email,
+      reservation.reservationId,
+      reservation.reserved,
+      result.tokensUsed
+    )
 
     const today = new Date().toISOString().slice(0, 10)
     return NextResponse.json({
@@ -115,6 +123,7 @@ export async function POST(request: Request) {
       newEventDate: newEventDate || null,
     })
   } catch (err) {
+    await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
     console.error("[generate-event-cancellation]", err)
     return NextResponse.json({ error: "Failed to generate cancellation message." }, { status: 500 })
   }

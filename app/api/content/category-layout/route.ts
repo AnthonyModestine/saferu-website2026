@@ -35,6 +35,9 @@ function ensureFlatArticleBucket(categoryId: string): void {
 }
 
 export async function GET(request: NextRequest) {
+  const denied = await unauthorizedIfNotAdmin()
+  if (denied) return denied
+
   const categoryId = request.nextUrl.searchParams.get("categoryId")
   if (!categoryId) {
     return NextResponse.json({ error: "categoryId required" }, { status: 400 })

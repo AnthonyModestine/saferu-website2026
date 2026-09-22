@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import {
   LayoutDashboard,
@@ -80,7 +80,7 @@ const createItems = [
 const assistantItems = [
   {
     title: "Dashboard",
-    description: "See what you should communicate today",
+    description: "Your Press Center overview",
     href: "/pio-tool",
     icon: LayoutDashboard,
     accent: "text-[#93A4C7]",
@@ -152,11 +152,18 @@ function LockedNavItem({
 
 export function PIOSidebar() {
   const pathname = usePathname()
+  const router = useRouter()
   const { settings } = useAgency()
   const { member } = useMemberSession()
 
+  const handleSignOut = async () => {
+    await fetch("/api/auth/logout", { method: "POST" })
+    router.push("/")
+    router.refresh()
+  }
+
   const agencyLabel =
-    settings.agencyName?.trim() || "Demo Township Police Department"
+    settings.agencyName?.trim() || "Demo Public Safety Agency"
   const displayName =
     member?.name?.trim() || member?.email?.split("@")[0] || null
   const shortName = displayName
@@ -343,7 +350,7 @@ export function PIOSidebar() {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold">{shortName}</p>
-                <p className="text-[11px] text-[#9fb0d9]">PIO Admin</p>
+                <p className="text-[11px] text-[#9fb0d9]">Agency member</p>
               </div>
               <Link
                 href="/pio-tool/settings"
@@ -352,13 +359,14 @@ export function PIOSidebar() {
               >
                 <Settings className="h-4 w-4" />
               </Link>
-              <Link
-                href="/"
+              <button
+                type="button"
+                onClick={() => void handleSignOut()}
                 className="rounded-md p-1.5 text-[#9fb0d9] hover:bg-white/10 hover:text-white"
                 aria-label="Log out"
               >
                 <LogOut className="h-4 w-4" />
-              </Link>
+              </button>
             </div>
           </>
         ) : (

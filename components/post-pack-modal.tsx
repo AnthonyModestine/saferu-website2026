@@ -93,7 +93,7 @@ export function PostPackModal({ pack, open, onOpenChange }: PostPackModalProps) 
               <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="facebook">Facebook</TabsTrigger>
                 <TabsTrigger value="instagram">Instagram</TabsTrigger>
-                <TabsTrigger value="twitter">X / Twitter</TabsTrigger>
+                <TabsTrigger value="twitter">X</TabsTrigger>
               </TabsList>
 
               <TabsContent value="facebook" className="space-y-3">
@@ -168,7 +168,7 @@ export function PostPackModal({ pack, open, onOpenChange }: PostPackModalProps) 
                   ) : (
                     <>
                       <Copy className="mr-2 h-4 w-4" />
-                      Copy X/Twitter Caption
+                      Copy X Caption
                     </>
                   )}
                 </Button>
