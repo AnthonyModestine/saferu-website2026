@@ -59,9 +59,9 @@ export default function AboutPage() {
               Built for the people behind the message
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-relaxed text-[#42536e] sm:text-xl">
-              SaferU pairs ready-to-share safety content with communication tools built for public
-              safety — helping agencies keep their communities informed without adding to their
-              workload.
+              SaferU helps public safety agencies communicate clearly and consistently — with
+              ready-to-share safety content and Press Center tools built for real department
+              workflows.
             </p>
           </div>
         </section>
@@ -109,9 +109,8 @@ export default function AboutPage() {
                 Who We Serve
               </h2>
               <p className="mt-4 text-base leading-relaxed text-[#b8c7e0] sm:text-lg">
-                SaferU is built for Public Information Officers, chiefs, and anyone responsible for
-                keeping the community informed — especially teams with limited staff or
-                communication resources.
+                Whether you&rsquo;re a PIO, a Chief, or the person who inherited communications on
+                top of everything else — SaferU is built for you.
               </p>
             </div>
             <ul className="flex flex-wrap items-center gap-2.5 lg:justify-end">
