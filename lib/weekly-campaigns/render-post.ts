@@ -67,14 +67,17 @@ export async function renderWeeklyCampaignPost(opts: {
   )
   post.imageUrl = stored.url
 
-  const captionResult = await generateSafetySocialCaption({
-    topic: post.topic,
-    headline: post.headline,
-    message: post.message,
-    agencyName: "SaferU",
-  })
-  if (captionResult.ok && captionResult.data.trim()) {
-    post.caption = captionResult.data.trim()
+  // Keep planner caption when present; otherwise draft one in PD/FD community voice.
+  if (!post.caption.trim()) {
+    const captionResult = await generateSafetySocialCaption({
+      topic: post.topic,
+      headline: post.headline,
+      message: post.message,
+      agencyName: "a local police or fire department",
+    })
+    if (captionResult.ok && captionResult.data.trim()) {
+      post.caption = captionResult.data.trim()
+    }
   }
 
   post.status = "ready"

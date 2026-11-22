@@ -47,7 +47,7 @@ const planSchema = z.object({
             z.object({
               topic: z.string().min(1),
               headline: z.string().min(1).max(80),
-              message: z.string().min(1).max(400),
+              message: z.string().min(1).max(500),
               messageFormat: messageFormatSchema.default("paragraph"),
               visualConcept: z.string().min(1),
               importantVisualDetails: visualDetailsSchema,
@@ -87,7 +87,7 @@ export async function planWeeklyCampaignBatch(): Promise<WeeklyCampaignBatch> {
   const openai = new OpenAI({ apiKey })
 
   const system = `You are SaferU's weekly public-safety content strategist.
-SaferU publishes free safety campaigns for police, fire, EMS, emergency management, and local government agencies.
+SaferU publishes free safety campaigns that police and fire departments (and EMS / emergency management / local government) share to keep their communities safe.
 
 Create 2 or 3 distinct campaign options for THIS week only.
 Prioritize:
@@ -96,16 +96,28 @@ Prioritize:
 - timely crime / scam / traffic safety trends that agencies commonly post about
 - community safety education that feels timely, not generic filler
 
-Rules:
+VOICE:
+Write like a local police or fire department speaking to residents — clear, calm, helpful, and human.
+Not corporate. Not fearmongering. Not generic PSA slogans ("stay safe", "safety starts with you").
+
+ON-GRAPHIC MESSAGE LENGTH — VARY IT:
+Within each campaign, mix lengths across posts:
+- Some short (about 1 punchy sentence)
+- Some medium (1–2 sentences)
+- Some a couple of fuller sentences when the tip needs a clear why + what to do
+Do NOT make every post the same length. Prefer readable phone-sized copy over walls of text.
+Hard cap ~70 words per on-graphic message.
+
+Every message should still cover what matters for residents: the situation/hazard, why it matters, and what to do — but shorter posts can weave that tightly into one sentence.
+
+Other rules:
 - Each campaign must have a clear theme and 4 to 6 social posts.
-- Every on-graphic message must include WHAT + WHY + WHAT TO DO in plain English.
 - Headlines: 3–8 words, concrete.
-- Messages: short (~25–45 words), official public-safety tone, no fearmongering.
-- Captions: Facebook/Instagram ready, 2–4 sentences, SaferU voice, no hashtag stuffing.
+- Captions: Facebook/Instagram ready for an agency to post — 2–4 sentences, community-facing, no hashtag stuffing. Written so a PD or FD can share as-is.
 - Visual concepts must teach the lesson (hazard or safer action), not generic sirens/tape.
-- Do not invent fake statistics, laws, or agency names.
+- Do not invent fake statistics, laws, or named local agencies.
 - Campaigns should feel different from each other (not three versions of the same tip).
-- Branding note: graphics will carry the SaferU logo; do not put agency names in copy.
+- Branding note: graphics will carry the SaferU logo; do not invent department names in the copy.
 
 Return JSON only.`
 
@@ -131,11 +143,11 @@ Return a JSON object with:
 For each post use EXACTLY these fields:
 - topic (string)
 - headline (string)
-- message (string)
+- message (string) — police/fire community voice; vary length from short to a couple sentences across posts
 - messageFormat: ONLY one of "paragraph" | "callout" | "bullets" (never "plain")
 - visualConcept (string)
 - importantVisualDetails: an ARRAY of short strings (never a single string)
-- caption (string)`
+- caption (string) — ready for a PD/FD Facebook post`
       },
     ],
   })
