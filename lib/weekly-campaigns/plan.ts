@@ -10,6 +10,29 @@ import type {
 } from "@/lib/weekly-campaigns/types"
 import { saveWeeklyCampaignBatch } from "@/lib/weekly-campaigns/store"
 
+const messageFormatSchema = z.preprocess((value) => {
+  const raw = String(value ?? "paragraph").trim().toLowerCase()
+  if (raw === "plain" || raw === "text" || raw === "paragraph" || raw === "") return "paragraph"
+  if (raw === "callout" || raw === "call-out") return "callout"
+  if (raw === "bullets" || raw === "bullet" || raw === "list") return "bullets"
+  return "paragraph"
+}, z.enum(["paragraph", "callout", "bullets"]))
+
+const visualDetailsSchema = z.preprocess((value) => {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).trim()).filter(Boolean)
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim()
+    if (!trimmed) return []
+    return trimmed
+      .split(/\n|;|\|/)
+      .map((part) => part.replace(/^[-•*\d.)\s]+/, "").trim())
+      .filter(Boolean)
+  }
+  return []
+}, z.array(z.string()).default([]))
+
 const planSchema = z.object({
   weekLabel: z.string().min(1),
   campaigns: z
@@ -25,9 +48,9 @@ const planSchema = z.object({
               topic: z.string().min(1),
               headline: z.string().min(1).max(80),
               message: z.string().min(1).max(400),
-              messageFormat: z.enum(["paragraph", "callout", "bullets"]).default("paragraph"),
+              messageFormat: messageFormatSchema.default("paragraph"),
               visualConcept: z.string().min(1),
-              importantVisualDetails: z.array(z.string()).default([]),
+              importantVisualDetails: visualDetailsSchema,
               caption: z.string().min(1),
             })
           )
@@ -103,7 +126,16 @@ Return JSON with weekLabel and campaigns[].`
 
 Return a JSON object with:
 - weekLabel (string)
-- campaigns (array of 2–3): title, summary, theme (seasonal|weather|crime_trend|holiday|community_safety), whyThisWeek, posts (array of 4–6 with topic, headline, message, messageFormat, visualConcept, importantVisualDetails, caption)`,
+- campaigns (array of 2–3): title, summary, theme (seasonal|weather|crime_trend|holiday|community_safety), whyThisWeek, posts (array of 4–6)
+
+For each post use EXACTLY these fields:
+- topic (string)
+- headline (string)
+- message (string)
+- messageFormat: ONLY one of "paragraph" | "callout" | "bullets" (never "plain")
+- visualConcept (string)
+- importantVisualDetails: an ARRAY of short strings (never a single string)
+- caption (string)`
       },
     ],
   })
