@@ -22,6 +22,7 @@ import {
   Menu,
   Mail,
   Sparkles,
+  CalendarDays,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -40,6 +41,7 @@ const navigation = [
   { name: "Tickets", href: "/admin/tickets", icon: MessageSquare, badgeKey: "tickets" as const },
   { name: "Member feedback", href: "/admin/member-feedback", icon: MessageSquareQuote },
   { name: "Graphic Studio", href: "/admin/graphics", icon: Sparkles },
+  { name: "Weekly Campaigns", href: "/admin/campaigns", icon: CalendarDays },
   { name: "Categories", href: "/admin/categories", icon: FolderTree },
   { name: "Articles", href: "/admin/articles", icon: FileText },
   { name: "Posts", href: "/admin/posts", icon: Images },

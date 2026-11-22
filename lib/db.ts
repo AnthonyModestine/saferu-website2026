@@ -369,5 +369,13 @@ export async function ensureSchema(): Promise<void> {
   `
   await db`CREATE INDEX IF NOT EXISTS idx_rate_limit_reset ON rate_limit_buckets (reset_at)`
 
+  await db`
+    CREATE TABLE IF NOT EXISTS weekly_campaign_batches (
+      id TEXT PRIMARY KEY,
+      payload JSONB NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `
+
   schemaReady = true
 }
