@@ -1,11 +1,10 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Star, Lock, ChevronRight } from "lucide-react"
+import { Star, Lock, ChevronRight, ArrowRight, FileText } from "lucide-react"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
-import { ArticleCard } from "@/components/article-card"
 import { ContentLibraryEmpty } from "@/components/content-library-empty"
 import Link from "next/link"
 import { useMemberSession } from "@/lib/use-member-session"
@@ -113,7 +112,7 @@ export function WhatsNewClient({
           </h2>
           <p className="mt-3 text-base leading-relaxed text-[#42536e]">
             Sign in with your free SaferU account to browse this week&apos;s seasonal graphics and
-            captions — same Content Library experience as the other sections.
+            captions.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
             <Button
@@ -136,7 +135,7 @@ export function WhatsNewClient({
 
   return (
     <WhatsNewShell categoryTitle={categoryTitle} categoryDescription={categoryDescription}>
-      <h2 className="mb-6 text-xl font-bold text-[#1A365D]">Articles</h2>
+      <h2 className="mb-6 text-xl font-bold text-[#1A365D]">Choose a topic</h2>
       {articles.length === 0 ? (
         <ContentLibraryEmpty
           title="Check back soon"
@@ -145,15 +144,43 @@ export function WhatsNewClient({
           actionLabel="Browse Content Library"
         />
       ) : (
-        <div className="mx-auto flex max-w-3xl flex-col gap-3">
-          {articles.map((article) => (
-            <ArticleCard
-              key={article.id}
-              article={article}
-              href={`/whats-new/${article.id}`}
-              accent={accent}
-            />
-          ))}
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {articles.map((article) => {
+            const postCount = article.posts.length
+            return (
+              <Link
+                key={article.id}
+                href={`/whats-new/${article.id}`}
+                className="group flex h-full flex-col overflow-hidden rounded-2xl border border-[#E2E8F5] bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+              >
+                <div className="h-1 w-full" style={{ backgroundColor: accent }} />
+                <div className="flex flex-1 flex-col p-6">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+                      style={{ backgroundColor: `${accent}1A`, color: accent }}
+                    >
+                      <FileText className="h-5 w-5" />
+                    </div>
+                    <h3 className="flex-1 text-lg font-bold leading-snug text-[#1A365D] transition-colors group-hover:text-[#1470AF]">
+                      {article.title}
+                    </h3>
+                    <ArrowRight className="h-5 w-5 shrink-0 text-[#8a99b0] transition-all group-hover:translate-x-0.5 group-hover:text-[#1470AF]" />
+                  </div>
+                  {article.description ? (
+                    <p className="mt-3 flex-1 text-sm leading-relaxed text-[#42536e] line-clamp-3">
+                      {article.description}
+                    </p>
+                  ) : (
+                    <div className="mt-3 flex-1" />
+                  )}
+                  <p className="mt-3 text-xs font-medium text-[#5c6b85]">
+                    {postCount} {postCount === 1 ? "post" : "posts"}
+                  </p>
+                </div>
+              </Link>
+            )
+          })}
         </div>
       )}
     </WhatsNewShell>
