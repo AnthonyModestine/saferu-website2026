@@ -377,5 +377,20 @@ export async function ensureSchema(): Promise<void> {
     )
   `
 
+  await db`
+    CREATE TABLE IF NOT EXISTS admin_contacts (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL,
+      name TEXT,
+      agency TEXT,
+      notes TEXT,
+      source TEXT NOT NULL DEFAULT 'csv',
+      created_at BIGINT NOT NULL,
+      updated_at BIGINT NOT NULL
+    )
+  `
+  await db`CREATE UNIQUE INDEX IF NOT EXISTS idx_admin_contacts_email ON admin_contacts (email)`
+  await db`CREATE INDEX IF NOT EXISTS idx_admin_contacts_created ON admin_contacts (created_at DESC)`
+
   schemaReady = true
 }

@@ -23,6 +23,7 @@ import {
   Mail,
   Sparkles,
   CalendarDays,
+  ContactRound,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -37,6 +38,7 @@ import { cn } from "@/lib/utils"
 const navigation = [
   { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
   { name: "Members", href: "/admin/members", icon: Users },
+  { name: "Contacts", href: "/admin/contacts", icon: ContactRound },
   { name: "Email", href: "/admin/email", icon: Mail },
   { name: "Tickets", href: "/admin/tickets", icon: MessageSquare, badgeKey: "tickets" as const },
   { name: "Member feedback", href: "/admin/member-feedback", icon: MessageSquareQuote },

@@ -27,7 +27,8 @@ function formatResendError(message: string): string {
   return message
 }
 
-async function sendHtmlEmail(params: {
+/** Shared Resend HTML sender (password reset, admin outreach, tests). */
+export async function sendHtmlEmail(params: {
   to: string
   subject: string
   html: string
