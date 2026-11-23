@@ -3,9 +3,11 @@
 import Link from "next/link"
 import { ArrowLeft, ImageIcon, Shield } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { PIOPaywall } from "@/components/pio-paywall"
 
 export default function GraphicStudioPage() {
   return (
+    <PIOPaywall>
     <div className="mx-auto max-w-4xl space-y-8 p-6 md:p-8">
       <div>
         <Button asChild variant="ghost" className="-ml-2 mb-3 text-[#475569]">
@@ -54,5 +56,6 @@ export default function GraphicStudioPage() {
         </div>
       </div>
     </div>
+    </PIOPaywall>
   )
 }

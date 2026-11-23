@@ -623,6 +623,30 @@ export default function PIODashboardPage() {
           />
         </div>
       </div>
+
+      {member ? (
+        <section className="rounded-2xl border border-[#e2e8f5] bg-white p-5 shadow-sm">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-bold uppercase tracking-[0.14em] text-[#64748b]">
+                This week from SaferU
+              </p>
+              <h2 className="mt-1 text-lg font-bold text-[#0f1c3f]">What&apos;s New + Content Library</h2>
+              <p className="mt-1 text-sm text-[#64748b]">
+                Seasonal graphics and captions ready to post — included with your membership.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild className="bg-[#0B1B3A] text-white hover:bg-[#12284F]">
+                <Link href="/whats-new">Open What&apos;s New</Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link href="/templates">Browse library</Link>
+              </Button>
+            </div>
+          </div>
+        </section>
+      ) : null}
     </div>
   )
 }
@@ -709,7 +733,8 @@ function UpcomingEventsPanel({
   events: PioEvent[]
   forceDemo?: boolean
 }) {
-  const useDemo = forceDemo || events.length === 0
+  // Guests see sample rows; paid members with no events get an honest empty state — never fake calendar items.
+  const useDemo = forceDemo
   const rows = useDemo
     ? [...DEMO_EVENTS]
         .sort((a, b) => a.daysAway - b.daysAway)
@@ -762,37 +787,53 @@ function UpcomingEventsPanel({
         }
       />
 
-      <ul className="flex flex-1 flex-col gap-2.5">
-        {rows.map((row) => (
-          <li key={row.id}>
-            <Link
-              href={row.href}
-              className="flex items-center gap-3 rounded-xl border border-[#e8eef8] bg-[#F8FAFC] p-3 transition hover:border-[#bfdbfe] hover:bg-[#EFF6FF]"
-            >
-              <div className="flex h-14 w-12 shrink-0 flex-col items-center justify-center rounded-xl bg-white text-[#0f1c3f] ring-1 ring-[#e2e8f5]">
-                <span className="text-[10px] font-bold tracking-wide text-[#64748b]">{row.month}</span>
-                <span className="text-xl font-bold leading-none">{row.day}</span>
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-[#0f1c3f]">{row.title}</p>
-                <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#64748b]">
-                  <span className="inline-flex items-center gap-1">
-                    <MapPin className="h-3 w-3" />
-                    {row.location}
-                  </span>
-                  <span className="inline-flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    {row.timeRange}
-                  </span>
-                </p>
-              </div>
-              <span className="shrink-0 rounded-full bg-[#EFF6FF] px-2.5 py-1 text-[11px] font-bold text-[#1D4ED8]">
-                {row.daysAwayLabel}
-              </span>
-            </Link>
-          </li>
-        ))}
-      </ul>
+      {rows.length === 0 ? (
+        <div className="flex flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-[#d8e0ef] bg-[#F8FAFC] px-4 py-8 text-center">
+          <CalendarDays className="mb-3 h-8 w-8 text-[#94A3B8]" />
+          <p className="text-sm font-semibold text-[#0f1c3f]">No events scheduled yet</p>
+          <p className="mt-1 max-w-xs text-xs text-[#64748b]">
+            Create a community event and SaferU will build your posting plan.
+          </p>
+          <Link
+            href="/pio-tool/events?new=1"
+            className="mt-4 inline-flex items-center rounded-lg bg-[#0B1B3A] px-4 py-2 text-xs font-semibold text-white hover:bg-[#12284F]"
+          >
+            Create community event
+          </Link>
+        </div>
+      ) : (
+        <ul className="flex flex-1 flex-col gap-2.5">
+          {rows.map((row) => (
+            <li key={row.id}>
+              <Link
+                href={row.href}
+                className="flex items-center gap-3 rounded-xl border border-[#e8eef8] bg-[#F8FAFC] p-3 transition hover:border-[#bfdbfe] hover:bg-[#EFF6FF]"
+              >
+                <div className="flex h-14 w-12 shrink-0 flex-col items-center justify-center rounded-xl bg-white text-[#0f1c3f] ring-1 ring-[#e2e8f5]">
+                  <span className="text-[10px] font-bold tracking-wide text-[#64748b]">{row.month}</span>
+                  <span className="text-xl font-bold leading-none">{row.day}</span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-[#0f1c3f]">{row.title}</p>
+                  <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#64748b]">
+                    <span className="inline-flex items-center gap-1">
+                      <MapPin className="h-3 w-3" />
+                      {row.location}
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {row.timeRange}
+                    </span>
+                  </p>
+                </div>
+                <span className="shrink-0 rounded-full bg-[#EFF6FF] px-2.5 py-1 text-[11px] font-bold text-[#1D4ED8]">
+                  {row.daysAwayLabel}
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   )
 }
@@ -815,7 +856,7 @@ function PostsToSharePanel({
   ]
 
   const demoPosts = DEMO_POSTS.slice(0, 3)
-  const showDemo = forceDemo || posts.length === 0
+  const showDemo = forceDemo
 
   return (
     <section className="flex h-full flex-col rounded-2xl border border-[#e2e8f5] bg-white p-5 shadow-sm">
@@ -852,7 +893,7 @@ function PostsToSharePanel({
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-[11px] font-bold uppercase tracking-wide text-[#64748b]">
-                    {post.time}
+                    Sample · {post.time}
                   </p>
                   <p className="mt-0.5 line-clamp-2 text-sm text-[#405172]">{post.preview}</p>
                   <div className="mt-2.5 flex flex-wrap items-center gap-2">
@@ -871,6 +912,28 @@ function PostsToSharePanel({
             </li>
           ))}
         </ul>
+      ) : posts.length === 0 ? (
+        <div className="flex flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-[#d8e0ef] bg-[#F8FAFC] px-4 py-8 text-center">
+          <Send className="mb-3 h-8 w-8 text-[#94A3B8]" />
+          <p className="text-sm font-semibold text-[#0f1c3f]">Nothing queued to share</p>
+          <p className="mt-1 max-w-xs text-xs text-[#64748b]">
+            Schedule an event or grab this week&apos;s ready graphics from What&apos;s New.
+          </p>
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+            <Link
+              href="/pio-tool/events?new=1"
+              className="inline-flex items-center rounded-lg bg-[#0B1B3A] px-3 py-2 text-xs font-semibold text-white hover:bg-[#12284F]"
+            >
+              Create event
+            </Link>
+            <Link
+              href="/whats-new"
+              className="inline-flex items-center rounded-lg border border-[#bfdbfe] bg-white px-3 py-2 text-xs font-semibold text-[#2563EB] hover:bg-[#EFF6FF]"
+            >
+              Open What&apos;s New
+            </Link>
+          </div>
+        </div>
       ) : (
         <ul className="flex flex-1 flex-col gap-2.5">
           {posts.map((post) => {

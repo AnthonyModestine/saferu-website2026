@@ -1,7 +1,8 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useEffect, useState } from "react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { PIOSidebar } from "@/components/pio/sidebar"
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { Menu } from "lucide-react"
@@ -11,6 +12,11 @@ import { AgencyProvider } from "@/lib/agency-context"
 /** Client chrome for Press Center (sidebar + mobile menu). Auth is enforced in the server layout. */
 export function PioToolShell({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const pathname = usePathname()
+
+  useEffect(() => {
+    setSidebarOpen(false)
+  }, [pathname])
 
   return (
     <AgencyProvider>

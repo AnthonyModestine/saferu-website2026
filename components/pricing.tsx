@@ -218,7 +218,7 @@ export function Pricing() {
                 variant="outline"
                 className="mt-8 w-full border-[#1470AF] py-6 font-semibold text-[#1470AF] hover:bg-[#1470AF]/5 hover:text-[#1470AF]"
               >
-                <Link href="/templates">Browse Free Content</Link>
+                <Link href="/sign-up?returnUrl=%2Fwhats-new">Create Free Account</Link>
               </Button>
               <p className="mt-3 text-center text-xs text-muted-foreground">
                 No credit card required.
@@ -417,7 +417,7 @@ export function Pricing() {
               variant="outline"
               className="w-full rounded-xl border-white/25 bg-white/5 px-9 py-7 text-lg font-semibold text-white backdrop-blur transition-colors hover:bg-white/10 hover:text-white sm:w-auto"
             >
-              <Link href="/templates">Browse Free Content</Link>
+              <Link href="/sign-up?returnUrl=%2Fwhats-new">Create Free Account</Link>
             </Button>
           </div>
           <p className="mt-10 text-lg font-bold text-[#F2B233]">

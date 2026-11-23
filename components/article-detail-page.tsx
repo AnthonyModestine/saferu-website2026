@@ -279,20 +279,25 @@ export function ArticleDetailPage({
                             onCopy={copyToClipboard}
                           />
 
-                          {/* Platform Links */}
-                          <div className="mt-auto grid grid-cols-4 gap-2">
+                          {/* Copy caption, then open the platform to paste */}
+                          <div className="mt-auto grid grid-cols-2 gap-2 sm:grid-cols-4">
                             {platforms.map((platform) => (
-                              <a
+                              <button
                                 key={platform.label}
-                                href={platform.href}
-                                target="_blank"
-                                rel="noopener noreferrer"
+                                type="button"
+                                onClick={() => {
+                                  void (async () => {
+                                    await copyToClipboard(message, `${post.id}-${platform.label}`, post.title)
+                                    window.open(platform.href, "_blank", "noopener,noreferrer")
+                                  })()
+                                }}
                                 className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium text-white transition-opacity hover:opacity-80 ${platform.bgColor}`}
-                                aria-label={`Share on ${platform.label}`}
+                                aria-label={`Copy caption and open ${platform.label}`}
+                                title="Copies the caption, then opens the platform so you can paste"
                               >
                                 {platform.icon}
-                                <span>{platform.label}</span>
-                              </a>
+                                <span className="hidden sm:inline">{platform.label}</span>
+                              </button>
                             ))}
                           </div>
                         </div>

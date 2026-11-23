@@ -123,7 +123,13 @@ function CheckoutSuccessContent() {
               <h1 className="text-xl font-bold text-[#1a365d]">Almost there</h1>
               <p className="text-sm text-muted-foreground">{error}</p>
               <Button asChild className="bg-[#f2b233] text-[#1a365d] hover:bg-[#f2b233]/90 font-semibold">
-                <Link href="/sign-in?returnUrl=%2Fpio-tool%2Fcheckout-success">Sign in</Link>
+                <Link
+                  href={`/sign-in?returnUrl=${encodeURIComponent(
+                    `/pio-tool/checkout-success?session_id=${sessionId}`
+                  )}`}
+                >
+                  Sign in
+                </Link>
               </Button>
             </>
           ) : (

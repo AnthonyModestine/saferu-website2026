@@ -1,4 +1,5 @@
 import { ArticleDetailPage } from "@/components/article-detail-page"
+import { MemberOnlyGate } from "@/components/member-only-gate"
 import { getCategoryById, findArticleInCategory } from "@/lib/content-merged"
 import { ensureContentLoaded } from "@/lib/ensure-content-loaded"
 import { notFound } from "next/navigation"
@@ -32,12 +33,18 @@ export default async function WhatsNewArticlePage({ params }: Props) {
   }
 
   return (
-    <ArticleDetailPage
-      category={category}
-      subcategory={found.subcategory}
-      article={found.article}
-      iconColor="text-[#f2b233]"
-      isWhatsNew
-    />
+    <MemberOnlyGate
+      returnUrl={`/whats-new/${articleId}`}
+      title="Members only"
+      description="Sign in with your free SaferU account to view this week's seasonal graphics and captions."
+    >
+      <ArticleDetailPage
+        category={category}
+        subcategory={found.subcategory}
+        article={found.article}
+        iconColor="text-[#f2b233]"
+        isWhatsNew
+      />
+    </MemberOnlyGate>
   )
 }

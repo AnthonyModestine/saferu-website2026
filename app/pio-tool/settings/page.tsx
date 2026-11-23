@@ -327,7 +327,7 @@ export default function AgencySettingsPage() {
               {settings.logoUrl ? (
                 <>
                   <Image
-                    src={settings.logoUrl || "/placeholder.svg"}
+                    src={settings.logoUrl}
                     alt="Agency logo"
                     fill
                     className="object-contain p-1"

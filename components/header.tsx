@@ -59,7 +59,7 @@ export function Header() {
 
           <DropdownMenu>
             <DropdownMenuTrigger suppressHydrationWarning className="flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
-              Templates
+              Content Library
               <ChevronDown className="h-4 w-4" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="center" className="w-48">
@@ -103,6 +103,15 @@ export function Header() {
         <div className="hidden items-center gap-4 md:flex">
           {!isLoading && member ? (
             <>
+              {member.paid ? (
+                <Button
+                  asChild
+                  size="sm"
+                  className="bg-[#1a365d] font-semibold text-white hover:bg-[#1a365d]/90"
+                >
+                  <Link href="/pio-tool">Open Press Center</Link>
+                </Button>
+              ) : null}
               <Link
                 href="/account"
                 className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground flex items-center gap-1.5"
@@ -166,7 +175,7 @@ export function Header() {
 
             <div className="px-3 py-2">
               <span className="text-sm font-semibold text-muted-foreground">
-                Templates
+                Content Library
               </span>
               <div className="mt-2 space-y-1 pl-2">
                 {templateLinks.map((link) => (
@@ -209,6 +218,15 @@ export function Header() {
             <div className="pt-4 space-y-2">
               {!isLoading && member ? (
                 <>
+                  {member.paid ? (
+                    <Link
+                      href="/pio-tool"
+                      className="block rounded-md bg-[#1a365d] px-3 py-2 text-center text-base font-semibold text-white"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      Open Press Center
+                    </Link>
+                  ) : null}
                   <Link
                     href="/account"
                     className="flex items-center gap-2 rounded-md px-3 py-2 text-base font-medium text-foreground hover:bg-muted"

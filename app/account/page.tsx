@@ -154,7 +154,45 @@ export default function AccountPage() {
           <h1 className="text-3xl font-bold text-foreground">Account</h1>
           <p className="mt-1 text-muted-foreground">View your profile and manage billing.</p>
 
-          <Card className="mt-8">
+          <Card className="mt-8 border-[#1470AF]/20 bg-[#1470AF]/5">
+            <CardHeader>
+              <CardTitle>Continue working</CardTitle>
+              <CardDescription>
+                {member.paid
+                  ? "Jump back into Press Center tools and this week’s member content."
+                  : "Browse the Content Library and What’s New, or upgrade for Press Center."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-wrap gap-2">
+              {member.paid ? (
+                <>
+                  <Button asChild className="bg-[#1a365d] text-white hover:bg-[#1a365d]/90">
+                    <Link href="/pio-tool">Press Center</Link>
+                  </Button>
+                  <Button asChild variant="outline">
+                    <Link href="/pio-tool/graphics/safety-tip">Create graphic</Link>
+                  </Button>
+                  <Button asChild variant="outline">
+                    <Link href="/whats-new">What&apos;s New</Link>
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button asChild className="bg-[#f2b233] text-[#1a365d] hover:bg-[#f2b233]/90 font-semibold">
+                    <Link href="/whats-new">What&apos;s New</Link>
+                  </Button>
+                  <Button asChild variant="outline">
+                    <Link href="/templates">Content Library</Link>
+                  </Button>
+                  <Button asChild variant="outline">
+                    <Link href="/pio-tool/subscribe">Upgrade to Press Center</Link>
+                  </Button>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="mt-6">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <User className="h-5 w-5" />

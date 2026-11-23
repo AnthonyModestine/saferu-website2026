@@ -1302,12 +1302,18 @@ export default function NewPressReleasePage() {
                     {agencySettings.logoUrl && (
                       <div className="mb-4">
                         <div className="relative h-16 w-16">
-                          <Image
-                            src={agencySettings.logoUrl || "/placeholder.svg"}
-                            alt="Agency logo"
-                            fill
-                            className="object-contain"
-                          />
+                          {agencySettings.logoUrl ? (
+                            <Image
+                              src={agencySettings.logoUrl}
+                              alt="Agency logo"
+                              fill
+                              className="object-contain"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center rounded-md bg-[#EEF2FF] text-[10px] font-semibold text-[#64748B]">
+                              Logo
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}

@@ -28,6 +28,8 @@ import {
 
 const TOPIC_OPTIONS = [
   { value: "general", label: "General Inquiry" },
+  { value: "sales", label: "Pricing / Demo" },
+  { value: "invoice", label: "Invoice / Purchase Order" },
   { value: "content", label: "Content Request" },
   { value: "feedback", label: "Feedback" },
   { value: "bug", label: "Report an Issue" },

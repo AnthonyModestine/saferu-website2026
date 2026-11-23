@@ -469,7 +469,7 @@ export function GraphicStudioSection() {
               size="lg"
               className="mt-10 rounded-xl bg-[#F2B233] px-9 py-7 text-lg font-bold text-[#1A365D] shadow-[0_8px_30px_rgba(242,178,51,0.3)] transition-transform hover:-translate-y-0.5 hover:bg-[#ffc44d]"
             >
-              <Link href="/pio-tool/graphics/safety-tip">Create your first safety graphic</Link>
+              <Link href="/pio-tool">Explore Graphic Studio in Press Center</Link>
             </Button>
           </div>
 

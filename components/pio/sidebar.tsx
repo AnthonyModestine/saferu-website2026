@@ -19,6 +19,8 @@ import {
   Home,
   ImageIcon,
   Layers,
+  Star,
+  Library,
 } from "lucide-react"
 import { useAgency } from "@/lib/agency-context"
 import { useMemberSession } from "@/lib/use-member-session"
@@ -131,10 +133,10 @@ function LockedNavItem({
   accent?: string
 }) {
   return (
-    <div
-      className="flex cursor-not-allowed items-start gap-3 rounded-xl px-3 py-2.5 opacity-55"
+    <Link
+      href={pressCenterSignInUrl()}
+      className="flex items-start gap-3 rounded-xl px-3 py-2.5 opacity-70 transition-colors hover:bg-white/10 hover:opacity-100"
       title="Sign in to unlock"
-      aria-disabled="true"
     >
       <Icon className={cn("mt-0.5 h-5 w-5 shrink-0", accent || "text-[#93A4C7]")} />
       <span className="min-w-0 flex-1">
@@ -146,9 +148,26 @@ function LockedNavItem({
           {description}
         </span>
       </span>
-    </div>
+    </Link>
   )
 }
+
+const libraryItems = [
+  {
+    title: "What's New",
+    description: "This week's seasonal graphics & captions",
+    href: "/whats-new",
+    icon: Star,
+    accent: "text-[#F2B233]",
+  },
+  {
+    title: "Content Library",
+    description: "Browse fire, crime, weather & more",
+    href: "/templates",
+    icon: Library,
+    accent: "text-[#93A4C7]",
+  },
+]
 
 export function PIOSidebar() {
   const pathname = usePathname()
@@ -162,8 +181,11 @@ export function PIOSidebar() {
     router.refresh()
   }
 
-  const agencyLabel =
-    settings.agencyName?.trim() || "Demo Public Safety Agency"
+  const agencyLabel = settings.agencyName?.trim()
+    ? settings.agencyName.trim()
+    : member
+      ? "Finish agency setup"
+      : "Guest preview"
   const displayName =
     member?.name?.trim() || member?.email?.split("@")[0] || null
   const shortName = displayName
@@ -333,17 +355,56 @@ export function PIOSidebar() {
               })}
           </div>
         </div>
+
+        <div>
+          <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#7B8BB0]">
+            Content
+          </p>
+          <div className="space-y-1">
+            {libraryItems.map((item) => {
+              const active =
+                pathname === item.href || pathname.startsWith(item.href + "/")
+              return (
+                <Link
+                  key={item.title}
+                  href={item.href}
+                  className={cn(
+                    "flex items-start gap-3 rounded-xl px-3 py-2.5 transition-colors",
+                    active ? "bg-white/15 text-white ring-1 ring-white/20" : "hover:bg-white/10"
+                  )}
+                  aria-current={active ? "page" : undefined}
+                >
+                  <item.icon
+                    className={cn(
+                      "mt-0.5 h-5 w-5 shrink-0",
+                      active ? "text-white" : item.accent
+                    )}
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold text-white">{item.title}</span>
+                    <span className="mt-0.5 block text-[11px] leading-snug text-[#94A3B8]">
+                      {item.description}
+                    </span>
+                  </span>
+                </Link>
+              )
+            })}
+          </div>
+        </div>
       </nav>
 
       <div className="space-y-2 border-t border-white/10 p-3">
         {member ? (
           <>
-            <div className="flex items-center gap-2.5 rounded-xl bg-white/5 px-3 py-2.5">
+            <Link
+              href="/pio-tool/settings"
+              className="flex items-center gap-2.5 rounded-xl bg-white/5 px-3 py-2.5 transition-colors hover:bg-white/10"
+            >
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1e90ff]/25 text-[#7ec8ff]">
                 <Shield className="h-4 w-4" />
               </div>
               <p className="min-w-0 truncate text-xs font-medium text-[#d7e0f7]">{agencyLabel}</p>
-            </div>
+            </Link>
             <div className="flex items-center gap-2.5 rounded-xl px-3 py-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#2563EB] to-[#7C5CFC] text-[11px] font-bold">
                 {initials}

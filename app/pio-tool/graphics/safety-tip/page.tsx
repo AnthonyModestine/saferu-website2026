@@ -28,6 +28,7 @@ import {
 } from "@/lib/graphic-studio/use-estimated-progress"
 import { SAVED_GRAPHICS_PATH } from "@/lib/press-center-features"
 import { GraphicStudioFeedback } from "@/components/pio/graphic-studio-feedback"
+import { PIOPaywall } from "@/components/pio-paywall"
 
 type PreparedMessage = {
   headline: string
@@ -69,7 +70,11 @@ export default function SafetyTipGraphicPage() {
 
   const agencyPayload = {
     agencyName: settings.agencyName,
-    agencyLogoUrl: settings.logoUrl?.startsWith("/") ? settings.logoUrl : null,
+    agencyLogoUrl:
+      settings.logoUrl &&
+      (settings.logoUrl.startsWith("/") || settings.logoUrl.startsWith("data:"))
+        ? settings.logoUrl
+        : null,
   }
 
   const prepareMessage = async () => {
@@ -336,6 +341,7 @@ export default function SafetyTipGraphicPage() {
   const busy = preparing || generating || revising || saving || Boolean(adjustingCaption)
 
   return (
+    <PIOPaywall>
     <div className="mx-auto max-w-5xl space-y-6 p-6 md:p-8">
       <div>
         <Button asChild variant="ghost" className="-ml-2 mb-3 text-[#475569]">
@@ -685,5 +691,6 @@ export default function SafetyTipGraphicPage() {
         />
       )}
     </div>
+    </PIOPaywall>
   )
 }

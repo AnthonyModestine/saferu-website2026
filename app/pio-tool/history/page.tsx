@@ -160,13 +160,13 @@ export default function HistoryPage() {
             </p>
           </div>
           <Button asChild className="shrink-0 bg-[#f2b233] text-[#1a365d] hover:bg-[#f2b233]/90 font-semibold">
-            <Link href="/pricing">Subscribe Now</Link>
+            <Link href="/pio-tool/subscribe">Subscribe Now</Link>
           </Button>
         </div>
       )}
 
       <div>
-        <h1 className="text-2xl font-bold text-[#1a365d]">History</h1>
+        <h1 className="text-2xl font-bold text-[#1a365d]">Saved Content</h1>
         <p className="text-muted-foreground">
           View, export, and manage your press releases and video requests from the past 30 days. Items older than 30 days are automatically removed.
         </p>
@@ -265,8 +265,21 @@ export default function HistoryPage() {
               <p className="text-muted-foreground">
                 {searchQuery
                   ? "No items found matching your search."
-                  : "Nothing here yet. Create your first press release or video request. Items appear here for 30 days."}
+                  : "Nothing saved yet. Create a press release, video request, or safety graphic — drafts stay here for 30 days."}
               </p>
+              {!searchQuery ? (
+                <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+                  <Button asChild className="bg-[#0B1B3A] text-white hover:bg-[#12284F]">
+                    <Link href="/pio-tool/new">Press release</Link>
+                  </Button>
+                  <Button asChild variant="outline">
+                    <Link href="/pio-tool/community-post">Video request</Link>
+                  </Button>
+                  <Button asChild variant="outline">
+                    <Link href="/pio-tool/graphics/safety-tip">Safety graphic</Link>
+                  </Button>
+                </div>
+              ) : null}
             </div>
           )}
         </CardContent>
