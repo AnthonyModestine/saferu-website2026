@@ -198,7 +198,8 @@ export function AdminContactsClient() {
               Import CSV
             </CardTitle>
             <CardDescription>
-              Headers: <code>email</code>, optional <code>name</code>, <code>agency</code>,{" "}
+              Supports <code>mail</code> / <code>email</code>, <code>First Name</code> +{" "}
+              <code>Last Name</code>, optional <code>Created On</code>, <code>agency</code>,{" "}
               <code>notes</code>. Duplicates merge by email.
             </CardDescription>
           </CardHeader>

@@ -63,8 +63,11 @@ export function csvRowsToObjects(rows: string[][]): Record<string, string>[] {
 
 const EMAIL_KEYS = ["email", "e-mail", "email address", "emailaddress", "mail"]
 const NAME_KEYS = ["name", "full name", "fullname", "contact", "contact name"]
+const FIRST_NAME_KEYS = ["first name", "firstname", "first", "given name"]
+const LAST_NAME_KEYS = ["last name", "lastname", "last", "surname", "family name"]
 const AGENCY_KEYS = ["agency", "organization", "organisation", "org", "department", "dept"]
 const NOTES_KEYS = ["notes", "note", "comments", "comment"]
+const CREATED_KEYS = ["created on", "created", "created at", "date created", "joined"]
 
 function pick(obj: Record<string, string>, keys: string[]): string {
   for (const key of keys) {
@@ -79,10 +82,16 @@ export function mapContactCsvRow(obj: Record<string, string>): {
   agency: string
   notes: string
 } {
+  const fullName = pick(obj, NAME_KEYS)
+  const first = pick(obj, FIRST_NAME_KEYS)
+  const last = pick(obj, LAST_NAME_KEYS)
+  const name = fullName || [first, last].filter(Boolean).join(" ").trim()
+  const notes = pick(obj, NOTES_KEYS) || pick(obj, CREATED_KEYS)
+
   return {
     email: pick(obj, EMAIL_KEYS),
-    name: pick(obj, NAME_KEYS),
+    name,
     agency: pick(obj, AGENCY_KEYS),
-    notes: pick(obj, NOTES_KEYS),
+    notes,
   }
 }
