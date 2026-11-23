@@ -14,6 +14,7 @@ import {
   settleAiTokens,
 } from "@/lib/pio-token-gate"
 import { TOKEN_ESTIMATES } from "@/lib/openai-usage"
+import { getAgencyVoiceBrief } from "@/lib/agency-voice-memory"
 
 export const maxDuration = 120
 
@@ -64,6 +65,7 @@ export async function POST(request: Request) {
       typeof body.agencyLogoUrl === "string" ? body.agencyLogoUrl : null
     )
 
+    const voiceBrief = await getAgencyVoiceBrief(session.memberId)
     const result = await generatePostOpportunityPackage({
       title,
       whyItMatters: String(body.whyItMatters || body.summary || title),
@@ -91,6 +93,7 @@ export async function POST(request: Request) {
       state: String(body.state || ""),
       agencyLogoUrl,
       seedMessage: String(body.seedMessage || ""),
+      agencyVoiceBrief: voiceBrief || undefined,
     })
 
     if (!result.ok) {

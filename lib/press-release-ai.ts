@@ -31,7 +31,8 @@ type PressReleaseRevision = {
 
 export async function generateStructuredPressReleaseDraft(
   payload: PressReleasePayload,
-  revision?: PressReleaseRevision | null
+  revision?: PressReleaseRevision | null,
+  agencyVoiceBrief?: string
 ): Promise<AiResult<PressReleaseDraft>> {
   const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) {
@@ -65,13 +66,17 @@ export async function generateStructuredPressReleaseDraft(
       wordCountMax: INCIDENT_MAX,
     })
     const direction = revision?.direction?.trim()
-    const callPayload = direction
-      ? {
-          ...userPayload,
-          revisionDirection: direction.slice(0, 1000),
-          ...(revision?.previousDrafts ? { previousDrafts: revision.previousDrafts } : {}),
-        }
-      : userPayload
+    const voice = agencyVoiceBrief?.trim()
+    const callPayload = {
+      ...(direction
+        ? {
+            ...userPayload,
+            revisionDirection: direction.slice(0, 1000),
+            ...(revision?.previousDrafts ? { previousDrafts: revision.previousDrafts } : {}),
+          }
+        : userPayload),
+      ...(voice ? { agencyVoiceMemory: voice.slice(0, 2500) } : {}),
+    }
 
     return runPioStructuredCall(
       openai,

@@ -21,6 +21,7 @@ import {
   settleAiTokens,
 } from "@/lib/pio-token-gate"
 import { TOKEN_ESTIMATES } from "@/lib/openai-usage"
+import { getAgencyVoiceBrief, recordVoiceSignal } from "@/lib/agency-voice-memory"
 
 const MAX = 1000 // max chars for free-text fields
 
@@ -128,7 +129,17 @@ export async function POST(request: Request) {
         }
       : null
 
-    const result = await generateMultiOutput(payload, selection, revision)
+    if (revisionDirection) {
+      void recordVoiceSignal({
+        memberId: session.memberId,
+        kind: "revision_direction",
+        detail: revisionDirection,
+        meta: "press_release",
+      })
+    }
+
+    const voiceBrief = await getAgencyVoiceBrief(session.memberId)
+    const result = await generateMultiOutput(payload, selection, revision, voiceBrief || undefined)
     if (!result.ok) {
       await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       console.error("[generate-all] AI failed:", result.reason, result.detail ?? "")

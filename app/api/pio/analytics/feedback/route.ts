@@ -6,6 +6,7 @@ import {
   type FeedbackRating,
   type FeedbackReason,
 } from "@/lib/pio-analytics"
+import { recordVoiceSignal } from "@/lib/agency-voice-memory"
 
 const REASONS: FeedbackReason[] = [
   "missing_information",
@@ -52,6 +53,22 @@ export async function POST(request: Request) {
       reason: rating === "negative" ? reason : undefined,
       comment,
     })
+
+    if (rating === "positive") {
+      void recordVoiceSignal({
+        memberId: session.memberId,
+        kind: "feedback_positive",
+        detail: "accepted_draft",
+        meta: generationSessionId.slice(0, 40),
+      })
+    } else {
+      void recordVoiceSignal({
+        memberId: session.memberId,
+        kind: "feedback_negative",
+        detail: reason || "other",
+        meta: comment?.trim().slice(0, 120),
+      })
+    }
 
     return NextResponse.json({ ok: true })
   } catch {

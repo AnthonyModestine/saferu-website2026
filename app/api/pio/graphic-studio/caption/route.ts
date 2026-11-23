@@ -12,6 +12,7 @@ import {
   settleAiTokens,
 } from "@/lib/pio-token-gate"
 import { TOKEN_ESTIMATES } from "@/lib/openai-usage"
+import { getAgencyVoiceBrief, recordVoiceSignal } from "@/lib/agency-voice-memory"
 
 export const maxDuration = 60
 
@@ -33,6 +34,8 @@ export async function POST(request: Request) {
     const caption = String(body.caption || "").trim()
     const mode = String(body.mode || "").trim()
 
+    const voiceBrief = await getAgencyVoiceBrief(session.memberId)
+
     if (action === "adjust") {
       if (!isCaptionAdjustMode(mode)) {
         await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
@@ -42,12 +45,19 @@ export async function POST(request: Request) {
         await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
         return NextResponse.json({ error: "Generate a caption before adjusting it." }, { status: 400 })
       }
+      void recordVoiceSignal({
+        memberId: session.memberId,
+        kind: "caption_adjust",
+        detail: mode,
+        meta: "graphic_studio",
+      })
       const result = await adjustSafetySocialCaption({
         caption,
         mode,
         headline,
         message,
         agencyName,
+        agencyVoiceBrief: voiceBrief || undefined,
       })
       if (!result.ok) {
         await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
@@ -69,6 +79,7 @@ export async function POST(request: Request) {
       headline,
       message,
       agencyName,
+      agencyVoiceBrief: voiceBrief || undefined,
     })
     if (!result.ok) {
       await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)

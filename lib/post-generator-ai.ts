@@ -201,7 +201,8 @@ export async function generateMessageFromOpportunity(
   agencyType?: string,
   agencyTypeOther?: string,
   messagingAngle?: string,
-  jurisdictionFit?: "own" | "nearby" | "regional" | "unknown"
+  jurisdictionFit?: "own" | "nearby" | "regional" | "unknown",
+  agencyVoiceBrief?: string
 ): Promise<AiResult<string>> {
   const opportunity: RankedExternalOpportunity = {
     id: "generate-post",
@@ -239,7 +240,7 @@ export async function generateMessageFromOpportunity(
     agencyName: agencyName || "",
     agencyType: formatAgencyTypeLabel(agencyType, agencyTypeOther),
     agencyRoleProfile: agencyRoleBrief(agencyType),
-    agencyVoiceProfile: "",
+    agencyVoiceProfile: agencyVoiceBrief?.trim() || "",
     city: city || "",
     county: "",
     state: state || "",

@@ -290,6 +290,14 @@ export async function ensureSchema(): Promise<void> {
   `
 
   await db`
+    CREATE TABLE IF NOT EXISTS agency_voice_memory (
+      member_id TEXT PRIMARY KEY,
+      data JSONB NOT NULL DEFAULT '{}',
+      updated_at BIGINT NOT NULL
+    )
+  `
+
+  await db`
     CREATE TABLE IF NOT EXISTS graphic_studio_records (
       graphic_id TEXT PRIMARY KEY,
       user_email TEXT NOT NULL,

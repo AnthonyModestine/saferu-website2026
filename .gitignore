@@ -40,5 +40,8 @@ data/content-analytics.json
 data/content-meta.json
 data/weekly-campaigns.json
 data/admin-contacts.json
+data/agency-voice-memory.json
+data/agency-recommendation-preferences.json
+data/agency-settings.json
 data/media-upload-sessions/
 data/media-upload-sessions/

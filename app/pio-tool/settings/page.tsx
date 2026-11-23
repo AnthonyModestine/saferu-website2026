@@ -15,7 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { Save, Upload, Building2, X, CreditCard, ExternalLink } from "lucide-react"
+import { Save, Upload, Building2, X, CreditCard, ExternalLink, Sparkles } from "lucide-react"
 import { useAgency, DEMO_AGENCY_LOGO_URL } from "@/lib/agency-context"
 import { DEPARTMENT_TYPES, type SupportedDepartmentType } from "@/lib/department-types"
 import { isLocalHostname } from "@/lib/local-preview"
@@ -46,6 +46,13 @@ export default function AgencySettingsPage() {
   } | null>(null)
   const [portalLoading, setPortalLoading] = useState(false)
   const [portalMessage, setPortalMessage] = useState<string | null>(null)
+  const [voiceNotes, setVoiceNotes] = useState("")
+  const [voiceSummary, setVoiceSummary] = useState("")
+  const [voiceLearning, setVoiceLearning] = useState<"new" | "learning" | "strong">("new")
+  const [voiceSignalCount, setVoiceSignalCount] = useState(0)
+  const [voiceSaving, setVoiceSaving] = useState(false)
+  const [voiceSaved, setVoiceSaved] = useState(false)
+  const [voiceError, setVoiceError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!isSubscribed) return
@@ -56,6 +63,51 @@ export default function AgencySettingsPage() {
       })
       .catch(() => {})
   }, [isSubscribed])
+
+  useEffect(() => {
+    if (!isSubscribed) return
+    fetch("/api/pio/voice-memory")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!data) return
+        setVoiceNotes(typeof data.manualNotes === "string" ? data.manualNotes : "")
+        setVoiceSummary(typeof data.summary === "string" ? data.summary : "")
+        setVoiceLearning(
+          data.learning === "strong" || data.learning === "learning" ? data.learning : "new"
+        )
+        setVoiceSignalCount(typeof data.signalCount === "number" ? data.signalCount : 0)
+      })
+      .catch(() => {})
+  }, [isSubscribed])
+
+  const handleSaveVoiceNotes = async () => {
+    setVoiceSaving(true)
+    setVoiceError(null)
+    setVoiceSaved(false)
+    try {
+      const res = await fetch("/api/pio/voice-memory", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ manualNotes: voiceNotes }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setVoiceError(data.error || "Could not save voice notes.")
+        return
+      }
+      setVoiceSummary(typeof data.summary === "string" ? data.summary : voiceSummary)
+      setVoiceLearning(
+        data.learning === "strong" || data.learning === "learning" ? data.learning : "new"
+      )
+      setVoiceSignalCount(typeof data.signalCount === "number" ? data.signalCount : voiceSignalCount)
+      setVoiceSaved(true)
+      window.setTimeout(() => setVoiceSaved(false), 2000)
+    } catch {
+      setVoiceError("Could not save voice notes.")
+    } finally {
+      setVoiceSaving(false)
+    }
+  }
 
   const handleManageBilling = async () => {
     setPortalMessage(null)
@@ -311,6 +363,63 @@ export default function AgencySettingsPage() {
               This paragraph will be automatically added to the end of your press releases and video requests.
             </p>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-[#F59E0B]" />
+            Agency voice memory
+          </CardTitle>
+          <CardDescription>
+            SaferU learns how your agency writes from revisions, caption adjustments, and draft
+            ratings — then aims to match that voice on the first try.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="rounded-xl border border-[#e2e8f5] bg-[#F8FAFC] px-4 py-3">
+            <p className="text-sm font-semibold text-[#0f1c3f]">
+              {voiceLearning === "strong"
+                ? "Strong voice match"
+                : voiceLearning === "learning"
+                  ? "Learning your voice"
+                  : "Just getting started"}
+              {voiceSignalCount > 0 ? (
+                <span className="ml-2 text-xs font-medium text-[#64748b]">
+                  · {voiceSignalCount} signal{voiceSignalCount === 1 ? "" : "s"}
+                </span>
+              ) : null}
+            </p>
+            <p className="mt-1 text-sm text-[#64748b]">
+              {voiceSummary ||
+                "Use Press Center a few times — revise drafts, adjust captions, or rate results — and SaferU will learn this voice."}
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="voice-notes">Voice notes (optional)</Label>
+            <Textarea
+              id="voice-notes"
+              rows={4}
+              disabled={locked}
+              placeholder='e.g. "Keep posts short and calm. Avoid slang. Always name the department. Prefer clear next steps for residents."'
+              className="placeholder:text-muted-foreground/60"
+              value={voiceNotes}
+              onChange={(e) => setVoiceNotes(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Seed the voice now, or let SaferU learn automatically from how you edit.
+            </p>
+          </div>
+          {voiceError ? <p className="text-sm text-destructive">{voiceError}</p> : null}
+          <Button
+            type="button"
+            disabled={locked || voiceSaving}
+            onClick={() => void handleSaveVoiceNotes()}
+            className="bg-[#0B1B3A] text-white hover:bg-[#12284F]"
+          >
+            {voiceSaving ? "Saving…" : voiceSaved ? "Saved" : "Save voice notes"}
+          </Button>
         </CardContent>
       </Card>
 

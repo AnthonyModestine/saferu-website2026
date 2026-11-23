@@ -29,6 +29,7 @@ export async function generatePostOpportunityPackage(opts: {
   state?: string
   agencyLogoUrl?: string | null
   seedMessage?: string
+  agencyVoiceBrief?: string
 }): Promise<AiResult<PostOpportunityPackage>> {
   const messageResult = await generateMessageFromOpportunity(
     opts.title,
@@ -45,7 +46,8 @@ export async function generatePostOpportunityPackage(opts: {
     opts.agencyType,
     opts.agencyTypeOther,
     opts.messagingAngle,
-    opts.jurisdictionFit
+    opts.jurisdictionFit,
+    opts.agencyVoiceBrief
   )
   if (!messageResult.ok) return messageResult
 

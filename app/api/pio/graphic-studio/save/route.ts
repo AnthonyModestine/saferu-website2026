@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { requireGraphicStudioAccess } from "@/lib/graphic-studio/api-auth"
 import { storeGraphicStudioImageFromDataUrl } from "@/lib/graphic-studio/store-image"
 import { markGraphicSaved } from "@/lib/graphic-studio-store"
+import { recordVoiceSignal } from "@/lib/agency-voice-memory"
 
 export const maxDuration = 60
 
@@ -36,6 +37,16 @@ export async function POST(request: Request) {
 
     if (!record) {
       return NextResponse.json({ error: "Could not save this graphic." }, { status: 500 })
+    }
+
+    const caption = typeof body.caption === "string" ? body.caption.trim() : ""
+    if (caption.length >= 40) {
+      void recordVoiceSignal({
+        memberId: session.memberId,
+        kind: "saved_example",
+        detail: caption.slice(0, 400),
+        meta: "graphic_studio",
+      })
     }
 
     return NextResponse.json({

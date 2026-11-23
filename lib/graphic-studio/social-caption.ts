@@ -80,22 +80,25 @@ export async function generateSafetySocialCaption(opts: {
   headline: string
   message: string
   agencyName?: string
+  agencyVoiceBrief?: string
 }): Promise<AiResult<string>> {
   if (!opts.headline.trim() || !opts.message.trim()) {
     return { ok: false, reason: "empty_input" }
   }
 
   const agency = opts.agencyName?.trim() || "(agency name not provided — write in a natural local public-safety voice)"
+  const voice = opts.agencyVoiceBrief?.trim()
   return completeCaption(
     CAPTION_SYSTEM,
     `Create a ready-to-post social media caption for this safety graphic.
 
 Agency: ${agency}
+${voice ? `\n${voice}\n` : ""}
 Topic notes: ${opts.topic || "(none)"}
 On-graphic headline: ${opts.headline}
 On-graphic message: ${opts.message}
 
-Make it strong and eye-catching. Make sure a resident instantly understands the issue and how to handle it. When it fits, make it feel personal — like this agency wrote it for their own community.`
+Make it strong and eye-catching. Make sure a resident instantly understands the issue and how to handle it. When it fits, make it feel personal — like this agency wrote it for their own community.${voice ? " Match the agency voice memory above so this PIO can use the caption with minimal edits." : ""}`
   )
 }
 
@@ -105,16 +108,18 @@ export async function adjustSafetySocialCaption(opts: {
   headline: string
   message: string
   agencyName?: string
+  agencyVoiceBrief?: string
 }): Promise<AiResult<string>> {
   if (!opts.caption.trim()) return { ok: false, reason: "empty_input" }
 
   const agency = opts.agencyName?.trim() || "(agency name not provided)"
+  const voice = opts.agencyVoiceBrief?.trim()
   return completeCaption(
     CAPTION_SYSTEM,
     `Revise this social caption for the same safety graphic. Keep the social-media-guru voice: strong, eye-catching, clear on the issue and the fix, and personal when it fits.
 
 Adjust: ${adjustInstruction(opts.mode)}
-
+${voice ? `\n${voice}\n` : ""}
 Agency: ${agency}
 On-graphic headline: ${opts.headline}
 On-graphic message: ${opts.message}

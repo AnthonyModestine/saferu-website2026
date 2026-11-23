@@ -11,6 +11,7 @@ import {
   settleAiTokens,
 } from "@/lib/pio-token-gate"
 import { TOKEN_ESTIMATES } from "@/lib/openai-usage"
+import { getAgencyVoiceBrief } from "@/lib/agency-voice-memory"
 
 const MAX = 1000
 
@@ -180,9 +181,11 @@ export async function POST(request: Request) {
       .filter(Boolean)
       .join("\n\n")
 
+    const voiceBrief = await getAgencyVoiceBrief(session.memberId)
     const result = await generateEventPostsWithAI({
       organizationName: organizationName || "Public Safety Agency",
       organizationType: organizationType || "public safety agency",
+      agencyVoiceMemory: voiceBrief || undefined,
       eventName,
       eventCategory,
       eventType,

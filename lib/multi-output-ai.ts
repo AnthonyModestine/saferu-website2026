@@ -280,7 +280,8 @@ export async function generateMultiOutput(
     talkingPoints: true,
     videoRequest: true,
   },
-  revision?: MultiOutputRevision | null
+  revision?: MultiOutputRevision | null,
+  agencyVoiceBrief?: string
 ): Promise<AiResult<MultiOutputResult>> {
   if (!selectionHasAny(selection)) {
     return { ok: false, reason: "invalid_json", detail: "Select at least one output to generate." }
@@ -318,9 +319,17 @@ export async function generateMultiOutput(
 
   let tokensUsed = 0
 
+  const voiceBrief = agencyVoiceBrief?.trim().slice(0, 2500) || ""
+  const withVoice = <T extends Record<string, unknown>>(p: T) =>
+    voiceBrief ? { ...p, agencyVoiceMemory: voiceBrief } : p
+
   let releaseDraft = emptyRelease()
   if (needsReleaseContext) {
-    const result = await generateStructuredPressReleaseDraft(normalizedPayload, activeRevision)
+    const result = await generateStructuredPressReleaseDraft(
+      normalizedPayload,
+      activeRevision,
+      voiceBrief || undefined
+    )
     if (!result.ok) return result
     tokensUsed += result.tokensUsed ?? 0
     releaseDraft = result.data
@@ -338,17 +347,19 @@ export async function generateMultiOutput(
     const result = await runPioStructuredCall(
       openai,
       SUPPLEMENTARY_DRAFT_PROMPT,
-      withRevisionPayload(
-        {
-          normalized,
-          pressReleaseDraft: releaseDraft,
-          requested: {
-            facebook: selection.facebook,
-            x: selection.twitter,
-            talkingPoints: selection.talkingPoints,
+      withVoice(
+        withRevisionPayload(
+          {
+            normalized,
+            pressReleaseDraft: releaseDraft,
+            requested: {
+              facebook: selection.facebook,
+              x: selection.twitter,
+              talkingPoints: selection.talkingPoints,
+            },
           },
-        },
-        activeRevision
+          activeRevision
+        )
       ),
       SUPPLEMENTARY_RESPONSE_FORMAT,
       supplementaryDraftSchema,
@@ -371,14 +382,16 @@ export async function generateMultiOutput(
   let assistance: AssistanceDraft | null = null
   if (selection.videoRequest) {
     const result = await generateStructuredCommunityRequest(
-      withRevisionPayload(
-        {
-          normalized,
-          requested: true,
-          instruction:
-            "Draft a public-assistance, witness, or video request only from supported facts.",
-        },
-        activeRevision
+      withVoice(
+        withRevisionPayload(
+          {
+            normalized,
+            requested: true,
+            instruction:
+              "Draft a public-assistance, witness, or video request only from supported facts.",
+          },
+          activeRevision
+        )
       )
     )
     if (!result.ok) return result

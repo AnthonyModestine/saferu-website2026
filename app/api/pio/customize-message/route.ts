@@ -18,6 +18,7 @@ import {
   settleAiTokens,
 } from "@/lib/pio-token-gate"
 import { TOKEN_ESTIMATES } from "@/lib/openai-usage"
+import { getAgencyVoiceBrief, recordVoiceSignal } from "@/lib/agency-voice-memory"
 
 export const maxDuration = 30
 
@@ -77,6 +78,7 @@ export async function POST(request: Request) {
         fitRaw === "own" || fitRaw === "nearby" || fitRaw === "regional" || fitRaw === "unknown"
           ? fitRaw
           : undefined
+      const voiceBrief = await getAgencyVoiceBrief(session.memberId)
       const result = await generateMessageFromOpportunity(
         String(body.title || ""),
         String(body.whyItMatters || ""),
@@ -92,7 +94,8 @@ export async function POST(request: Request) {
         String(body.agencyType || body.departmentType || ""),
         String(body.agencyTypeOther || body.departmentOther || ""),
         String(body.messagingAngle || body.whyThisAgency || ""),
-        jurisdictionFit
+        jurisdictionFit,
+        voiceBrief || undefined
       )
       if (!result.ok) {
         await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
@@ -118,6 +121,21 @@ export async function POST(request: Request) {
       await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       return NextResponse.json({ error: "Add a message before customizing." }, { status: 400 })
     }
+
+    const modeToVoice: Record<string, string> = {
+      shorten: "shorter",
+      longer: "longer",
+      more_excited: "more_urgent",
+      conversational: "calmer",
+      formal: "more_formal",
+      facebook: "stronger_cta",
+    }
+    void recordVoiceSignal({
+      memberId: session.memberId,
+      kind: "caption_adjust",
+      detail: modeToVoice[mode] || mode,
+      meta: "customize_message",
+    })
 
     const verifiedFactsRaw = Array.isArray(body.verifiedFacts) ? body.verifiedFacts.map(String) : []
     const verifiedFacts = verifiedFactsRaw

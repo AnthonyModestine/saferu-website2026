@@ -10,6 +10,7 @@ import {
   settleAiTokens,
 } from "@/lib/pio-token-gate"
 import { TOKEN_ESTIMATES } from "@/lib/openai-usage"
+import { getAgencyVoiceBrief } from "@/lib/agency-voice-memory"
 import {
   isSafetyAudience,
   isSafetyGraphicStyle,
@@ -93,11 +94,13 @@ export async function POST(request: Request) {
       return NextResponse.json(graphicStudioErrorPayload(result.reason, result.detail), { status: 503 })
     }
 
+    const voiceBrief = await getAgencyVoiceBrief(session.memberId)
     const captionResult = await generateSafetySocialCaption({
       topic,
       headline,
       message,
       agencyName,
+      agencyVoiceBrief: voiceBrief || undefined,
     })
     const caption = captionResult.ok ? captionResult.data : ""
 
