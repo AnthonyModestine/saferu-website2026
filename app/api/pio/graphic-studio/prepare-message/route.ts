@@ -13,6 +13,8 @@ import {
   settleAiTokens,
 } from "@/lib/pio-token-gate"
 import { TOKEN_ESTIMATES } from "@/lib/openai-usage"
+import { adviseCopyPlacement } from "@/lib/graphic-studio/copy-placement-advisory"
+import { adaptiveCreativeShadowEnabled } from "@/lib/ai-config/phase3"
 
 export const maxDuration = 120
 
@@ -68,13 +70,36 @@ export async function POST(request: Request) {
       result.tokensUsed
     )
 
+    const copyPlacement = adviseCopyPlacement({
+      headline: result.data.headline,
+      message: result.data.message,
+      researchSocialCaption: result.data.social_caption || null,
+    })
+
     return NextResponse.json({
       headline: result.data.headline,
       message: result.data.message,
       messageFormat: result.data.message_format,
+      socialCaption: result.data.social_caption || "",
       visualConcept: result.data.visual_concept,
       importantVisualDetails: result.data.important_visual_details,
+      omitFromCommunication: result.data.omit_from_communication || [],
       sourceRecords: result.data.source_records,
+      // Optional Phase 3 creative strategist output — clients may ignore.
+      creativeStrategy: result.data.creative_strategy || null,
+      researchConfidence: result.data.research_confidence || null,
+      // Shadow-mode adaptive recommendation — never auto-routes production.
+      adaptiveCreative: adaptiveCreativeShadowEnabled()
+        ? {
+            recommendedVariant: result.data.creative_direction_needed
+              ? "creative_direction"
+              : "autonomy",
+            reason: result.data.creative_direction_reason || "",
+            shadowOnly: true,
+          }
+        : null,
+      // Advisory only — never silently replaces approved graphic copy.
+      copyPlacement,
     })
   } catch (err) {
     await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)

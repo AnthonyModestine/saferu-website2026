@@ -17,6 +17,8 @@ import {
   isSafetyTipCategory,
   type GraphicStudioSource,
 } from "@/lib/pio-graphic-studio-types"
+import { recordGraphicQualityEvent } from "@/lib/graphic-studio/quality-metrics"
+import { phase3ConfigSnapshot } from "@/lib/ai-config/phase3"
 
 export const maxDuration = 300
 
@@ -31,6 +33,7 @@ export async function POST(request: Request) {
   )
   if (!reservation.ok) return reservation.response
 
+  const started = Date.now()
   try {
     const body = await request.json()
     const category = String(body.category || "Other / Custom").trim()
@@ -78,6 +81,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Visual concept is required." }, { status: 400 })
     }
 
+    let creativeStrategy = null
+    if (body.creativeStrategy && typeof body.creativeStrategy === "object") {
+      const { creativeStrategySchema } = await import("@/lib/ai-intelligence/creative-strategy")
+      const parsed = creativeStrategySchema.safeParse(body.creativeStrategy)
+      if (parsed.success) creativeStrategy = parsed.data
+    }
+
     const result = await generateSafetyGraphic({
       approvedHeadline: headline,
       approvedMessage: message,
@@ -87,10 +97,23 @@ export async function POST(request: Request) {
       visualNotes,
       style,
       agencyLogoUrl,
+      topic,
+      audience,
+      creativeStrategy,
     })
 
     if (!result.ok) {
       await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
+      const snap = phase3ConfigSnapshot()
+      recordGraphicQualityEvent({
+        at: new Date().toISOString(),
+        result: result.reason === "qa_failed" ? "failed_qa" : "failed_generation",
+        latencyMs: Date.now() - started,
+        failureReason: result.reason,
+        promptVersion: String(snap.promptVersion || ""),
+        imageVariant: String(snap.imageVariant || "autonomy"),
+        hadLogo: Boolean(agencyLogoUrl),
+      })
       return NextResponse.json(graphicStudioErrorPayload(result.reason, result.detail), { status: 503 })
     }
 
@@ -145,9 +168,10 @@ export async function POST(request: Request) {
         visual_concept: visualConcept,
         important_visual_details: importantVisualDetails,
         social_caption: caption || undefined,
+        creative_strategy: creativeStrategy || undefined,
       },
       source_records: sources,
-      image_prompt: [headline, message].join(" — "),
+      image_prompt: result.data.promptUsed || [headline, message].join(" — "),
       agency_logo_used: Boolean(agencyLogoUrl),
       generation_model: result.data.generationModel,
       generated_at: new Date().toISOString(),
@@ -156,6 +180,19 @@ export async function POST(request: Request) {
       image_url: imageUrl,
       social_caption: caption || "",
       feedback: null,
+    })
+
+    const snap = phase3ConfigSnapshot()
+    recordGraphicQualityEvent({
+      at: new Date().toISOString(),
+      result: "success",
+      firstAttemptQaPass:
+        result.data.qaPassed && !(result.data.correctionsAttempted && result.data.correctionsAttempted > 0),
+      correctionsAttempted: result.data.correctionsAttempted || 0,
+      latencyMs: Date.now() - started,
+      promptVersion: String(snap.promptVersion || ""),
+      imageVariant: String(snap.imageVariant || "autonomy"),
+      hadLogo: Boolean(agencyLogoUrl),
     })
 
     return NextResponse.json({
@@ -167,6 +204,12 @@ export async function POST(request: Request) {
     })
   } catch (err) {
     await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
+    recordGraphicQualityEvent({
+      at: new Date().toISOString(),
+      result: "abandoned",
+      latencyMs: Date.now() - started,
+      failureReason: "unhandled_exception",
+    })
     console.error("[api/pio/graphic-studio/generate]", err)
     return NextResponse.json({ error: "Failed to generate graphic." }, { status: 500 })
   }

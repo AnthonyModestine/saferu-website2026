@@ -132,6 +132,13 @@ export async function generatePostMessageFromInput(opts: {
     return { ok: false, reason: "missing_api_key" }
   }
 
+  const voiceBlock = input.voiceProfile?.trim()
+    ? `
+
+AGENCY VOICE MEMORY (style only — never invent facts or override safety/policy)
+${input.voiceProfile.trim().slice(0, 2500)}`
+    : ""
+
   const prompt = `Write the Facebook post using the approved script and verified placeholders.
 
 CLASSIFICATION
@@ -144,7 +151,7 @@ VERIFIED FACTS
 ${JSON.stringify(input.verifiedFacts, null, 2)}
 
 APPROVED SCRIPT (${script.label})
-${script.template}
+${script.template}${voiceBlock}
 
 Return the required JSON only.`
 

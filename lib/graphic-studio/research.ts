@@ -1,11 +1,17 @@
 import "server-only"
 
 import type { AiResult } from "@/lib/ai-result"
+import { creativeStrategistEnabled } from "@/lib/ai-config/phase3"
 import { parseModelJson } from "@/lib/parse-model-json"
 import { researchModel } from "@/lib/graphic-studio/constants"
 import { buildResearchPrompt } from "@/lib/graphic-studio/prompts"
+import { leanResearchPromptEnabled } from "@/lib/graphic-studio/lean-research-prompt"
+import { validateCreativeStrategyForImage } from "@/lib/ai-intelligence/creative-strategy-guard"
 import {
   SAFETY_RESEARCH_JSON_SCHEMA,
+  SAFETY_RESEARCH_LEAN_JSON_SCHEMA,
+  SAFETY_RESEARCH_LEAN_WITH_STRATEGY_JSON_SCHEMA,
+  SAFETY_RESEARCH_WITH_STRATEGY_JSON_SCHEMA,
   safetyResearchSchema,
   type SafetyResearchResult,
 } from "@/lib/graphic-studio/schemas"
@@ -27,6 +33,17 @@ function extractResponsesText(response: {
   return null
 }
 
+function researchJsonSchema(includeStrategist: boolean) {
+  if (leanResearchPromptEnabled()) {
+    return includeStrategist
+      ? SAFETY_RESEARCH_LEAN_WITH_STRATEGY_JSON_SCHEMA
+      : SAFETY_RESEARCH_LEAN_JSON_SCHEMA
+  }
+  return includeStrategist
+    ? SAFETY_RESEARCH_WITH_STRATEGY_JSON_SCHEMA
+    : SAFETY_RESEARCH_JSON_SCHEMA
+}
+
 function parseResearchJson(raw: string): AiResult<SafetyResearchResult> {
   let json: unknown
   try {
@@ -41,14 +58,33 @@ function parseResearchJson(raw: string): AiResult<SafetyResearchResult> {
   if (!result.success) {
     return { ok: false, reason: "invalid_json", detail: result.error.message }
   }
-  return { ok: true, data: result.data }
+
+  const data = result.data
+
+  // Drop stale/misleading creative strategies before they reach generation.
+  if (data.creative_strategy) {
+    const validated = validateCreativeStrategyForImage(data.creative_strategy)
+    if (!validated.ok) {
+      data.creative_strategy = undefined
+      if (data.creative_direction_needed) {
+        data.creative_direction_needed = false
+        data.creative_direction_reason = `Strategy rejected (${validated.reason}); using straightforward visual idea.`
+      }
+    } else {
+      // Selected concept replaces the original visual idea when valid.
+      data.visual_concept = validated.strategy.primaryVisualConcept
+    }
+  }
+
+  return { ok: true, data }
 }
 
 async function researchViaResponsesApi(
   prompt: string,
   openai: OpenAIClient,
   model: string,
-  useWebSearch: boolean
+  useWebSearch: boolean,
+  includeStrategist: boolean
 ): Promise<AiResult<SafetyResearchResult>> {
   const response = await openai.responses.create({
     model,
@@ -57,8 +93,10 @@ async function researchViaResponsesApi(
     text: {
       format: {
         type: "json_schema",
-        name: "safety_graphic_research",
-        schema: SAFETY_RESEARCH_JSON_SCHEMA,
+        name: includeStrategist
+          ? "safety_graphic_research_with_strategy"
+          : "safety_graphic_research",
+        schema: researchJsonSchema(includeStrategist),
         strict: true,
       },
     },
@@ -72,24 +110,28 @@ async function researchViaResponsesApi(
 async function researchViaStructuredChat(
   prompt: string,
   openai: OpenAIClient,
-  model: string
+  model: string,
+  includeStrategist: boolean
 ): Promise<AiResult<SafetyResearchResult>> {
   const completion = await openai.chat.completions.create({
     model,
-    temperature: 0.3,
+    temperature: includeStrategist ? 0.45 : 0.3,
     messages: [
       {
         role: "system",
-        content:
-          "You are a public-safety content editor. Turn the user's topic note into a short headline + on-graphic message (~25–45 words). Default message_format to paragraph — use bullets only when 2–3 distinct steps are truly needed. Every message MUST include what to do AND why it matters (consequence). Return only JSON.",
+        content: includeStrategist
+          ? "You are a public-safety content editor AND creative strategist. Produce short official-ready headline + message (what/why/what-to-do), then a genuine creative_strategy with 2–4 distinct concept options and one selected concept. Do not invent safety facts. Return only JSON."
+          : "You are a public-safety content editor. Turn the user's topic note into a short headline + on-graphic message (~25–45 words). Default message_format to paragraph — use bullets only when 2–3 distinct steps are truly needed. Every message MUST include what to do AND why it matters (consequence). Return only JSON.",
       },
       { role: "user", content: prompt },
     ],
     response_format: {
       type: "json_schema",
       json_schema: {
-        name: "safety_graphic_research",
-        schema: SAFETY_RESEARCH_JSON_SCHEMA,
+        name: includeStrategist
+          ? "safety_graphic_research_with_strategy"
+          : "safety_graphic_research",
+        schema: researchJsonSchema(includeStrategist),
         strict: true,
       },
     } as never,
@@ -123,12 +165,14 @@ export async function researchSafetyGraphic(opts: {
   const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) return { ok: false, reason: "missing_api_key" }
 
+  const includeStrategist = creativeStrategistEnabled()
   const prompt = buildResearchPrompt({
     category: opts.category,
     topic: opts.topic,
     audience: opts.audience,
     style: opts.style,
     visualNotes: opts.visualNotes?.trim() || "",
+    includeCreativeStrategist: includeStrategist,
   })
 
   const primary = researchModel()
@@ -138,23 +182,27 @@ export async function researchSafetyGraphic(opts: {
   }> = [
     {
       label: `${primary}+web_search`,
-      run: (openai) => researchViaResponsesApi(prompt, openai, primary, true),
+      run: (openai) =>
+        researchViaResponsesApi(prompt, openai, primary, true, includeStrategist),
     },
     {
       label: "gpt-4.1+web_search",
-      run: (openai) => researchViaResponsesApi(prompt, openai, "gpt-4.1", true),
+      run: (openai) =>
+        researchViaResponsesApi(prompt, openai, "gpt-4.1", true, includeStrategist),
     },
     {
       label: "gpt-4o-mini+web_search",
-      run: (openai) => researchViaResponsesApi(prompt, openai, "gpt-4o-mini", true),
+      run: (openai) =>
+        researchViaResponsesApi(prompt, openai, "gpt-4o-mini", true, includeStrategist),
     },
     {
       label: "gpt-4o-mini",
-      run: (openai) => researchViaStructuredChat(prompt, openai, "gpt-4o-mini"),
+      run: (openai) =>
+        researchViaStructuredChat(prompt, openai, "gpt-4o-mini", includeStrategist),
     },
     {
       label: "gpt-4.1",
-      run: (openai) => researchViaStructuredChat(prompt, openai, "gpt-4.1"),
+      run: (openai) => researchViaStructuredChat(prompt, openai, "gpt-4.1", includeStrategist),
     },
   ]
 

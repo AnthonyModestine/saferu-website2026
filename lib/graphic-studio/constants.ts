@@ -8,6 +8,8 @@ export const LOGO_MARGIN_RIGHT = 62
 export const LOGO_MARGIN_BOTTOM = 48
 
 export const MAX_GENERATION_ATTEMPTS = 3
+/** Bounded targeted image corrections after a failed inspection (internal; no extra customer credit). */
+export const MAX_CORRECTION_ATTEMPTS = 2
 
 export function researchModel(): string {
   return process.env.OPENAI_GRAPHIC_RESEARCH_MODEL?.trim() || "gpt-4.1"
@@ -15,6 +17,7 @@ export function researchModel(): string {
 
 export function imageModel(): string {
   // Sunburst: best quality + precise edits for polished public-safety graphics.
+  // Experimental variants: resolveImageModelAndQuality() in lib/ai-config/phase2.ts
   return process.env.OPENAI_GRAPHIC_IMAGE_MODEL?.trim() || "gpt-image-2.5-sunburst"
 }
 

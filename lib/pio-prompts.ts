@@ -186,6 +186,33 @@ Hard safeguards:
 - Put missing publication-critical information in detailsToVerify. Use needs_human_review when safe copy requires a human decision.
 `
 
+export function pressWritingIntelligenceAddendum(): string {
+  // Static imports avoided at module top to keep client bundles lean; resolve via
+  // named ESM imports when available. Keep function-shaped exports — never assume
+  // default export bags.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const phase3 = require("@/lib/ai-config/phase3") as typeof import("@/lib/ai-config/phase3")
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const phase2 = require("@/lib/ai-config/phase2") as typeof import("@/lib/ai-config/phase2")
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const writing = require("@/lib/ai-intelligence/pio-writing") as typeof import("@/lib/ai-intelligence/pio-writing")
+  const professionalWritingEnabled = phase3.professionalWritingEnabled
+  const pressCommunicationPlanEnabled = phase2.pressCommunicationPlanEnabled
+  if (typeof professionalWritingEnabled !== "function" || typeof pressCommunicationPlanEnabled !== "function") {
+    throw new Error(
+      "pressWritingIntelligenceAddendum: phase2/phase3 flag helpers missing — check import interop"
+    )
+  }
+  let add = ""
+  if (pressCommunicationPlanEnabled() || professionalWritingEnabled()) {
+    add += `\n${writing.COMMUNICATION_INTENT_PLAN_INSTRUCTIONS}`
+  }
+  if (professionalWritingEnabled()) {
+    add += `\n${writing.PROFESSIONAL_WRITING_STANDARDS}`
+  }
+  return add
+}
+
 export const PRESS_RELEASE_DRAFT_PROMPT = `You are SaferU's structured press-release writer.
 ${PRODUCTION_SAFEGUARDS}
 Write a factual draft for a supported public-safety release type, including incident/update, arrest/charging, missing/endangered person, traffic, fire/EMS, emergency notice, public assistance, event/service, and closure/resolution releases. For unusual types, preserve the supplied type without inventing a template.
@@ -199,6 +226,16 @@ Use the normalized facts as authority and the structured press-release draft onl
 export const ASSISTANCE_DRAFT_PROMPT = `You are SaferU's structured public-assistance writer.
 ${PRODUCTION_SAFEGUARDS}
 Create a request only when requested and supported by facts. It may request witnesses, information, or relevant doorbell/security/business video. Include only the supplied area, timeframe, descriptors, what to look for, case number, and submission methods. Never imply access to private camera feeds. Include a supported safety line; if no safety instruction is supplied, a generic call-911-for-emergencies line is permitted without implying facts about a suspect. Return only JSON matching the strict schema.`
+
+export function pressEditorialIntelligenceAddendum(): string {
+  const { professionalEditorialEnabled } =
+    require("@/lib/ai-config/phase3") as typeof import("@/lib/ai-config/phase3")
+  const writing = require("@/lib/ai-intelligence/pio-writing") as typeof import("@/lib/ai-intelligence/pio-writing")
+  if (professionalEditorialEnabled()) {
+    return `\n${writing.PROFESSIONAL_EDITORIAL_REVIEW_ADDENDUM}`
+  }
+  return ""
+}
 
 export const PIO_QUALITY_GATE_PROMPT = `You are SaferU's final structured PIO quality gate.
 ${PRODUCTION_SAFEGUARDS}

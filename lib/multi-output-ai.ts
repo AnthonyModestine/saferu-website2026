@@ -16,6 +16,8 @@ import {
 import {
   PIO_QUALITY_GATE_PROMPT,
   SUPPLEMENTARY_DRAFT_PROMPT,
+  pressEditorialIntelligenceAddendum,
+  pressWritingIntelligenceAddendum,
 } from "./pio-prompts"
 import {
   QUALITY_GATE_RESPONSE_FORMAT,
@@ -27,6 +29,7 @@ import {
   type QualityGateResult,
   type SupplementaryDraft,
 } from "./pio-structured-schemas"
+import { experimentalPressDraftModel } from "./ai-config/phase2"
 import { runPioStructuredCall } from "./pio-structured-call"
 
 export interface MultiOutputResult {
@@ -342,11 +345,12 @@ export async function generateMultiOutput(
 
   const { default: OpenAI } = await import("openai")
   const openai = new OpenAI({ apiKey })
+  const draftModel = experimentalPressDraftModel() || undefined
   let supplementary = emptySupplementary()
   if (selection.facebook || selection.twitter || selection.talkingPoints) {
     const result = await runPioStructuredCall(
       openai,
-      SUPPLEMENTARY_DRAFT_PROMPT,
+      SUPPLEMENTARY_DRAFT_PROMPT + pressWritingIntelligenceAddendum(),
       withVoice(
         withRevisionPayload(
           {
@@ -364,7 +368,8 @@ export async function generateMultiOutput(
       SUPPLEMENTARY_RESPONSE_FORMAT,
       supplementaryDraftSchema,
       2400,
-      0.1
+      0.1,
+      draftModel ? { model: draftModel } : undefined
     )
     if (!result.ok) return result
     tokensUsed += result.tokensUsed ?? 0
@@ -406,7 +411,7 @@ export async function generateMultiOutput(
 
   const gateResult = await runPioStructuredCall(
     openai,
-    PIO_QUALITY_GATE_PROMPT,
+    PIO_QUALITY_GATE_PROMPT + pressEditorialIntelligenceAddendum(),
     withRevisionPayload(
       {
         normalized,
@@ -425,7 +430,8 @@ export async function generateMultiOutput(
     QUALITY_GATE_RESPONSE_FORMAT,
     qualityGateSchema,
     6000,
-    0
+    0,
+    { useExperimentalGateModel: true }
   )
   if (!gateResult.ok) return gateResult
   tokensUsed += gateResult.tokensUsed ?? 0

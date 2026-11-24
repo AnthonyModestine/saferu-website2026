@@ -37,6 +37,9 @@ type PreparedMessage = {
   visualConcept: string
   importantVisualDetails: string[]
   sourceRecords: Array<{ organization: string; url: string; claim_supported: string }>
+  /** Phase 3 AI creative strategist output when enabled — opaque to UI. */
+  creativeStrategy?: Record<string, unknown> | null
+  researchConfidence?: string | null
 }
 
 export default function SafetyTipGraphicPage() {
@@ -116,6 +119,12 @@ export default function SafetyTipGraphicPage() {
           ? data.importantVisualDetails.map(String)
           : [],
         sourceRecords: Array.isArray(data.sourceRecords) ? data.sourceRecords : [],
+        creativeStrategy:
+          data.creativeStrategy && typeof data.creativeStrategy === "object"
+            ? (data.creativeStrategy as Record<string, unknown>)
+            : null,
+        researchConfidence:
+          typeof data.researchConfidence === "string" ? data.researchConfidence : null,
       }
       setHeadline(next.headline)
       setMessage(next.message)
@@ -148,6 +157,7 @@ export default function SafetyTipGraphicPage() {
           importantVisualDetails: prepared.importantVisualDetails,
           visualNotes,
           sourceRecords: prepared.sourceRecords,
+          creativeStrategy: prepared.creativeStrategy || null,
           ...agencyPayload,
         }),
       })
@@ -248,7 +258,12 @@ export default function SafetyTipGraphicPage() {
     setRevising(true)
     setError(null)
     try {
-      const compressed = await compressGraphicDataUrlForUpload(preview)
+      // Prefer full-res PNG when under body limit — avoid lossy JPEG for revisions.
+      const compressed = await compressGraphicDataUrlForUpload(preview, {
+        maxWidth: 2048,
+        quality: 0.92,
+        preferPngMaxChars: 3_500_000,
+      })
       const res = await fetch("/api/pio/graphic-studio/revise", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

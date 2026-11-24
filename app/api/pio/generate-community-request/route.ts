@@ -15,6 +15,7 @@ import {
   settleAiTokens,
 } from "@/lib/pio-token-gate"
 import { TOKEN_ESTIMATES } from "@/lib/openai-usage"
+import { getAgencyVoiceBrief } from "@/lib/agency-voice-memory"
 
 const MAX = 1000
 
@@ -89,13 +90,19 @@ export async function POST(request: Request) {
       tipLine: body.tipLine != null ? cap(body.tipLine, 100) : undefined,
     })
 
-    const result = await generateMultiOutput(userPayload, {
-      pressRelease: false,
-      facebook: false,
-      twitter: false,
-      talkingPoints: false,
-      videoRequest: true,
-    })
+    const voiceBrief = await getAgencyVoiceBrief(session.memberId)
+    const result = await generateMultiOutput(
+      userPayload,
+      {
+        pressRelease: false,
+        facebook: false,
+        twitter: false,
+        talkingPoints: false,
+        videoRequest: true,
+      },
+      null,
+      voiceBrief || undefined
+    )
     if (!result.ok) {
       await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
       console.error("[generate-community-request] AI failed:", result.reason, result.detail ?? "")

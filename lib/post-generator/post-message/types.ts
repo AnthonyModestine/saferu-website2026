@@ -77,6 +77,8 @@ export type PostMessageInput = {
   agencyName: string
   agencyType?: string
   serviceArea?: string
+  /** Learned agency voice preferences — never overrides facts or safety policy. */
+  voiceProfile?: string
   title: string
   category?: string
   sourceLabel?: string

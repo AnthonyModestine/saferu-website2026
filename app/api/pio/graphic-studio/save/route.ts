@@ -3,6 +3,7 @@ import { requireGraphicStudioAccess } from "@/lib/graphic-studio/api-auth"
 import { storeGraphicStudioImageFromDataUrl } from "@/lib/graphic-studio/store-image"
 import { markGraphicSaved } from "@/lib/graphic-studio-store"
 import { recordVoiceSignal } from "@/lib/agency-voice-memory"
+import { recordGraphicQualityEvent } from "@/lib/graphic-studio/quality-metrics"
 
 export const maxDuration = 60
 
@@ -48,6 +49,12 @@ export async function POST(request: Request) {
         meta: "graphic_studio",
       })
     }
+
+    recordGraphicQualityEvent({
+      at: new Date().toISOString(),
+      result: "success",
+      downloaded: true,
+    })
 
     return NextResponse.json({
       ok: true,

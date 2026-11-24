@@ -158,6 +158,7 @@ export async function POST(request: Request) {
       eventType: String(body.eventType || ""),
     })
 
+    const voiceBrief = await getAgencyVoiceBrief(session.memberId)
     const result = await customizeCuratedMessage(
       message,
       mode,
@@ -169,6 +170,7 @@ export async function POST(request: Request) {
       {
         agencyType,
         verifiedFacts,
+        voiceProfile: voiceBrief || undefined,
         holidayEmojiFocus: holiday?.emojiFocus,
       }
     )

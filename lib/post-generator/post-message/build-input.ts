@@ -14,17 +14,20 @@ export function buildPostMessageInputFromOpportunity(
   opportunity: RankedExternalOpportunity,
   context: Pick<
     PipelineAgencyContext,
-    "agencyName" | "agencyType" | "city" | "county" | "state"
+    "agencyName" | "agencyType" | "agencyVoiceProfile" | "city" | "county" | "state"
   >
 ): PostMessageInput {
   const serviceArea =
     [context.city, context.state].filter(Boolean).join(", ") ||
     [context.county, context.state].filter(Boolean).join(", ")
 
+  const voiceProfile = context.agencyVoiceProfile?.trim() || undefined
+
   return {
     agencyName: context.agencyName,
     agencyType: context.agencyType,
     serviceArea,
+    voiceProfile,
     title: opportunity.title,
     category: opportunity.category,
     sourceLabel: opportunity.sourceLabel,
@@ -52,6 +55,7 @@ export function buildPostMessageInputFromRecommendation(
     serviceArea:
       [context.city, context.state].filter(Boolean).join(", ") ||
       [context.county, context.state].filter(Boolean).join(", "),
+    voiceProfile: context.agencyVoiceProfile?.trim() || undefined,
     title: recommendation.title,
     category: recommendation.category,
     sourceLabel: "Current Local Opportunity",

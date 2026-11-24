@@ -21,6 +21,8 @@ export interface PressReleasePayload {
   arrests: { name: string; details: string }[]
   propertyDamage?: string
   tipLine?: string
+  /** When true, tipLine may be described as anonymous. Default false — a phone number alone is not anonymity. */
+  tipLineIsAnonymous?: boolean
   detectiveContact?: string
   resolutionText?: string
   boilerplate?: string
@@ -91,7 +93,14 @@ export type Call1Facts = {
   victims: PersonFact[]
   arrests: ArrestFact[]
   resolution: string | null
+  /** Generic tip contact — do NOT imply anonymity from this field alone. */
+  tip_line: string | null
+  /**
+   * Only populated when anonymity is explicitly authorized.
+   * Kept for backward compatibility with prompts that reference anonymous_tip_line.
+   */
   anonymous_tip_line: string | null
+  tip_line_is_anonymous: boolean
   detective_contact: string | null
   online_tip_url: string | null
   footage_video_request: boolean
@@ -119,6 +128,14 @@ function orNull(value: unknown): string | null {
   return trimmed
 }
 
+function tipLineIsExplicitlyAnonymous(p: PressReleasePayload): boolean {
+  if (p.tipLineIsAnonymous === true) return true
+  const tip = orNull(p.tipLine)
+  if (!tip) return false
+  // Only treat as anonymous when the supplied tip string itself asserts anonymity.
+  return /\banonymous\b/i.test(tip)
+}
+
 function buildFootageSubmissionMethods(p: PressReleasePayload): string[] {
   const methods: string[] = []
   const tip = orNull(p.tipLine)
@@ -128,7 +145,11 @@ function buildFootageSubmissionMethods(p: PressReleasePayload): string[] {
     orNull(p.contactName) && orNull(p.contactPhone)
       ? `${p.contactName}, ${p.contactPhone}`
       : null
-  if (tip) methods.push(`Anonymous tip line: ${tip}`)
+  if (tip) {
+    methods.push(
+      tipLineIsExplicitlyAnonymous(p) ? `Anonymous tip line: ${tip}` : `Tip line: ${tip}`
+    )
+  }
   if (detective) methods.push(`Detective contact: ${detective}`)
   if (online) methods.push(`Online tips: ${online}`)
   if (media) methods.push(`Media contact: ${media}`)
@@ -169,7 +190,9 @@ export function buildCall1Facts(p: PressReleasePayload): Call1Facts {
       .map((a) => ({ name: orNull(a.name), details: orNull(a.details) }))
       .filter((a) => a.name || a.details),
     resolution: orNull(p.resolutionText),
-    anonymous_tip_line: orNull(p.tipLine),
+    tip_line: orNull(p.tipLine),
+    anonymous_tip_line: tipLineIsExplicitlyAnonymous(p) ? orNull(p.tipLine) : null,
+    tip_line_is_anonymous: tipLineIsExplicitlyAnonymous(p),
     detective_contact: orNull(p.detectiveContact),
     online_tip_url: orNull(p.onlineTipsUrl),
     footage_video_request: wantsVideo,
@@ -265,7 +288,10 @@ export function normalizePressReleasePayload(raw: Record<string, unknown>): Pres
         })
       : [],
     propertyDamage: text(pick(raw.propertyDamage, valueAt(facts, "propertyDamage"), valueAt(facts, "property_damage")), 1000),
-    tipLine: text(pick(raw.tipLine, valueAt(facts, "tipLine"), valueAt(facts, "anonymous_tip_line")), 100),
+    tipLine: text(pick(raw.tipLine, valueAt(facts, "tipLine"), valueAt(facts, "tip_line")), 100),
+    tipLineIsAnonymous: Boolean(
+      pick(raw.tipLineIsAnonymous, valueAt(facts, "tipLineIsAnonymous"), valueAt(facts, "tip_line_is_anonymous"))
+    ),
     detectiveContact: text(pick(raw.detectiveContact, valueAt(facts, "detectiveContact"), valueAt(facts, "detective_contact")), 300),
     resolutionText: text(pick(raw.resolutionText, valueAt(facts, "resolution")), 1000),
     boilerplate: text(pick(raw.boilerplate, valueAt(agency, "boilerplate")), 2000),
@@ -424,7 +450,8 @@ export function buildCall3UserPayload(input: {
   const submissionMethods = input.submissionMethods?.filter(Boolean) ?? []
   const tip = orNull(input.tipLine)
   if (tip && !submissionMethods.some((m) => m.includes(tip))) {
-    submissionMethods.push(`Anonymous tip line: ${tip}`)
+    const anonymous = /\banonymous\b/i.test(tip)
+    submissionMethods.push(anonymous ? `Anonymous tip line: ${tip}` : `Tip line: ${tip}`)
   }
 
   const summaryParts = [orNull(input.incidentSummary), orNull(input.suspectDescriptions)].filter(
@@ -443,7 +470,8 @@ export function buildCall3UserPayload(input: {
     what_to_look_for: orNull(input.whatToLookFor),
     submission_methods: submissionMethods,
     case_number: orNull(input.caseNumber),
-    anonymous_tip_line: tip,
+    tip_line: tip,
+    anonymous_tip_line: tip && /\banonymous\b/i.test(tip) ? tip : null,
   }
 }
 

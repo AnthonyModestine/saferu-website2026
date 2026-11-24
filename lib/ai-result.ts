@@ -4,6 +4,7 @@ export type AiFailureReason =
   | "empty_response"
   | "invalid_json"
   | "empty_input"
+  | "qa_failed"
 
 export type AiResult<T> =
   | { ok: true; data: T; tokensUsed?: number }
@@ -21,6 +22,9 @@ export function aiErrorMessage(reason: AiFailureReason): string {
   }
   if (reason === "invalid_json" || reason === "empty_response") {
     return "Drafting returned an incomplete response. Please try again."
+  }
+  if (reason === "qa_failed") {
+    return "Quality review could not approve this draft. Please try again."
   }
   return "Drafting is temporarily unavailable. Please try again in a few minutes."
 }
@@ -52,6 +56,12 @@ export function graphicStudioErrorMessage(reason: AiFailureReason, detail?: stri
   }
   if (reason === "invalid_json" || reason === "empty_response") {
     return "We could not finish this graphic brief. Please try again."
+  }
+  if (reason === "qa_failed") {
+    return (
+      detail?.trim() ||
+      "This graphic did not pass SaferU's safety and quality inspection. Please try again or adjust the message."
+    )
   }
   return "Graphic Studio is temporarily unavailable. Please try again in a few minutes."
 }

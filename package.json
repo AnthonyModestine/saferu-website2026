@@ -7,7 +7,20 @@
     "dev": "next dev",
     "dev:host": "next dev --hostname 0.0.0.0",
     "lint": "eslint .",
-    "start": "next start"
+    "start": "next start",
+    "test:ai-phase2": "npx --yes tsx --test lib/graphic-studio/inspection-types.test.ts lib/graphic-studio/creative-brief.test.ts lib/graphic-studio/qa-policy.test.ts lib/ai-config/phase2.test.ts lib/post-generator/post-message/voice-memory.test.ts",
+    "test:ai-phase3": "npx --yes tsx --test lib/ai-intelligence/creative-strategy.test.ts lib/graphic-studio/qa-contradiction.test.ts scripts/ai-eval/lib/budget.test.ts",
+    "test:ai-phase5": "npx --yes tsx --test lib/graphic-studio/text-fidelity.test.ts lib/graphic-studio/execution-strategy.test.ts lib/graphic-studio/qa-contradiction.test.ts scripts/ai-eval/lib/experiment-id.test.ts",
+    "test:ai-phase6": "npx --yes tsx --test lib/graphic-studio/text-fidelity.test.ts lib/graphic-studio/execution-strategy.test.ts lib/graphic-studio/qa-contradiction.test.ts lib/graphic-studio/concise-image-prompt.test.ts lib/graphic-studio/research-integrity.test.ts lib/graphic-studio/copy-placement-advisory.test.ts scripts/ai-eval/lib/experiment-id.test.ts lib/ai-config/experiment-profiles.test.ts lib/pio-claim-grounding.test.ts lib/ai-intelligence/conceptual-strategy-instructions.test.ts lib/ai-intelligence/creative-strategy.test.ts",
+    "test:ai-final": "npx --yes tsx --test lib/graphic-studio/lean-image-prompt.test.ts lib/ai-intelligence/creative-strategy.test.ts lib/ai-intelligence/conceptual-strategy-instructions.test.ts lib/ai-config/experiment-profiles.test.ts lib/graphic-studio/copy-placement-advisory.test.ts lib/pio-claim-grounding.test.ts",
+    "test:ai-production": "npx --yes tsx --test lib/ai-config/production.test.ts lib/graphic-studio/quality-metrics.test.ts lib/graphic-studio/lean-image-prompt.test.ts lib/graphic-studio/qa-contradiction.test.ts lib/graphic-studio/research-integrity.test.ts lib/pio-claim-grounding.test.ts lib/ai-intelligence/concept-differentiation.test.ts lib/post-generator/post-message/voice-memory.test.ts lib/ai-config/experiment-profiles.test.ts",
+    "dump:lean-prompts": "npx --yes tsx scripts/ai-eval/dump-lean-prompts.ts",
+    "eval:phase5-calibration": "npx --yes tsx scripts/ai-eval/build-calibration-set.ts",
+    "eval:phase5-hybrid-poc": "npx --yes tsx --require ./scripts/ai-eval/shim-server-only.cjs scripts/ai-eval/hybrid-poc.ts",
+    "eval:phase5-blind-zip": "npx --yes tsx scripts/ai-eval/build-blind-review-zip.ts",
+    "eval:ai-mock": "npx --yes tsx scripts/ai-eval/run-mock.ts",
+    "eval:ai-paid": "npx --yes tsx scripts/ai-eval/run-paid.ts",
+    "eval:ai-phase4": "node --require ./scripts/ai-eval/shim-server-only.cjs ./node_modules/tsx/dist/cli.mjs scripts/ai-eval/run-phase4.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

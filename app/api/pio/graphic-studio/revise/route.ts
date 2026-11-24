@@ -13,6 +13,7 @@ import {
   settleAiTokens,
 } from "@/lib/pio-token-gate"
 import { TOKEN_ESTIMATES } from "@/lib/openai-usage"
+import { recordGraphicQualityEvent } from "@/lib/graphic-studio/quality-metrics"
 
 export const maxDuration = 300
 
@@ -69,10 +70,22 @@ export async function POST(request: Request) {
 
     if (!result.ok) {
       await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)
+      recordGraphicQualityEvent({
+        at: new Date().toISOString(),
+        result: "failed_generation",
+        revision: true,
+        failureReason: result.reason,
+      })
       return NextResponse.json(graphicStudioErrorPayload(result.reason, result.detail), {
         status: 503,
       })
     }
+
+    recordGraphicQualityEvent({
+      at: new Date().toISOString(),
+      result: "success",
+      revision: true,
+    })
 
     await settleAiTokens(
       session.email,
@@ -114,6 +127,9 @@ export async function POST(request: Request) {
     return NextResponse.json({
       imageDataUrl: result.data.imageDataUrl,
       generationModel: result.data.generationModel,
+      qaPassed: result.data.qaPassed,
+      qaIssues: result.data.qaIssues,
+      inspectionOutcome: result.data.inspectionOutcome,
     })
   } catch (err) {
     await abandonAiTokens(session.email, reservation.reservationId, reservation.reserved)

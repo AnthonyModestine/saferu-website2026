@@ -4,7 +4,10 @@
 
 import { INCIDENT_MIN, INCIDENT_MAX } from "./press-release-length"
 import type { AiResult } from "./ai-result"
-import { PRESS_RELEASE_DRAFT_PROMPT } from "./pio-prompts"
+import {
+  PRESS_RELEASE_DRAFT_PROMPT,
+  pressWritingIntelligenceAddendum,
+} from "./pio-prompts"
 import {
   buildCall1UserPayload,
   type PressReleasePayload,
@@ -14,6 +17,7 @@ import {
   pressReleaseDraftSchema,
   type PressReleaseDraft,
 } from "./pio-structured-schemas"
+import { experimentalPressDraftModel } from "./ai-config/phase2"
 import { runPioStructuredCall } from "./pio-structured-call"
 
 export type { PressReleasePayload } from "./pio-normalized-facts"
@@ -78,14 +82,16 @@ export async function generateStructuredPressReleaseDraft(
       ...(voice ? { agencyVoiceMemory: voice.slice(0, 2500) } : {}),
     }
 
+    const draftModel = experimentalPressDraftModel() || undefined
     return runPioStructuredCall(
       openai,
-      PRESS_RELEASE_DRAFT_PROMPT,
+      PRESS_RELEASE_DRAFT_PROMPT + pressWritingIntelligenceAddendum(),
       callPayload,
       PRESS_RELEASE_DRAFT_RESPONSE_FORMAT,
       pressReleaseDraftSchema,
       4000,
-      0.1
+      0.1,
+      draftModel ? { model: draftModel } : undefined
     )
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err)
